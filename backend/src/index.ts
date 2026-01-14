@@ -1,7 +1,7 @@
 import "dotenv/config";
 import http from "http";
 import { createApp } from "./app";
-
+import { logger } from "./shared/utils/logger";
 const PORT = Number(process.env.APP_PORT) || 3001;
 
 async function startServer() {
@@ -10,27 +10,27 @@ async function startServer() {
   const server = http.createServer(app);
 
   server.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    logger.info(`🚀 Server running on http://localhost:${PORT}`);
   });
 
   const shutdown = async (signal: string) => {
     server.close(async (err) => {
       if (err) {
-        console.error("❌ Error during server close", err);
+        logger.error("❌ Error during server close" + err.message);
         process.exit(1);
       }
 
       try {
-        console.log("✅ Cleanup complete. Exiting.");
+        logger.info("✅ Cleanup complete. Exiting.");
         process.exit(0);
       } catch (e) {
-        console.error("❌ Cleanup failed", e);
+        logger.error("❌ Cleanup failed", e);
         process.exit(1);
       }
     });
 
     setTimeout(() => {
-      console.error("⏰ Force shutdown");
+      logger.error("⏰ Force shutdown");
       process.exit(1);
     }, 10_000).unref();
   };
@@ -40,6 +40,6 @@ async function startServer() {
 }
 
 startServer().catch((err) => {
-  console.error("❌ Failed to start server", err);
+  logger.error("❌ Failed to start server", err);
   process.exit(1);
 });
