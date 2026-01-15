@@ -18,6 +18,7 @@ class User extends Model<InferAttributes<User>, InferCreationAttributes<User>> {
   declare fullName: string;
   declare email: string;
   declare password: string;
+  declare avatar: string;
   declare signupMethod: SignupMethod;
   declare refreshToken: CreationOptional<string | null>;
 
@@ -49,6 +50,11 @@ User.init(
     password: {
       type: DataTypes.TEXT,
       allowNull: false,
+    },
+
+    avatar: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
 
     signupMethod: {

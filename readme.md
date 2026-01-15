@@ -20,7 +20,16 @@ so there are certain aspects or patterns i have to follow ? the end goal ?
 - Database is the most cruical part while building a product , and i often suffer from the "Over-engineering disease" while building it everytime , the ideal thing to do here is make sure the requirements are clear here and just build it !
 - you always have the option to change the schema once
 
-So this is the initial plan i came up with (ofcourse there's always a room for improvment )but we'll continue building and will fix stuffs later !!! 
+So this is the initial plan i came up with (ofcourse there's always a room for improvment )but we'll continue building and will fix stuffs later !!!
 ![DB Schema](./docs/db-schema.png)
 
+### SETTING UP PAYMENTS
 
+- i'll be using stripe for this : and ofcourse it's not registered as a company , so everything will be done in test mode
+- why i am doing this ? TOLD YAA Buddy "i am a product-first full stack engineer" and if i am not , i'll be one :)
+- and to learn stripe and how payments are handled in industries is important :)
+
+### Now it's time for User registration flow :
+
+- user can register either by [email/password , google oauth , microsoft oauth];
+- now i have to make sure the flow is consistent will start by implementing email/password flow :)
