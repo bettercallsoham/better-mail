@@ -7,6 +7,15 @@ const router = Router();
 
 router.get("/user", verifyAccessToken(), authController.getUserDetails);
 
+router.patch(
+  "/email/updateProfile",
+  authValidator.validateUpdateAccount,
+  verifyAccessToken(),
+  authController.updateProfileWithEmail
+);
+
+// Email-login
+
 router.post(
   "/email/signup",
   authValidator.validateSignupUser,
@@ -18,11 +27,12 @@ router.post(
   authValidator.validateLoginUser,
   authController.loginWithEmail
 );
-router.patch(
-  "/email/updateProfile",
-  authValidator.validateUpdateAccount,
-  verifyAccessToken(),
-  authController.updateProfileWithEmail
-);
+
+// GOOGLE OAUTH LOGIN
+
+router.get("/google", authController.googleLogin);
+router.get("/google/callback", authController.googleCallback);
+
+// MICROSOFT OAUTH LOGIN
 
 export default router;

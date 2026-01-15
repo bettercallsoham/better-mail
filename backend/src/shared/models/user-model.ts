@@ -12,14 +12,15 @@ export enum SignupMethod {
   MICROSOFT = "microsoft",
   EMAIL = "email",
 }
-
 class User extends Model<InferAttributes<User>, InferCreationAttributes<User>> {
   declare id: CreationOptional<string>;
   declare fullName: string;
   declare email: string;
-  declare password: string;
+  declare password: string | null;
   declare avatar: string;
   declare signupMethod: SignupMethod;
+  declare googleId: string | null;
+  declare microsoftId: string | null;
   declare refreshToken: CreationOptional<string | null>;
 
   declare created_at: CreationOptional<Date>;
@@ -49,7 +50,7 @@ User.init(
 
     password: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
     },
 
     avatar: {
@@ -67,6 +68,16 @@ User.init(
     },
 
     refreshToken: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
+    googleId: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
+    microsoftId: {
       type: DataTypes.TEXT,
       allowNull: true,
     },
@@ -109,6 +120,5 @@ User.init(
     ],
   }
 );
-
 
 export { User };
