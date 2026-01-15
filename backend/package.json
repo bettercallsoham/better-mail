@@ -20,7 +20,8 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.9.1",
     "pg": "^8.17.0",
-    "sequelize": "^6.37.7"
+    "sequelize": "^6.37.7",
+    "stripe": "^20.1.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

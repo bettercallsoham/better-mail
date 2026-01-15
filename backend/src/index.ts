@@ -25,8 +25,9 @@ async function startServer() {
       try {
         logger.info("✅ Cleanup complete. Exiting.");
         process.exit(0);
-      } catch (e) {
-        logger.error("❌ Cleanup failed", e);
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        logger.error("❌ Cleanup failed" + errorMessage);
         process.exit(1);
       }
     });
