@@ -1,5 +1,15 @@
-import { v2 as cloudinary } from "cloudinary";
+// import { v2 as cloudinary } from "cloudinary";
+// import "dotenv/config";
 
-cloudinary.config();
+// cloudinary.config({
+//   cloud_name: process.env.CLOUDINARY_CLOUDNAME!,
+// });
 
-export default cloudinary;
+// const main = async () => {
+//   const res = await cloudinary.api.ping();p
+//   console.log(res);
+// };
+
+// main();
+
+// export default cloudinary;

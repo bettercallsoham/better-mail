@@ -61,5 +61,4 @@ Plan.init(
 );
 
 
-Plan.sync({alter:true});
 export { Plan };

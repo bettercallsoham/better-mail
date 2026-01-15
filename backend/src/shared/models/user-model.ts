@@ -8,9 +8,9 @@ import {
 import { sequelize } from "../config/db";
 
 export enum SignupMethod {
-  GMAIL = "gmail",
-  OUTLOOK = "outlook",
-  SMTP = "smtp",
+  GOOGLE = "google",
+  MICROSOFT = "microsoft",
+  EMAIL = "email",
 }
 
 class User extends Model<InferAttributes<User>, InferCreationAttributes<User>> {
@@ -59,9 +59,9 @@ User.init(
 
     signupMethod: {
       type: DataTypes.ENUM(
-        SignupMethod.GMAIL,
-        SignupMethod.OUTLOOK,
-        SignupMethod.SMTP
+        SignupMethod.EMAIL,
+        SignupMethod.GOOGLE,
+        SignupMethod.MICROSOFT
       ),
       allowNull: false,
     },
@@ -109,6 +109,6 @@ User.init(
     ],
   }
 );
-User.sync({ alter: true });
+
 
 export { User };

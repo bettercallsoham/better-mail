@@ -89,6 +89,5 @@ Subscription.init(
   }
 );
 
-Subscription.sync({ alter: true });
 
 export { Subscription };

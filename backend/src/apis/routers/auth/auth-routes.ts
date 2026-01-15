@@ -1,12 +1,28 @@
 import { Router } from "express";
 import { verifyAccessToken } from "../../middleware/auth";
-import * as authValidator from "../../validators/auth-validator" ;
+import * as authController from "../../controllers/auth-controller";
+import * as authValidator from "../../validators/auth-validator";
 
 const router = Router();
 
+router.get("/user", verifyAccessToken(), authController.getUserDetails);
 
-router.get('/signup/email' , authValidator.validateSignupUser, )
-router.get('/login/email' , authValidator.validateLoginUser, )
-router.get('/update/email' , authValidator.validateUpdateAccount , )
+router.post(
+  "/email/signup",
+  authValidator.validateSignupUser,
+  authController.signUpWithEmail
+);
+
+router.post(
+  "/email/login",
+  authValidator.validateLoginUser,
+  authController.loginWithEmail
+);
+router.patch(
+  "/email/updateProfile",
+  authValidator.validateUpdateAccount,
+  verifyAccessToken(),
+  authController.updateProfileWithEmail
+);
 
 export default router;

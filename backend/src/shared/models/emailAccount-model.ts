@@ -92,6 +92,5 @@ EmailAccount.init(
     ],
   }
 );
-EmailAccount.sync({alter:true});
 
 export { EmailAccount };

@@ -46,7 +46,7 @@ export const validateSignupUser = [
 
 export const validateLoginUser = [
   body("email")
-    .exists({ checkFalsy: true })
+    .exists()
     .withMessage("Email is required")
     .isEmail()
     .withMessage("Invalid email address")
@@ -54,10 +54,12 @@ export const validateLoginUser = [
 
   body("password")
     .if(body("auth_provider").equals("email"))
-    .exists({ checkFalsy: true })
+    .exists()
     .withMessage("Password is required for email auth")
     .isLength({ min: 8, max: 100 })
     .withMessage("Password must be between 8 and 100 characters"),
+
+  handleValidationErrors,
 ];
 
 export const validateUpdateAccount = [
