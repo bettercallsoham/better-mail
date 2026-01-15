@@ -2,9 +2,11 @@ import "dotenv/config";
 import http from "http";
 import { createApp } from "./app";
 import { logger } from "./shared/utils/logger";
+import { connectDb } from "./shared/config/db";
 const PORT = Number(process.env.APP_PORT) || 3001;
 
 async function startServer() {
+  await connectDb();
   const app = createApp();
 
   const server = http.createServer(app);

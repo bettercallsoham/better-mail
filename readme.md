@@ -14,3 +14,13 @@ so there are certain aspects or patterns i have to follow ? the end goal ?
 - Consistency , availability , minimum down time , error/bug-free ( lol )
 - then comes monitoring ,and obserability ( i think sentry will handle this for me ).
 - then comes the scalability ( as i am not expecting a huge traffic now ) , i still have to follow some backend principles so that users get the right feel about the BETTERMAIL !!!!
+
+## Day 2 : (Jan 16 ) CREATION OF THE DATABASE
+
+- Database is the most cruical part while building a product , and i often suffer from the "Over-engineering disease" while building it everytime , the ideal thing to do here is make sure the requirements are clear here and just build it !
+- you always have the option to change the schema once
+
+So this is the initial plan i came up with (ofcourse there's always a room for improvment )but we'll continue building and will fix stuffs later !!! 
+![DB Schema](./docs/db-schema.png)
+
+
