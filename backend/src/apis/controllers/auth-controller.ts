@@ -3,11 +3,10 @@ import jwt from "jsonwebtoken";
 const { JWT_SECRET } = process.env;
 import bcrypt from "bcrypt";
 import { Request, Response } from "express";
-import { SignupMethod, User } from "../../shared/models";
+import { EmailAccount, SignupMethod, User } from "../../shared/models";
 import axios from "axios";
-import { OAuth2Client } from "google-auth-library";
-
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID!);
+import { GoogleOAuthService } from "../services/oauth/google-oauth.service";
+import { OutlookOAuthService } from "../services/oauth/outlook-oauth.service";
 
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined");
@@ -197,112 +196,136 @@ export const getUserDetails = asyncHandler(
   "getUserDetails"
 );
 
-export const googleLogin = asyncHandler(
-  async (_req: Request, res: Response) => {
-    const redirectUri = encodeURIComponent(process.env.GOOGLE_REDIRECT_URI!);
+export const googleLogin = asyncHandler(async (_req, res) => {
+  const url = GoogleOAuthService.buildAuthUrl("AUTH");
+  res.redirect(url);
+}, "googleLogin");
 
-    const scope = encodeURIComponent("openid email profile");
+export const googleCallback = asyncHandler(async (req, res) => {
+  const code = req.query.code as string;
+  if (!code) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Authorization code missing" });
+  }
 
-    const googleAuthUrl =
-      `https://accounts.google.com/o/oauth2/v2/auth` +
-      `?client_id=${process.env.GOOGLE_CLIENT_ID}` +
-      `&redirect_uri=${redirectUri}` +
-      `&response_type=code` +
-      `&scope=${scope}` +
-      `&access_type=offline` +
-      `&prompt=consent`;
+  const tokens = await GoogleOAuthService.exchangeCode(code);
+  const identity = await GoogleOAuthService.verifyIdToken(tokens.id_token);
 
-    res.redirect(googleAuthUrl);
-  },
-  "googleLogin"
-);
+  let user = await User.findOne({ where: { googleId: identity.googleId } });
 
-export const googleCallback = asyncHandler(
-  async (req: Request, res: Response) => {
-    const code = req.query.code as string;
+  if (!user) {
+    user = await User.findOne({ where: { email: identity.email } });
+  }
 
-    if (!code) {
-      return res.status(400).json({
-        success: false,
-        message: "Authorization code missing",
-      });
-    }
+  if (!user) {
+    user = await User.create({
+      email: identity.email,
+      fullName: identity.fullName,
+      avatar: identity.avatar,
+      signupMethod: SignupMethod.GOOGLE,
+      googleId: identity.googleId,
+    });
+  }
 
-    const tokenResponse = await axios.post(
-      "https://oauth2.googleapis.com/token",
-      {
-        code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
-        grant_type: "authorization_code",
-      },
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      }
-    );
+  if (user.signupMethod !== SignupMethod.GOOGLE) {
+    return res.status(400).json({
+      success: false,
+      message: "Account exists with email/password login",
+    });
+  }
 
-    const { id_token } = tokenResponse.data;
+  if (tokens.refresh_token) {
+    await EmailAccount.upsert({
+      user_id: user.id,
+      provider: "google",
+      email: identity.email,
+      refresh_token: tokens.access_token,
+    });
+  }
 
-    const ticket = await googleClient.verifyIdToken({
-      idToken: id_token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+  const token = jwt.sign({ userId: user.id }, JWT_SECRET!, { expiresIn: "7d" });
+
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      signupMethod: user.signupMethod,
+      avatar: user.avatar,
+    },
+  });
+}, "googleCallback");
+
+export const outlookLogin = asyncHandler(async (_req, res) => {
+  const url = OutlookOAuthService.buildAuthUrl("AUTH");
+  res.redirect(url);
+}, "outlookLogin");
+
+export const outlookCallback = asyncHandler(async (req, res) => {
+  const code = req.query.code as string;
+
+  if (!code) {
+    return res.status(400).json({
+      success: false,
+      message: "Authorization code missing",
+    });
+  }
+
+  const tokens = await OutlookOAuthService.exchangeCode(code);
+  const identity = OutlookOAuthService.parseIdToken(tokens.id_token);
+
+  let user = await User.findOne({
+    where: { microsoftId: identity.outlookId },
+  });
+
+  if (!user) {
+    user = await User.findOne({
+      where: { email: identity.email },
+    });
+  }
+
+  if (!user) {
+    user = await User.create({
+      email: identity.email,
+      fullName: identity.fullName,
+      avatar: "",
+      signupMethod: SignupMethod.MICROSOFT,
+      microsoftId: identity.outlookId,
+      refreshToken:tokens.refresh_token
     });
 
-    const payload = ticket.getPayload();
+  }
 
-    if (!payload || !payload.email_verified) {
-      return res.status(401).json({
-        success: false,
-        message: "Google email not verified",
-      });
-    }
-
-    let user = await User.findOne({
-      where: { googleId: payload.sub },
+  if (user.signupMethod !== SignupMethod.MICROSOFT) {
+    return res.status(400).json({
+      success: false,
+      message: "Account exists with different signup method",
     });
+  }
 
-    if (!user) {
-      user = await User.findOne({
-        where: { email: payload.email },
-      });
-    }
+  await EmailAccount.upsert({
+    user_id: user.id,
+    provider: "MICROSOFT",
+    email: identity.email,
+    refresh_token: tokens.refresh_token,
+  });
 
-    if (!user) {
-      user = await User.create({
-        email: payload.email!,
-        fullName: payload.name!,
-        avatar: payload.picture || "",
-        signupMethod: SignupMethod.GOOGLE,
-        googleId: payload.sub,
-      });
-    }
+  const token = jwt.sign({ userId: user.id }, JWT_SECRET!, {
+    expiresIn: "7d",
+  });
 
-    if (user.signupMethod !== SignupMethod.GOOGLE) {
-      return res.status(400).json({
-        success: false,
-        message: "Account exists with email/password login",
-      });
-    }
-
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET!, {
-      expiresIn: "7d",
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Google login successful",
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        signupMethod: user.signupMethod,
-        avatar: user.avatar,
-      },
-    });
-  },
-  "googleCallback"
-);
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      signupMethod: user.signupMethod,
+      avatar: user.avatar,
+    },
+  });
+}, "outlookCallback");

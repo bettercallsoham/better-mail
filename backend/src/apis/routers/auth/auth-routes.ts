@@ -35,4 +35,7 @@ router.get("/google/callback", authController.googleCallback);
 
 // MICROSOFT OAUTH LOGIN
 
+router.get("/outlook", authController.outlookLogin);
+router.get("/outlook/callback", authController.outlookCallback);
+
 export default router;

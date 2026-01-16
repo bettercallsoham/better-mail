@@ -18,7 +18,7 @@ class EmailAccount extends Model<
   declare password: string | null;
   declare host: string | null;
   declare refresh_token: string | null;
-  declare email_engine_id: string;
+  declare email_engine_id: string | null;
 }
 
 EmailAccount.init(
@@ -68,7 +68,7 @@ EmailAccount.init(
 
     email_engine_id: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: "email_engine_instances",
         key: "id",
