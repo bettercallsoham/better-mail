@@ -1,28 +1,16 @@
 import axios from "axios";
 import { OAuth2Client } from "google-auth-library";
 import "dotenv/config";
-const {
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  GOOGLE_REDIRECT_URI,
-  GOOGLE_CONNECT_REDIRECT_URI,
-} = process.env;
+const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } =
+  process.env;
 
-if (
-  !GOOGLE_CLIENT_ID ||
-  !GOOGLE_CLIENT_SECRET ||
-  !GOOGLE_REDIRECT_URI ||
-  !GOOGLE_CONNECT_REDIRECT_URI
-) {
+if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {
   throw new Error("Google OAuth env vars are missing");
 }
-
-export type GoogleOAuthMode = "AUTH" | "EMAIL";
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const GOOGLE_SCOPES = {
-  AUTH: ["openid", "email", "profile"],
   EMAIL: [
     "openid",
     "email",
@@ -35,13 +23,12 @@ export class GoogleOAuthService {
   /**
    * Build Google OAuth consent URL
    */
-  static buildAuthUrl(mode: GoogleOAuthMode) {
-    const scopes = GOOGLE_SCOPES[mode].join(" ");
+  static buildAuthUrl() {
+    const scopes = GOOGLE_SCOPES.EMAIL.join(" ");
 
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID!,
-      redirect_uri:
-        mode == "AUTH" ? GOOGLE_REDIRECT_URI! : GOOGLE_CONNECT_REDIRECT_URI!,
+      redirect_uri: GOOGLE_REDIRECT_URI!,
       response_type: "code",
       scope: scopes,
       access_type: "offline",
@@ -54,16 +41,14 @@ export class GoogleOAuthService {
   /**
    * Exchange authorization code for tokens
    */
-
-  static async exchangeCode(code: string, mode: GoogleOAuthMode) {
+  static async exchangeCode(code: string) {
     const response = await axios.post(
       "https://oauth2.googleapis.com/token",
       new URLSearchParams({
         code,
         client_id: GOOGLE_CLIENT_ID!,
         client_secret: GOOGLE_CLIENT_SECRET!,
-        redirect_uri:
-          mode === "AUTH" ? GOOGLE_REDIRECT_URI! : GOOGLE_CONNECT_REDIRECT_URI!,
+        redirect_uri: GOOGLE_REDIRECT_URI!,
         grant_type: "authorization_code",
       }),
       {

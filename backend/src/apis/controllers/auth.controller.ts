@@ -4,9 +4,9 @@ const { JWT_SECRET } = process.env;
 import bcrypt from "bcrypt";
 import { Request, Response } from "express";
 import { EmailAccount, SignupMethod, User } from "../../shared/models";
-import axios from "axios";
 import { GoogleOAuthService } from "../services/oauth/google-oauth.service";
 import { OutlookOAuthService } from "../services/oauth/outlook-oauth.service";
+import redis from "../../shared/config/redis";
 
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined");
@@ -209,7 +209,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Authorization code missing" });
   }
 
-  const tokens = await GoogleOAuthService.exchangeCode(code);
+  const tokens = await GoogleOAuthService.exchangeCode(code, "AUTH");
   const identity = await GoogleOAuthService.verifyIdToken(tokens.id_token);
 
   let user = await User.findOne({ where: { googleId: identity.googleId } });
@@ -260,22 +260,55 @@ export const googleCallback = asyncHandler(async (req, res) => {
 }, "googleCallback");
 
 export const outlookLogin = asyncHandler(async (_req, res) => {
-  const result = OutlookOAuthService.buildAuthUrl("AUTH");
-  res.redirect(result.url);
+  const { url, state, codeVerifier } = OutlookOAuthService.buildAuthUrl("AUTH");
+
+  await redis.set(
+    `outlook:oauth:${state}`,
+    JSON.stringify({
+      codeVerifier,
+      mode: "AUTH",
+    }),
+    "EX",
+    300
+  );
+
+  res.redirect(url);
 }, "outlookLogin");
 
 export const outlookCallback = asyncHandler(async (req, res) => {
   const code = req.query.code as string;
+  const state = req.query.state as string;
 
-  if (!code) {
+  if (!code || !state) {
     return res.status(400).json({
       success: false,
-      message: "Authorization code missing",
+      message: "Authorization code or state missing",
     });
   }
 
-  const tokens = await OutlookOAuthService.exchangeCode(code);
-  const identity = OutlookOAuthService.parseIdToken(tokens.id_token!);
+  const raw = await redis.get(`outlook:oauth:${state}`);
+  if (!raw) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired OAuth state",
+    });
+  }
+
+  await redis.del(`outlook:oauth:${state}`);
+
+  const { codeVerifier, mode } = JSON.parse(raw);
+
+  const tokens = await OutlookOAuthService.exchangeCode(
+    code,
+    mode,
+    codeVerifier
+  );
+
+  if (!tokens.id_token) {
+    throw new Error("Missing id_token from Outlook");
+  }
+
+  const identity = OutlookOAuthService.parseIdToken(tokens.id_token);
 
   let user = await User.findOne({
     where: { microsoftId: identity.outlookId },
