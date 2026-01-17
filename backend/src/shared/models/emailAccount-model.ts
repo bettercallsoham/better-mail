@@ -19,6 +19,9 @@ class EmailAccount extends Model<
   declare host: string | null;
   declare refresh_token: string | null;
   declare email_engine_id: string | null;
+  declare created_at: CreationOptional<Date>;
+  declare updated_at: CreationOptional<Date>;
+  declare deleted_at: CreationOptional<Date | null>;
 }
 
 EmailAccount.init(
@@ -76,18 +79,40 @@ EmailAccount.init(
       onDelete: "RESTRICT",
       onUpdate: "CASCADE",
     },
+
+    created_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+
+    updated_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+
+    deleted_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
   },
   {
     sequelize,
     modelName: "email_account",
     tableName: "email_accounts",
-
-    timestamps: false,
+    paranoid: true,
+    timestamps: true,
     underscored: true,
 
     indexes: [
       {
         fields: ["id"],
+      },
+      {
+        unique: true,
+        fields: ["user_id", "email"],
+        name: "email_accounts_user_id_email_unique",
       },
     ],
   }

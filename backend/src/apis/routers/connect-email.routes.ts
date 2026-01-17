@@ -5,10 +5,10 @@ import * as connectEmailController from "../controllers/connect-email.controller
 const router = Router();
 
 router.get("/gmail", verifyAccessToken(), connectEmailController.connectGmail);
-router.get("/outlook", verifyAccessToken(), );
-router.post("/imap", verifyAccessToken());
+router.get("/outlook", verifyAccessToken(), connectEmailController.connectOutlook);
+// router.post("/imap", verifyAccessToken());
 
-router.get("/gmail/callback");
-router.get("/outlook/callback");
+router.get("/gmail/callback", connectEmailController.gmailConnectCallback);
+router.get("/outlook/callback", connectEmailController.outlookConnectCallback);
 
 export default router;

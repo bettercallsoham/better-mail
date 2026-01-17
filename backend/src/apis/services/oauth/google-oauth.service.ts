@@ -37,18 +37,23 @@ export class GoogleOAuthService {
    */
   static buildAuthUrl(mode: GoogleOAuthMode) {
     const scopes = GOOGLE_SCOPES[mode].join(" ");
+    const state = crypto.randomUUID();
 
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID!,
       redirect_uri:
-        mode == "AUTH" ? GOOGLE_REDIRECT_URI! : GOOGLE_CONNECT_REDIRECT_URI!,
+        mode === "AUTH" ? GOOGLE_REDIRECT_URI! : GOOGLE_CONNECT_REDIRECT_URI!,
       response_type: "code",
       scope: scopes,
       access_type: "offline",
       prompt: "consent",
+      state,
     });
 
-    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    return {
+      url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+      state,
+    };
   }
 
   /**

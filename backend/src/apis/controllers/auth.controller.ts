@@ -197,25 +197,56 @@ export const getUserDetails = asyncHandler(
 );
 
 export const googleLogin = asyncHandler(async (_req, res) => {
-  const url = GoogleOAuthService.buildAuthUrl("AUTH");
+  const { url, state } = GoogleOAuthService.buildAuthUrl("AUTH");
+
+  await redis.set(
+    `google:oauth:${state}`,
+    JSON.stringify({ mode: "AUTH" }),
+    "EX",
+    300
+  );
+
   res.redirect(url);
 }, "googleLogin");
 
+
 export const googleCallback = asyncHandler(async (req, res) => {
   const code = req.query.code as string;
-  if (!code) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Authorization code missing" });
+  const state = req.query.state as string;
+
+  if (!code || !state) {
+    return res.status(400).json({
+      success: false,
+      message: "Authorization code or state missing",
+    });
   }
 
+  const raw = await redis.get(`google:oauth:${state}`);
+  if (!raw) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired OAuth state",
+    });
+  }
+
+  await redis.del(`google:oauth:${state}`);
+
   const tokens = await GoogleOAuthService.exchangeCode(code, "AUTH");
+
+  if (!tokens.id_token) {
+    throw new Error("Missing id_token from Google");
+  }
+
   const identity = await GoogleOAuthService.verifyIdToken(tokens.id_token);
 
-  let user = await User.findOne({ where: { googleId: identity.googleId } });
+  let user = await User.findOne({
+    where: { googleId: identity.googleId },
+  });
 
   if (!user) {
-    user = await User.findOne({ where: { email: identity.email } });
+    user = await User.findOne({
+      where: { email: identity.email },
+    });
   }
 
   if (!user) {
@@ -231,20 +262,24 @@ export const googleCallback = asyncHandler(async (req, res) => {
   if (user.signupMethod !== SignupMethod.GOOGLE) {
     return res.status(400).json({
       success: false,
-      message: "Account exists with email/password login",
+      message: "Account exists with different signup method",
     });
   }
 
   if (tokens.refresh_token) {
     await EmailAccount.upsert({
       user_id: user.id,
-      provider: "google",
+      provider: "GOOGLE",
       email: identity.email,
-      refresh_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
     });
   }
 
-  const token = jwt.sign({ userId: user.id }, JWT_SECRET!, { expiresIn: "7d" });
+  const token = jwt.sign(
+    { userId: user.id },
+    JWT_SECRET!,
+    { expiresIn: "7d" }
+  );
 
   res.json({
     success: true,
