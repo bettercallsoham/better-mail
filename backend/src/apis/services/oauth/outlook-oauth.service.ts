@@ -1,5 +1,6 @@
 import axios from "axios";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 const { OUTLOOK_CLIENT_ID, OUTLOOK_CLIENT_SECRET, OUTLOOK_REDIRECT_URI } =
   process.env;
@@ -10,29 +11,29 @@ if (!OUTLOOK_CLIENT_ID || !OUTLOOK_CLIENT_SECRET || !OUTLOOK_REDIRECT_URI) {
 
 export type OutlookOAuthMode = "AUTH" | "EMAIL";
 
+/**
+ * Scopes
+ * AUTH  -> identity only
+ * EMAIL -> mailbox access
+ */
 const OUTLOOK_SCOPES: Record<OutlookOAuthMode, string[]> = {
-  AUTH: ["openid", "profile", "email", "offline_access", "User.Read"],
-  EMAIL: [
-    "openid",
-    "profile",
-    "email",
-    "offline_access",
-    "User.Read",
-    "Mail.Read",
-    "Mail.Send",
-  ],
+  AUTH: ["openid", "profile", "email", "User.Read"],
+  EMAIL: ["offline_access", "Mail.Read", "Mail.Send", "User.Read"],
 };
 
 const AUTHORIZE_URL =
-  "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
-const TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+  "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
+const TOKEN_URL =
+  "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 
 export class OutlookOAuthService {
   /**
-   * Build Outlook OAuth authorization URL
+   * Build OAuth authorization URL
    */
   static buildAuthUrl(mode: OutlookOAuthMode) {
     const scope = OUTLOOK_SCOPES[mode].join(" ");
+
+    const state = crypto.randomUUID();
 
     const params = new URLSearchParams({
       client_id: OUTLOOK_CLIENT_ID!,
@@ -40,11 +41,19 @@ export class OutlookOAuthService {
       redirect_uri: OUTLOOK_REDIRECT_URI!,
       response_mode: "query",
       scope,
+      prompt: "consent",
+      state,
     });
 
-    return `${AUTHORIZE_URL}?${params.toString()}`;
+    return {
+      url: `${AUTHORIZE_URL}?${params.toString()}`,
+      state,
+    };
   }
 
+  /**
+   * Exchange authorization code for tokens
+   */
   static async exchangeCode(code: string) {
     const res = await axios.post(
       TOKEN_URL,
@@ -67,11 +76,15 @@ export class OutlookOAuthService {
       refresh_token?: string;
       expires_in: number;
       scope: string;
-      id_token: string;
+      id_token?: string;
       token_type: "Bearer";
     };
   }
 
+  /**
+   * Refresh access token using refresh token
+   * NOTE: refresh tokens are opaque, do NOT decode
+   */
   static async refreshToken(refreshToken: string) {
     const res = await axios.post(
       TOKEN_URL,
@@ -98,6 +111,9 @@ export class OutlookOAuthService {
     };
   }
 
+  /**
+   * Parse ID token (AUTH flow only)
+   */
   static parseIdToken(idToken: string) {
     const decoded = jwt.decode(idToken) as any;
 
@@ -109,7 +125,7 @@ export class OutlookOAuthService {
       outlookId: decoded.sub,
       email: decoded.email || decoded.preferred_username,
       fullName: decoded.name ?? "",
-      tenantId: decoded.tid,
+      issuer: decoded.iss,
     };
   }
 }

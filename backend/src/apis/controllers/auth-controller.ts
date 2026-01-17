@@ -260,8 +260,8 @@ export const googleCallback = asyncHandler(async (req, res) => {
 }, "googleCallback");
 
 export const outlookLogin = asyncHandler(async (_req, res) => {
-  const url = OutlookOAuthService.buildAuthUrl("AUTH");
-  res.redirect(url);
+  const result = OutlookOAuthService.buildAuthUrl("AUTH");
+  res.redirect(result.url);
 }, "outlookLogin");
 
 export const outlookCallback = asyncHandler(async (req, res) => {
@@ -275,7 +275,7 @@ export const outlookCallback = asyncHandler(async (req, res) => {
   }
 
   const tokens = await OutlookOAuthService.exchangeCode(code);
-  const identity = OutlookOAuthService.parseIdToken(tokens.id_token);
+  const identity = OutlookOAuthService.parseIdToken(tokens.id_token!);
 
   let user = await User.findOne({
     where: { microsoftId: identity.outlookId },
@@ -294,9 +294,8 @@ export const outlookCallback = asyncHandler(async (req, res) => {
       avatar: "",
       signupMethod: SignupMethod.MICROSOFT,
       microsoftId: identity.outlookId,
-      refreshToken:tokens.refresh_token
+      refreshToken: tokens.refresh_token,
     });
-
   }
 
   if (user.signupMethod !== SignupMethod.MICROSOFT) {
