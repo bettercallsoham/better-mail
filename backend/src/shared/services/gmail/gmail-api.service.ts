@@ -3,12 +3,44 @@ import "dotenv/config";
 import redis from "../../config/redis";
 import { EmailAccount } from "../../models";
 
+export interface GmailHeader {
+  name: string;
+  value: string;
+}
+
+export interface GmailBody {
+  size: number;
+  data?: string;
+  attachmentId?: string;
+}
+
+export interface GmailPayload {
+  partId: string;
+  mimeType: string;
+  filename: string;
+
+  headers: GmailHeader[];
+
+  body: GmailBody;
+
+  parts?: GmailPayload[];
+}
+
 export interface GmailMessage {
   id: string;
   threadId: string;
-  snippet?: string;
-  payload?: any;
-  internalDate?: string;
+
+  labelIds: string[];
+
+  snippet: string;
+
+  sizeEstimate: number;
+
+  historyId: string;
+
+  internalDate: string;
+
+  payload: GmailPayload;
 }
 
 export class GmailApiService {
@@ -18,8 +50,6 @@ export class GmailApiService {
   constructor({ email }: { email: string }) {
     this.email = email.toLowerCase();
   }
-
-  /* ===================== TOKEN HANDLING ===================== */
 
   private async refreshAccessToken(refreshToken: string) {
     const res = await axios.post(
@@ -138,11 +168,3 @@ export class GmailApiService {
     return results;
   }
 }
-
-const main = async () => {
-  console.time("time");
-  const gs = new GmailApiService({ email: "theabhisharma29@gmail.com" });
-  const res = await gs.fetchLastNDaysEmails(1);
-  console.log(res.length);
-  console.timeEnd("time");
-};
