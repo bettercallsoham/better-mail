@@ -1,4 +1,4 @@
-import {
+import {k
   Model,
   DataTypes,
   InferAttributes,
