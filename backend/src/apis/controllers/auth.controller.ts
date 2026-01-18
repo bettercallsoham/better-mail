@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 const { JWT_SECRET } = process.env;
 import bcrypt from "bcrypt";
 import { Request, Response } from "express";
-import { EmailAccount, SignupMethod, User } from "../../shared/models";
+import { SignupMethod, User } from "../../shared/models";
 import { GoogleOAuthService } from "../services/oauth/google-oauth.service";
 import { OutlookOAuthService } from "../services/oauth/outlook-oauth.service";
 import redis from "../../shared/config/redis";
@@ -52,7 +52,7 @@ export const signUpWithEmail = asyncHandler(
       },
     });
   },
-  "createUser"
+  "createUser",
 );
 
 export const loginWithEmail = asyncHandler(
@@ -92,7 +92,7 @@ export const loginWithEmail = asyncHandler(
       },
     });
   },
-  "loginWithEmail"
+  "loginWithEmail",
 );
 
 export const updateProfileWithEmail = asyncHandler(
@@ -128,7 +128,7 @@ export const updateProfileWithEmail = asyncHandler(
     if (newPassword) {
       const isCurrentPasswordValid = await bcrypt.compare(
         currentPassword,
-        user.password!
+        user.password!,
       );
       if (!isCurrentPasswordValid) {
         return res.status(400).json({
@@ -159,7 +159,7 @@ export const updateProfileWithEmail = asyncHandler(
       },
     });
   },
-  "updateProfileWithEmail"
+  "updateProfileWithEmail",
 );
 
 export const getUserDetails = asyncHandler(
@@ -193,7 +193,7 @@ export const getUserDetails = asyncHandler(
       },
     });
   },
-  "getUserDetails"
+  "getUserDetails",
 );
 
 export const googleLogin = asyncHandler(async (_req, res) => {
@@ -203,12 +203,11 @@ export const googleLogin = asyncHandler(async (_req, res) => {
     `google:oauth:${state}`,
     JSON.stringify({ mode: "AUTH" }),
     "EX",
-    300
+    300,
   );
 
   res.redirect(url);
 }, "googleLogin");
-
 
 export const googleCallback = asyncHandler(async (req, res) => {
   const code = req.query.code as string;
@@ -266,20 +265,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
     });
   }
 
-  if (tokens.refresh_token) {
-    await EmailAccount.upsert({
-      user_id: user.id,
-      provider: "GOOGLE",
-      email: identity.email,
-      refresh_token: tokens.refresh_token,
-    });
-  }
-
-  const token = jwt.sign(
-    { userId: user.id },
-    JWT_SECRET!,
-    { expiresIn: "7d" }
-  );
+  const token = jwt.sign({ userId: user.id }, JWT_SECRET!, { expiresIn: "7d" });
 
   res.json({
     success: true,
@@ -304,7 +290,7 @@ export const outlookLogin = asyncHandler(async (_req, res) => {
       mode: "AUTH",
     }),
     "EX",
-    300
+    300,
   );
 
   res.redirect(url);
@@ -336,7 +322,7 @@ export const outlookCallback = asyncHandler(async (req, res) => {
   const tokens = await OutlookOAuthService.exchangeCode(
     code,
     mode,
-    codeVerifier
+    codeVerifier,
   );
 
   if (!tokens.id_token) {
@@ -372,13 +358,6 @@ export const outlookCallback = asyncHandler(async (req, res) => {
       message: "Account exists with different signup method",
     });
   }
-
-  await EmailAccount.upsert({
-    user_id: user.id,
-    provider: "MICROSOFT",
-    email: identity.email,
-    refresh_token: tokens.refresh_token,
-  });
 
   const token = jwt.sign({ userId: user.id }, JWT_SECRET!, {
     expiresIn: "7d",

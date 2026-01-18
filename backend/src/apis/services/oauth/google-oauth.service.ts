@@ -28,6 +28,7 @@ const GOOGLE_SCOPES = {
     "email",
     "profile",
     "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/contacts.readonly",
   ],
 };
 
@@ -75,7 +76,7 @@ export class GoogleOAuthService {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-      }
+      },
     );
 
     return response.data as {
@@ -115,3 +116,4 @@ export class GoogleOAuthService {
     };
   }
 }
+

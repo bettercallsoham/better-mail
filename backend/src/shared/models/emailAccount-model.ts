@@ -1,4 +1,4 @@
-import {k
+import {
   Model,
   DataTypes,
   InferAttributes,
@@ -115,7 +115,7 @@ EmailAccount.init(
         name: "email_accounts_user_id_email_unique",
       },
     ],
-  }
+  },
 );
 
 export { EmailAccount };

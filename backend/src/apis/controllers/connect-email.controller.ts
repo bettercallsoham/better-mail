@@ -113,6 +113,12 @@ export const gmailConnectCallback = asyncHandler(async (req, res) => {
     });
   }
 
+
+  // add to handle-mailbox-connection-queue
+
+
+  // 
+
   res.json({
     success: true,
     message: "Gmail connected successfully",

@@ -40,7 +40,7 @@ export class OutlookApiService {
     pageSize?: number;
   }): Promise<OutlookMessage[]> {
     const sinceDate = new Date(
-      Date.now() - days * 24 * 60 * 60 * 1000
+      Date.now() - days * 24 * 60 * 60 * 1000,
     ).toISOString();
 
     let url =
@@ -56,7 +56,7 @@ export class OutlookApiService {
       messages.push(...res.data.value);
       url = res.data["@odata.nextLink"]?.replace(
         "https://graph.microsoft.com/v1.0",
-        ""
+        "",
       );
     }
 
@@ -90,25 +90,3 @@ export class OutlookApiService {
   }
 }
 
-// const main = async () => {
-//   const token = await refreshOutlookAccessToken({
-//     emailAccountId: "35ca32da-935d-4b06-b4ee-7b4383029872",
-//     refreshToken: refresh_token,
-//   });
-
-//   console.log(token.access_token);
-
-//   const outlookService = new OutlookApiService(token.access_token);
-
-//   console.log("Fetching emails");
-//   console.time("FetchTime");
-
-//   try {
-//     const mailFolders = await outlookService.fetchFolders();
-//     console.log(mailFolders);
-//   } catch (error: any) {
-//     console.log(error);
-//   }
-// };
-
-// main();

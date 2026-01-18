@@ -1,97 +1,148 @@
-import axios from "axios";
-import { OAuth2Client } from "google-auth-library";
+import axios, { AxiosInstance } from "axios";
 import "dotenv/config";
-const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } =
-  process.env;
+import redis from "../../config/redis";
+import { EmailAccount } from "../../models";
 
-if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {
-  throw new Error("Google OAuth env vars are missing");
+export interface GmailMessage {
+  id: string;
+  threadId: string;
+  snippet?: string;
+  payload?: any;
+  internalDate?: string;
 }
 
-const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+export class GmailApiService {
+  private client?: AxiosInstance;
+  private email: string;
 
-const GOOGLE_SCOPES = {
-  EMAIL: [
-    "openid",
-    "email",
-    "profile",
-    "https://www.googleapis.com/auth/gmail.readonly",
-  ],
-};
-
-export class GoogleOAuthService {
-  /**
-   * Build Google OAuth consent URL
-   */
-  static buildAuthUrl() {
-    const scopes = GOOGLE_SCOPES.EMAIL.join(" ");
-
-    const params = new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID!,
-      redirect_uri: GOOGLE_REDIRECT_URI!,
-      response_type: "code",
-      scope: scopes,
-      access_type: "offline",
-      prompt: "consent",
-    });
-
-    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  constructor({ email }: { email: string }) {
+    this.email = email.toLowerCase();
   }
 
-  /**
-   * Exchange authorization code for tokens
-   */
-  static async exchangeCode(code: string) {
-    const response = await axios.post(
+  /* ===================== TOKEN HANDLING ===================== */
+
+  private async refreshAccessToken(refreshToken: string) {
+    const res = await axios.post(
       "https://oauth2.googleapis.com/token",
       new URLSearchParams({
-        code,
-        client_id: GOOGLE_CLIENT_ID!,
-        client_secret: GOOGLE_CLIENT_SECRET!,
-        redirect_uri: GOOGLE_REDIRECT_URI!,
-        grant_type: "authorization_code",
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
       }),
       {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      }
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      },
     );
 
-    return response.data as {
-      access_token: string;
-      refresh_token?: string;
-      expires_in: number;
-      scope: string;
-      id_token: string;
-      token_type: string;
+    return {
+      accessToken: res.data.access_token,
+      expiresIn: res.data.expires_in,
     };
+  }
+
+  private async getAccessToken(): Promise<string> {
+    const cacheKey = `gmail:access_token:${this.email}`;
+
+    const cached = await redis.get(cacheKey);
+    if (cached) return cached;
+
+    const account = await EmailAccount.findOne({
+      where: { email: this.email },
+      attributes: ["refresh_token"],
+    });
+
+    if (!account?.refresh_token) {
+      throw new Error("Missing Gmail refresh token");
+    }
+
+    const { accessToken, expiresIn } = await this.refreshAccessToken(
+      account.refresh_token,
+    );
+
+    await redis.set(cacheKey, accessToken, "EX", Math.max(expiresIn - 60, 60));
+
+    return accessToken;
+  }
+
+  private async getClient(): Promise<AxiosInstance> {
+    if (this.client) return this.client;
+
+    const accessToken = await this.getAccessToken();
+
+    this.client = axios.create({
+      baseURL: "https://gmail.googleapis.com/gmail/v1",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    return this.client;
+  }
+
+  /* ===================== CORE FETCH LOGIC ===================== */
+
+  private async *iterateMessageIds(days: number) {
+    const client = await this.getClient();
+
+    const after = Math.floor((Date.now() - days * 24 * 60 * 60 * 1000) / 1000);
+
+    let pageToken: string | undefined;
+
+    do {
+      const res = await client.get("/users/me/messages", {
+        params: {
+          q: `after:${after}`,
+          maxResults: 100,
+          pageToken,
+        },
+      });
+
+      for (const msg of res.data.messages ?? []) {
+        yield msg.id;
+      }
+
+      pageToken = res.data.nextPageToken;
+    } while (pageToken);
+  }
+
+  private async fetchMessage(messageId: string): Promise<GmailMessage> {
+    const client = await this.getClient();
+
+    const res = await client.get(`/users/me/messages/${messageId}`, {
+      params: { format: "full" },
+    });
+
+    return res.data;
   }
 
   /**
-   * Verify Google ID token and extract identity
+   * Fetch ALL Gmail emails from last N days (all folders)
    */
-  static async verifyIdToken(idToken: string) {
-    const ticket = await googleClient.verifyIdToken({
-      idToken,
-      audience: GOOGLE_CLIENT_ID,
-    });
+  public async fetchLastNDaysEmails(
+    days = 30,
+    onMessage?: (msg: GmailMessage) => Promise<void>,
+  ): Promise<GmailMessage[]> {
+    const results: GmailMessage[] = [];
 
-    const payload = ticket.getPayload();
+    for await (const messageId of this.iterateMessageIds(days)) {
+      const message = await this.fetchMessage(messageId);
 
-    if (!payload) {
-      throw new Error("Invalid Google ID token");
+      if (onMessage) {
+        await onMessage(message);
+      } else {
+        results.push(message);
+      }
     }
 
-    if (!payload.email_verified) {
-      throw new Error("Google email not verified");
-    }
-
-    return {
-      googleId: payload.sub,
-      email: payload.email!,
-      fullName: payload.name || "",
-      avatar: payload.picture || "",
-    };
+    return results;
   }
 }
+
+const main = async () => {
+  console.time("time");
+  const gs = new GmailApiService({ email: "theabhisharma29@gmail.com" });
+  const res = await gs.fetchLastNDaysEmails(1);
+  console.log(res.length);
+  console.timeEnd("time");
+};
