@@ -23,13 +23,7 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const GOOGLE_SCOPES = {
   AUTH: ["openid", "email", "profile"],
-  EMAIL: [
-    "openid",
-    "email",
-    "profile",
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/contacts.readonly",
-  ],
+  EMAIL: ["openid", "email", "profile", "https://mail.google.com/"],
 };
 
 export class GoogleOAuthService {
@@ -116,4 +110,3 @@ export class GoogleOAuthService {
     };
   }
 }
-

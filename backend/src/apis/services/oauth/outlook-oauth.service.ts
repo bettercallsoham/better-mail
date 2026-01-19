@@ -28,6 +28,7 @@ const OUTLOOK_SCOPES: Record<OutlookOAuthMode, string[]> = {
     "email",
     "User.Read",
     "Mail.Read",
+    "Mail.ReadWrite",
     "Mail.Send",
     "offline_access",
   ],
@@ -63,14 +64,10 @@ export class OutlookOAuthService {
 
     // PKCE
     const codeVerifier = base64URLEncode(crypto.randomBytes(32));
-    const codeChallenge = base64URLEncode(
-      sha256(Buffer.from(codeVerifier))
-    );
+    const codeChallenge = base64URLEncode(sha256(Buffer.from(codeVerifier)));
 
     const redirectUri =
-      mode === "AUTH"
-        ? OUTLOOK_REDIRECT_URI!
-        : OUTLOOK_CONNECT_REDIRECT_URI!;
+      mode === "AUTH" ? OUTLOOK_REDIRECT_URI! : OUTLOOK_CONNECT_REDIRECT_URI!;
 
     const params = new URLSearchParams({
       client_id: OUTLOOK_CLIENT_ID!,
@@ -97,12 +94,10 @@ export class OutlookOAuthService {
   static async exchangeCode(
     code: string,
     mode: OutlookOAuthMode,
-    codeVerifier: string
+    codeVerifier: string,
   ) {
     const redirectUri =
-      mode === "AUTH"
-        ? OUTLOOK_REDIRECT_URI!
-        : OUTLOOK_CONNECT_REDIRECT_URI!;
+      mode === "AUTH" ? OUTLOOK_REDIRECT_URI! : OUTLOOK_CONNECT_REDIRECT_URI!;
 
     const res = await axios.post(
       TOKEN_URL,
@@ -118,7 +113,7 @@ export class OutlookOAuthService {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-      }
+      },
     );
 
     return res.data as {
@@ -147,7 +142,7 @@ export class OutlookOAuthService {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-      }
+      },
     );
 
     return res.data as {
