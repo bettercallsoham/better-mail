@@ -1,35 +1,42 @@
-export interface OutlookFolder {
-  id: string;
-  displayName: string;
-  totalItemCount: number;
-}
-
-export interface OutlookEmailAddress {
-  name: string;
-  address: string;
-}
-
-export interface OutlookRecipient {
-  emailAddress: OutlookEmailAddress;
-}
-
 export interface OutlookMessage {
   id: string;
-  subject: string;
-  bodyPreview: string;
+  conversationId: string;
+
   receivedDateTime: string;
   sentDateTime: string;
-  from: OutlookRecipient | null;
-  toRecipients: OutlookRecipient[];
-  ccRecipients: OutlookRecipient[];
-  isRead: boolean;
-  hasAttachments: boolean;
-  conversationId: string;
-  internetMessageId: string;
-  webLink: string;
-}
 
-export interface OutlookFolderWithMessages {
-  folder: OutlookFolder;
-  messages: OutlookMessage[];
+  subject: string;
+  bodyPreview: string;
+
+  from?: {
+    emailAddress: {
+      name: string;
+      address: string;
+    };
+  };
+
+  toRecipients: {
+    emailAddress: {
+      name: string;
+      address: string;
+    };
+  }[];
+
+  ccRecipients?: {
+    emailAddress: {
+      name: string;
+      address: string;
+    };
+  }[];
+
+  body: {
+    contentType: "text" | "html";
+    content: string;
+  };
+
+  hasAttachments: boolean;
+  internetMessageHeaders?: {
+    name: string;
+    value: string;
+  }[];
 }

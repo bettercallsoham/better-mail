@@ -14,6 +14,8 @@ class EmailEngineInstance extends Model<
   declare id: CreationOptional<string>;
   declare base_url: string;
   declare api_key: string;
+  declare gmail_provider: string | null;
+  declare outlook_provider: string | null;
   declare accounts_connected: number;
 }
 
@@ -36,6 +38,16 @@ EmailEngineInstance.init(
       allowNull: false,
     },
 
+    gmail_provider: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
+    outlook_provider: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
     accounts_connected: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -55,7 +67,7 @@ EmailEngineInstance.init(
         fields: ["id"],
       },
     ],
-  }
+  },
 );
 
 export { EmailEngineInstance };
