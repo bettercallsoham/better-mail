@@ -3,11 +3,6 @@
  * Import from here to use queues throughout the application
  */
 
-export {
-  mailboxConnectionQueue,
-  mailboxConnectionWorker,
-} from "./handle-mailbox-connection.queue";
-
 export { webhookQueue, webhookWorker } from "./handle-webhook.queue";
 
 export { gmailSyncQueue, gmailSyncWorker } from "./sync-gmail.queue";
