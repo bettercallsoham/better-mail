@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bull-board/api": "^6.16.4",
+    "@bull-board/express": "^6.16.4",
     "@elastic/elasticsearch": "^8.19.1",
     "@sentry/node": "^10.34.0",
     "@types/express": "^5.0.6",
@@ -17,6 +19,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.67.3",
     "cloudinary": "^2.8.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

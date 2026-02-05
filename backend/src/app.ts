@@ -10,10 +10,18 @@ import cors from "cors";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import router from "./apis";
+import path from "path";
+
+import serverAdapter from "./shared/config/bullboard";
+import {
+  bullBoardAuth,
+  bullBoardEnvCheck,
+} from "./apis/middleware/bullboard-auth";
 
 export function createApp() {
   const app = express();
 
+  app.use(express.static(path.join(__dirname, "../public")));
   const limiter = rateLimit({
     windowMs: 1 * 60 * 1000,
     limit: 120,
@@ -31,6 +39,14 @@ export function createApp() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: false }));
   app.use(limiter);
+
+  // BullBoard Dashboard with authentication and security
+  app.use(
+    "/admin/queues",
+    bullBoardEnvCheck,
+    bullBoardAuth,
+    serverAdapter.getRouter(),
+  );
 
   app.use("/api/v1", router);
 
