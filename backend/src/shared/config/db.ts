@@ -19,25 +19,26 @@ const sequelize = new Sequelize(PG_CONNECTION_STRING!, {
     keepAliveInitialDelayMillis: 10000,
     ssl: {
       require: true,
-      rejectUnauthorized: true,
+      rejectUnauthorized: false,
     },
   },
 
   pool: {
-    max: 250,
+    max: 10,
     min: 0,
     idle: 10000,
-    acquire: 600000,
+    acquire: 60000,
   },
 });
 
 const connectDb = async (): Promise<void> => {
   try {
     await sequelize.authenticate();
-    await sequelize.sync({ alter: true });
+    // await sequelize.sync({ alter: true });
     logger.info("Db Connected Succesfully");
   } catch (error: any) {
-    logger.error("Error while connecting db :" + error.message);
+    console.log(error);
+    logger.error("Error while connecting db :" + error);
     process.exit(1);
   }
 };

@@ -2,7 +2,8 @@ import axios, { AxiosInstance } from "axios";
 import "dotenv/config";
 import redis from "../../config/redis";
 import { EmailAccount } from "../../models";
-import { OutlookMessage } from "./interfaces";
+import { OutlookMessage, OutlookAttachment } from "./interfaces";
+
 export class OutlookApiService {
   private client?: AxiosInstance;
   private email: string;
@@ -80,9 +81,31 @@ export class OutlookApiService {
     return this.client;
   }
 
+  /* ===================== ATTACHMENT HANDLING ===================== */
+
+  /**
+   * Fetch attachment metadata for a specific message
+   */
+  public async fetchMessageAttachments(
+    messageId: string,
+  ): Promise<OutlookAttachment[]> {
+    const client = await this.getClient();
+
+    try {
+      const res = await client.get(`/me/messages/${messageId}/attachments`);
+      return res.data.value || [];
+    } catch (error) {
+      console.error(
+        `Failed to fetch attachments for message ${messageId}:`,
+        error,
+      );
+      return [];
+    }
+  }
+
   /* ===================== CORE ITERATOR ===================== */
 
-  private async *iterateMessages(days: number) {
+  private async *iterateMessages(days: number, includeAttachments = false) {
     const client = await this.getClient();
 
     const sinceDate = new Date(
@@ -99,6 +122,11 @@ export class OutlookApiService {
       const res = await client.get(url);
 
       for (const message of res.data.value ?? []) {
+        // If message has attachments and we want to include metadata
+        if (includeAttachments && message.hasAttachments) {
+          message.attachments = await this.fetchMessageAttachments(message.id);
+        }
+
         yield message as OutlookMessage;
       }
 
@@ -114,11 +142,18 @@ export class OutlookApiService {
    */
   public async fetchLastNDaysEmails(
     days = 30,
-    onMessage?: (msg: OutlookMessage) => Promise<void>,
+    options: {
+      includeAttachments?: boolean;
+      onMessage?: (msg: OutlookMessage) => Promise<void>;
+    } = {},
   ): Promise<OutlookMessage[]> {
+    const { includeAttachments = false, onMessage } = options;
     const results: OutlookMessage[] = [];
 
-    for await (const message of this.iterateMessages(days)) {
+    for await (const message of this.iterateMessages(
+      days,
+      includeAttachments,
+    )) {
       if (onMessage) {
         await onMessage(message);
       } else {

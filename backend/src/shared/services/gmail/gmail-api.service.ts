@@ -2,46 +2,7 @@ import axios, { AxiosInstance } from "axios";
 import "dotenv/config";
 import redis from "../../config/redis";
 import { EmailAccount } from "../../models";
-
-export interface GmailHeader {
-  name: string;
-  value: string;
-}
-
-export interface GmailBody {
-  size: number;
-  data?: string;
-  attachmentId?: string;
-}
-
-export interface GmailPayload {
-  partId: string;
-  mimeType: string;
-  filename: string;
-
-  headers: GmailHeader[];
-
-  body: GmailBody;
-
-  parts?: GmailPayload[];
-}
-
-export interface GmailMessage {
-  id: string;
-  threadId: string;
-
-  labelIds: string[];
-
-  snippet: string;
-
-  sizeEstimate: number;
-
-  historyId: string;
-
-  internalDate: string;
-
-  payload: GmailPayload;
-}
+import { GmailMessage } from "./interfaces";
 
 export class GmailApiService {
   private client?: AxiosInstance;
@@ -134,6 +95,71 @@ export class GmailApiService {
 
       pageToken = res.data.nextPageToken;
     } while (pageToken);
+  }
+
+  /**
+   * Fetch messages changed since a given historyId
+   * Used after receiving Gmail push notification
+   */
+  public async fetchHistorySince(
+    startHistoryId: string | number,
+    onMessage?: (msg: GmailMessage) => Promise<void>,
+  ): Promise<GmailMessage[]> {
+    const client = await this.getClient();
+
+    let pageToken: string | undefined;
+    const messages: GmailMessage[] = [];
+    const seenMessageIds = new Set<string>();
+
+    do {
+      const res = await client.get("/users/me/history", {
+        params: {
+          startHistoryId,
+          historyTypes: ["messageAdded"],
+          maxResults: 100,
+          pageToken,
+        },
+      });
+
+      for (const h of res.data.history ?? []) {
+        for (const item of h.messagesAdded ?? []) {
+          const messageId = item.message?.id;
+          if (!messageId || seenMessageIds.has(messageId)) continue;
+
+          seenMessageIds.add(messageId);
+
+          const msg = await this.fetchMessage(messageId);
+
+          if (onMessage) {
+            await onMessage(msg);
+          } else {
+            messages.push(msg);
+          }
+        }
+      }
+
+      pageToken = res.data.nextPageToken;
+    } while (pageToken);
+
+    return messages;
+  }
+
+  public async watchMailbox(): Promise<{
+    historyId: string;
+    expiration: string;
+  }> {
+    const client = await this.getClient();
+
+    const res = await client.post("/users/me/watch", {
+      topicName: process.env.GMAIL_PUBSUB_TOPIC!,
+      labelIds: ["INBOX"],
+      labelFilterAction: "include",
+    });
+
+    return {
+      historyId: res.data.historyId,
+      expiration: res.data.expiration,
+    };
   }
 
   private async fetchMessage(messageId: string): Promise<GmailMessage> {

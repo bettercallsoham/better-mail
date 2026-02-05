@@ -1,3 +1,14 @@
+export interface OutlookAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  isInline: boolean;
+  lastModifiedDateTime: string;
+  "@odata.type": string;
+  contentBytes?: string; // Base64 encoded (if fetched)
+}
+
 export interface OutlookMessage {
   id: string;
   conversationId: string;
@@ -35,6 +46,7 @@ export interface OutlookMessage {
   };
 
   hasAttachments: boolean;
+  attachments?: OutlookAttachment[]; // Optional: populated when includeAttachments is true
   internetMessageHeaders?: {
     name: string;
     value: string;

@@ -25,6 +25,7 @@ export function createApp() {
   });
 
   Sentry.setupExpressErrorHandler(app);
+  app.set("trust proxy", 1);
   app.use(cors());
   app.use(helmet());
   app.use(express.json({ limit: "50mb" }));
@@ -38,7 +39,7 @@ export function createApp() {
       error: any,
       req: express.Request,
       res: express.Response,
-      next: express.NextFunction
+      next: express.NextFunction,
     ) => {
       const status = error.status || error.statusCode || 500;
       const message = error.message || "Internal Server Error";
@@ -48,7 +49,7 @@ export function createApp() {
         message,
         ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
       });
-    }
+    },
   );
   app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
