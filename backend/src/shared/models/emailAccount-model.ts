@@ -18,6 +18,9 @@ class EmailAccount extends Model<
   declare password: string | null;
   declare host: string | null;
   declare refresh_token: string | null;
+  declare subscription_id: string | null;
+  declare subscription_expiration: Date | null;
+
   declare email_engine_id: string | null;
   declare created_at: CreationOptional<Date>;
   declare updated_at: CreationOptional<Date>;
@@ -66,6 +69,16 @@ EmailAccount.init(
 
     refresh_token: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
+    subscription_id: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
+    subscription_expiration: {
+      type: DataTypes.DATE,
       allowNull: true,
     },
 

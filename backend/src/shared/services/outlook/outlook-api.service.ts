@@ -66,6 +66,109 @@ export class OutlookApiService {
     return accessToken;
   }
 
+  public async createEmailSubscription() {
+    // Check if a valid subscription already exists in the database
+    const account = await EmailAccount.findOne({
+      where: { email: this.email },
+    });
+
+    if (!account) {
+      throw new Error(`Email account not found: ${this.email}`);
+    }
+
+    // If subscription exists and hasn't expired, return it
+    if (
+      account.subscription_id &&
+      account.subscription_expiration &&
+      new Date(account.subscription_expiration) > new Date()
+    ) {
+      return {
+        subscriptionId: account.subscription_id,
+        expirationDateTime: account.subscription_expiration.toISOString(),
+        resource: "me/messages",
+        isExisting: true,
+      };
+    }
+
+    // If subscription exists but expired, try to delete it from Microsoft
+    if (account.subscription_id) {
+      try {
+        await this.deleteSubscription(account.subscription_id);
+      } catch (error) {
+        console.warn(
+          `Failed to delete expired subscription ${account.subscription_id}:`,
+          error,
+        );
+      }
+    }
+
+    // Create new subscription
+    const client = await this.getClient();
+
+    const expirationDate = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const res = await client.post(
+      "/subscriptions",
+      {
+        changeType: "created,updated",
+        resource: "me/messages",
+        notificationUrl: process.env.OUTLOOK_WEBHOOK_URL,
+        expirationDateTime: expirationDate,
+        clientState: process.env.OUTLOOK_CLIENT_STATE,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    // Save subscription details to database
+    await account.update({
+      subscription_id: res.data.id,
+      subscription_expiration: new Date(res.data.expirationDateTime),
+    });
+
+    return {
+      subscriptionId: res.data.id,
+      expirationDateTime: res.data.expirationDateTime,
+      resource: res.data.resource,
+      isExisting: false,
+    };
+  }
+
+  public async renewSubscription(subscriptionId: string) {
+    const client = await this.getClient();
+
+    const newExpiration = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const res = await client.patch(`/subscriptions/${subscriptionId}`, {
+      expirationDateTime: newExpiration,
+    });
+
+    // Update expiration time in database
+    await EmailAccount.update(
+      {
+        subscription_expiration: new Date(res.data.expirationDateTime),
+      },
+      {
+        where: {
+          email: this.email,
+          subscription_id: subscriptionId,
+        },
+      },
+    );
+
+    return {
+      subscriptionId: res.data.id,
+      expirationDateTime: res.data.expirationDateTime,
+    };
+  }
+
   private async getClient(): Promise<AxiosInstance> {
     if (this.client) return this.client;
 
@@ -163,4 +266,23 @@ export class OutlookApiService {
 
     return results;
   }
+
+  public async listSubscriptions() {
+    const client = await this.getClient();
+    const res = await client.get("/subscriptions");
+    return res.data.value;
+  }
+
+  public async deleteSubscription(subscriptionId: string) {
+    const client = await this.getClient();
+    await client.delete(`/subscriptions/${subscriptionId}`);
+  }
 }
+
+const main = async () => {
+  const os = new OutlookApiService({ email: "nerdyabhisharma@outlook.com" });
+  const result = await os.createEmailSubscription();
+  console.log(result);
+};
+
+main();
