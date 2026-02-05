@@ -11,10 +11,13 @@ import { logger } from "../../shared/utils/logger";
 export const bullBoardAuth = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   // Allow access in development without auth (optional - you can remove this)
-  if (process.env.NODE_ENV === "development" && process.env.BULLBOARD_DEV_MODE === "true") {
+  if (
+    process.env.NODE_ENV === "development" &&
+    process.env.BULLBOARD_DEV_MODE === "true"
+  ) {
     logger.warn("BullBoard accessed without auth in development mode");
     return next();
   }
@@ -34,7 +37,7 @@ export const bullBoardAuth = (
   // Decode credentials
   const base64Credentials = authHeader.split(" ")[1];
   const credentials = Buffer.from(base64Credentials, "base64").toString(
-    "ascii"
+    "ascii",
   );
   const [username, password] = credentials.split(":");
 
@@ -44,7 +47,7 @@ export const bullBoardAuth = (
 
   if (!validUsername || !validPassword) {
     logger.error(
-      "BULLBOARD_USERNAME or BULLBOARD_PASSWORD not set in environment"
+      "BULLBOARD_USERNAME or BULLBOARD_PASSWORD not set in environment",
     );
     return res.status(500).json({
       success: false,
@@ -58,7 +61,7 @@ export const bullBoardAuth = (
 
   if (!usernameMatch || !passwordMatch) {
     logger.warn(
-      `Failed BullBoard login attempt for user '${username}' from ${req.ip}`
+      `Failed BullBoard login attempt for user '${username}' from ${req.ip}`,
     );
     return res.status(401).json({
       success: false,
@@ -80,16 +83,14 @@ export const bullBoardAuth = (
 export const bullBoardEnvCheck = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   // Disable BullBoard completely in production if desired
   if (
     process.env.NODE_ENV === "production" &&
     process.env.BULLBOARD_ENABLED !== "true"
   ) {
-    logger.warn(
-      `BullBoard access blocked in production from ${req.ip}`
-    );
+    logger.warn(`BullBoard access blocked in production from ${req.ip}`);
     return res.status(404).json({
       success: false,
       message: "Not found",
@@ -97,15 +98,18 @@ export const bullBoardEnvCheck = (
   }
 
   // Check IP whitelist in production (optional)
-  if (process.env.NODE_ENV === "production" && process.env.BULLBOARD_ALLOWED_IPS) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.BULLBOARD_ALLOWED_IPS
+  ) {
     const allowedIps = process.env.BULLBOARD_ALLOWED_IPS.split(",").map((ip) =>
-      ip.trim()
+      ip.trim(),
     );
     const clientIp = req.ip || req.socket.remoteAddress;
 
     if (clientIp && !allowedIps.includes(clientIp)) {
       logger.warn(
-        `BullBoard access denied for IP ${clientIp} - not in whitelist`
+        `BullBoard access denied for IP ${clientIp} - not in whitelist`,
       );
       return res.status(403).json({
         success: false,

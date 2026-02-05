@@ -30,13 +30,13 @@ export const webhookWorker = new Worker<WebhookData>(
   "webhook-processing",
   async (job: Job<WebhookData>) => {
     logger.info(`Processing webhook event: ${job.data.event}`);
-    
+
     try {
       const { event, payload, source } = job.data;
-      
+
       // Add your webhook processing logic here
       await new Promise((resolve) => setTimeout(resolve, 500));
-      
+
       logger.info(`Successfully processed webhook: ${event}`);
       return { success: true, event };
     } catch (error) {
@@ -47,7 +47,7 @@ export const webhookWorker = new Worker<WebhookData>(
   {
     connection: redis as any,
     concurrency: 10,
-  }
+  },
 );
 
 webhookWorker.on("completed", (job) => {

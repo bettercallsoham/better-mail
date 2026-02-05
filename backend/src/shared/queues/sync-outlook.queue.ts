@@ -31,13 +31,13 @@ export const outlookSyncWorker = new Worker<OutlookSyncData>(
   "outlook-sync",
   async (job: Job<OutlookSyncData>) => {
     logger.info(`Syncing Outlook for ${job.data.email}`);
-    
+
     try {
       const { accountId, email, deltaToken, fullSync } = job.data;
-      
+
       // Add your Outlook sync logic here
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      
+
       logger.info(`Successfully synced Outlook for ${email}`);
       return { success: true, accountId, messagesSynced: 0 };
     } catch (error) {
@@ -48,7 +48,7 @@ export const outlookSyncWorker = new Worker<OutlookSyncData>(
   {
     connection: redis as any,
     concurrency: 3,
-  }
+  },
 );
 
 outlookSyncWorker.on("completed", (job) => {

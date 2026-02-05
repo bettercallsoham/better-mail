@@ -27,9 +27,7 @@ export const bullBoard = createBullBoard({
         width: "50px",
         height: "50px",
       },
-      miscLinks: [
-        { text: "Documentation", url: "https://docs.bullmq.io" },
-      ],
+      miscLinks: [{ text: "Documentation", url: "https://docs.bullmq.io" }],
       favIcon: {
         default: "/logos/logo-black.svg",
         alternative: "static/favicon.ico",
@@ -37,7 +35,5 @@ export const bullBoard = createBullBoard({
     },
   },
 });
-
-
 
 export default serverAdapter;

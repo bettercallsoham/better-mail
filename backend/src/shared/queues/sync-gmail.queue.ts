@@ -31,13 +31,13 @@ export const gmailSyncWorker = new Worker<GmailSyncData>(
   "gmail-sync",
   async (job: Job<GmailSyncData>) => {
     logger.info(`Syncing Gmail for ${job.data.email}`);
-    
+
     try {
       const { accountId, email, historyId, fullSync } = job.data;
-      
+
       // Add your Gmail sync logic here
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      
+
       logger.info(`Successfully synced Gmail for ${email}`);
       return { success: true, accountId, messagesSynced: 0 };
     } catch (error) {
@@ -48,7 +48,7 @@ export const gmailSyncWorker = new Worker<GmailSyncData>(
   {
     connection: redis as any,
     concurrency: 3,
-  }
+  },
 );
 
 gmailSyncWorker.on("completed", (job) => {

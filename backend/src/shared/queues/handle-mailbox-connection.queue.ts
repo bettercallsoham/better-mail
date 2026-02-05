@@ -26,21 +26,21 @@ export const mailboxConnectionQueue = new Queue<MailboxConnectionData>(
         age: 24 * 3600, // Keep failed jobs for 24 hours
       },
     },
-  }
+  },
 );
 
 export const mailboxConnectionWorker = new Worker<MailboxConnectionData>(
   "mailbox-connection",
   async (job: Job<MailboxConnectionData>) => {
     logger.info(`Processing mailbox connection for ${job.data.email}`);
-    
+
     try {
       // Add your mailbox connection logic here
       const { accountId, email, provider } = job.data;
-      
+
       // Simulate processing
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      
+
       logger.info(`Successfully connected mailbox for ${email}`);
       return { success: true, accountId, email };
     } catch (error) {
@@ -51,7 +51,7 @@ export const mailboxConnectionWorker = new Worker<MailboxConnectionData>(
   {
     connection: redis as any,
     concurrency: 5,
-  }
+  },
 );
 
 mailboxConnectionWorker.on("completed", (job) => {
