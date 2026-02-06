@@ -3,6 +3,8 @@ import http from "http";
 import { createApp } from "./app";
 import { logger } from "./shared/utils/logger";
 import { connectDb } from "./shared/config/db";
+import { elasticClient } from "./shared/config/elastic";
+import { ElasticsearchService } from "./shared/services/elastic/elastic.service";
 const PORT = Number(process.env.APP_PORT) || 3001;
 
 async function startServer() {
@@ -10,6 +12,16 @@ async function startServer() {
   const app = createApp();
 
   const server = http.createServer(app);
+
+  const isElasticConnected = await elasticClient.ping();
+  if (!isElasticConnected) {
+    throw new Error("Elastic Service Not connected.");
+  } else {
+    console.log("Elastic Server connected successfully");
+  }
+
+  const elasticService = new ElasticsearchService(elasticClient);
+  await elasticService.ensureIndexes();
 
   server.listen(PORT, () => {
     logger.info(`🚀 Server running on http://localhost:${PORT}`);

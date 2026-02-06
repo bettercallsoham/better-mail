@@ -18,3 +18,5 @@ export const elasticClient = new Client({
     rejectUnauthorized: false,
   },
 });
+
+
