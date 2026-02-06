@@ -106,7 +106,7 @@ export class OutlookApiService {
     const client = await this.getClient();
 
     const expirationDate = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
+      Date.now() + 6 * 24 * 60 * 60 * 1000,
     ).toISOString();
 
     const res = await client.post(
@@ -143,7 +143,7 @@ export class OutlookApiService {
     const client = await this.getClient();
 
     const newExpiration = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
+      Date.now() + 6 * 24 * 60 * 60 * 1000,
     ).toISOString();
 
     const res = await client.patch(`/subscriptions/${subscriptionId}`, {
@@ -278,11 +278,3 @@ export class OutlookApiService {
     await client.delete(`/subscriptions/${subscriptionId}`);
   }
 }
-
-const main = async () => {
-  const os = new OutlookApiService({ email: "nerdyabhisharma@outlook.com" });
-  const result = await os.createEmailSubscription();
-  console.log(result);
-};
-
-main();

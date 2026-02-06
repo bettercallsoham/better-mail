@@ -7,6 +7,7 @@ import { EmailAccount, User } from "../../shared/models";
 import { GoogleOAuthService } from "../services/oauth/google-oauth.service";
 import { OutlookOAuthService } from "../services/oauth/outlook-oauth.service";
 import redis from "../../shared/config/redis";
+import { handleMailboxConnectionQueue } from "../../shared/queues/handle-mailbox-connection";
 
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined");
@@ -36,12 +37,12 @@ export const connectGmail = asyncHandler(
       `google:oauth:${state}`,
       JSON.stringify({ userId }),
       "EX",
-      300
+      300,
     );
 
     res.json(url);
   },
-  "connectGmail"
+  "connectGmail",
 );
 
 export const connectOutlook = asyncHandler(async (req, res) => {
@@ -61,7 +62,7 @@ export const connectOutlook = asyncHandler(async (req, res) => {
       codeVerifier,
     }),
     "EX",
-    300
+    300,
   );
   res.json(url);
 }, "connectOutlook");
@@ -113,11 +114,11 @@ export const gmailConnectCallback = asyncHandler(async (req, res) => {
     });
   }
 
-
   // add to handle-mailbox-connection-queue
-
-
-  // 
+  await handleMailboxConnectionQueue.add(handleMailboxConnectionQueue.name, {
+    provider: "gmail",
+    email: identity.email,
+  });
 
   res.json({
     success: true,
@@ -161,7 +162,7 @@ export const outlookConnectCallback = asyncHandler(
     const tokens = await OutlookOAuthService.exchangeCode(
       code,
       mode,
-      codeVerifier
+      codeVerifier,
     );
 
     if (!tokens.id_token) {
@@ -187,11 +188,16 @@ export const outlookConnectCallback = asyncHandler(
       refresh_token: tokens.refresh_token ?? null,
     });
 
+    await handleMailboxConnectionQueue.add(handleMailboxConnectionQueue.name, {
+      provider: "outlook",
+      email: identity.email,
+    });
+
     res.json({
       success: true,
       message: "Outlook connected successfully",
       email: identity.email,
     });
   },
-  "outlookConnectCallback"
+  "outlookConnectCallback",
 );

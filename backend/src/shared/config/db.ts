@@ -34,7 +34,7 @@ const sequelize = new Sequelize(PG_CONNECTION_STRING!, {
 const connectDb = async (): Promise<void> => {
   try {
     await sequelize.authenticate();
-    // await sequelize.sync({ alter: true });
+    await sequelize.sync({ alter: true });
     logger.info("Db Connected Succesfully");
   } catch (error: any) {
     console.log(error);

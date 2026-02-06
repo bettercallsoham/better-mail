@@ -4,7 +4,7 @@ import { EmailAccount } from "../shared/models";
 import { GmailApiService } from "../shared/services/gmail/gmail-api.service";
 import { OutlookApiService } from "../shared/services/outlook/outlook-api.service";
 import { logger } from "../shared/utils/logger";
-
+import "dotenv/config";
 interface MailboxConnectionData {
   accountId: string;
   email: string;
@@ -62,7 +62,6 @@ async function setupOutlookSubscription(
 async function cacheSubscriptionDetails(
   provider: string,
   email: string,
-  accountId: string,
   subscriptionId: string,
   expiresAt: Date,
 ): Promise<void> {
@@ -72,22 +71,21 @@ async function cacheSubscriptionDetails(
     JSON.stringify({
       subscriptionId,
       expiresAt: expiresAt.toISOString(),
-      accountId,
     }),
   );
 }
 
 async function processMailboxConnection(job: Job<MailboxConnectionData>) {
-  const { accountId, email, provider } = job.data;
+  const { email, provider } = job.data;
 
   logger.info(`Processing mailbox connection: ${email} (${provider})`);
 
   const emailAccount = await EmailAccount.findOne({
-    where: { id: accountId, email: email.toLowerCase() },
+    where: { email: email.toLowerCase() },
   });
 
   if (!emailAccount) {
-    throw new Error(`Email account not found: ${accountId}`);
+    throw new Error(`Email account not found: ${email}`);
   }
 
   // Setup subscription based on provider
@@ -103,13 +101,7 @@ async function processMailboxConnection(job: Job<MailboxConnectionData>) {
   });
 
   // Cache subscription details
-  await cacheSubscriptionDetails(
-    provider,
-    email,
-    accountId,
-    subscriptionId,
-    expiresAt,
-  );
+  await cacheSubscriptionDetails(provider, email, subscriptionId, expiresAt);
 
   logger.info(`Subscription saved for ${email}`);
 
@@ -117,7 +109,6 @@ async function processMailboxConnection(job: Job<MailboxConnectionData>) {
 
   return {
     success: true,
-    accountId,
     email,
     provider,
     subscriptionId,

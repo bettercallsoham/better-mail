@@ -2,7 +2,6 @@ import { Queue, Worker, Job } from "bullmq";
 import { redis } from "../config/redis";
 
 interface MailboxConnectionData {
-  accountId: string;
   email: string;
   provider: "google" | "outlook";
 }

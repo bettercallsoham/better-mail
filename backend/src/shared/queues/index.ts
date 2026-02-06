@@ -1,7 +1,4 @@
-/**
- * Central export file for all queue instances
- * Import from here to use queues throughout the application
- */
+
 
 export { webhookQueue, webhookWorker } from "./handle-webhook.queue";
 

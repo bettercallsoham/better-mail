@@ -7,6 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
+    "dev:worker": "ts-node-dev src/workers/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
