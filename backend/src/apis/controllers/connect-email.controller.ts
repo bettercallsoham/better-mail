@@ -116,7 +116,7 @@ export const gmailConnectCallback = asyncHandler(async (req, res) => {
 
   // add to handle-mailbox-connection-queue
   await handleMailboxConnectionQueue.add(handleMailboxConnectionQueue.name, {
-    provider: "gmail",
+    provider: "google",
     email: identity.email,
   });
 

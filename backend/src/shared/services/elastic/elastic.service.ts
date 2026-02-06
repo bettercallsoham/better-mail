@@ -1,4 +1,6 @@
-import { Client } from "@elastic/elasticsearch";
+import { Client, helpers } from "@elastic/elasticsearch";
+import { logger } from "../../utils/logger";
+import { UnifiedEmailDocument } from "./interface";
 
 export class ElasticsearchService {
   private readonly client: Client;
@@ -168,5 +170,99 @@ export class ElasticsearchService {
         },
       },
     });
+  }
+
+  // --------------------
+  // EMAIL OPERATIONS
+  // --------------------
+
+  /**
+   * Single insert - for real-time webhooks
+   */
+  async indexEmail(email: UnifiedEmailDocument): Promise<void> {
+    await this.client.index({
+      index: this.EMAILS_INDEX,
+      id: email.id,
+      document: email,
+    });
+  }
+
+  /**
+   * Bulk insert - uses Elasticsearch bulk API
+   * Call this multiple times, batching happens internally
+   */
+  async bulkIndexEmails(emails: UnifiedEmailDocument[]): Promise<void> {
+    if (emails.length === 0) return;
+
+    const operations = emails.flatMap((email) => [
+      { index: { _index: this.EMAILS_INDEX, _id: email.id } },
+      email,
+    ]);
+
+    const result = await this.client.bulk({ operations });
+
+    if (result.errors) {
+      const failed = result.items.filter((item) => item.index?.error);
+      logger.error(`Bulk index failed: ${failed.length} errors`);
+    } else {
+      logger.info(`Indexed ${emails.length} emails`);
+    }
+  }
+
+  /**
+   * Update single email
+   */
+  async updateEmail(
+    id: string,
+    updates: Partial<UnifiedEmailDocument>,
+  ): Promise<void> {
+    await this.client.update({
+      index: this.EMAILS_INDEX,
+      id,
+      doc: updates,
+    });
+  }
+
+  /**
+   * Search emails
+   */
+  async searchEmails(query: {
+    mailboxId: string;
+    searchText?: string;
+    from?: number;
+    size?: number;
+  }) {
+    const { mailboxId, searchText, from = 0, size = 20 } = query;
+
+    const must: any[] = [{ term: { mailboxId } }];
+
+    if (searchText) {
+      must.push({
+        multi_match: {
+          query: searchText,
+          fields: ["subject^3", "searchText^2", "snippet"],
+          fuzziness: "AUTO",
+        },
+      });
+    }
+
+    const result = await this.client.search({
+      index: this.EMAILS_INDEX,
+      from,
+      size,
+      query: { bool: { must } },
+      sort: [{ receivedAt: "desc" }],
+    });
+
+    return {
+      total:
+        typeof result.hits.total === "number"
+          ? result.hits.total
+          : result.hits.total?.value || 0,
+      emails: result.hits.hits.map((hit) => ({
+        ...(hit._source as UnifiedEmailDocument),
+        id: hit._id as string,
+      })),
+    };
   }
 }

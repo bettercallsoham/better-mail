@@ -178,19 +178,15 @@ export class GmailApiService {
   public async fetchLastNDaysEmails(
     days = 30,
     onMessage?: (msg: GmailMessage) => Promise<void>,
-  ): Promise<GmailMessage[]> {
-    const results: GmailMessage[] = [];
-
+  ): Promise<boolean> {
     for await (const messageId of this.iterateMessageIds(days)) {
       const message = await this.fetchMessage(messageId);
 
       if (onMessage) {
         await onMessage(message);
-      } else {
-        results.push(message);
       }
     }
 
-    return results;
+    return true;
   }
 }

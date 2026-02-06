@@ -25,35 +25,3 @@ export const webhookQueue = new Queue<WebhookData>("webhook-processing", {
     },
   },
 });
-
-export const webhookWorker = new Worker<WebhookData>(
-  "webhook-processing",
-  async (job: Job<WebhookData>) => {
-    logger.info(`Processing webhook event: ${job.data.event}`);
-
-    try {
-      const { event, payload, source } = job.data;
-
-      // Add your webhook processing logic here
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      logger.info(`Successfully processed webhook: ${event}`);
-      return { success: true, event };
-    } catch (error) {
-      logger.error(`Failed to process webhook: ${error}`);
-      throw error;
-    }
-  },
-  {
-    connection: redis as any,
-    concurrency: 10,
-  },
-);
-
-webhookWorker.on("completed", (job) => {
-  logger.info(`Webhook job ${job.id} completed`);
-});
-
-webhookWorker.on("failed", (job, err) => {
-  logger.error(`Webhook job ${job?.id} failed: ${err.message}`);
-});

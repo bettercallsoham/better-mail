@@ -5,6 +5,7 @@ import { GmailApiService } from "../shared/services/gmail/gmail-api.service";
 import { OutlookApiService } from "../shared/services/outlook/outlook-api.service";
 import { logger } from "../shared/utils/logger";
 import "dotenv/config";
+import { gmailSyncQueue, outlookSyncQueue } from "../shared/queues";
 interface MailboxConnectionData {
   accountId: string;
   email: string;
@@ -18,7 +19,7 @@ interface SubscriptionResult {
 
 const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60;
 
-async function setupGmailWatch(email: string): Promise<SubscriptionResult> {
+async function processGmail(email: string): Promise<SubscriptionResult> {
   const gmailService = new GmailApiService({ email });
   const watchResponse = await gmailService.watchMailbox();
 
@@ -35,15 +36,17 @@ async function setupGmailWatch(email: string): Promise<SubscriptionResult> {
     `Gmail watch setup for ${email}, expires ${expiresAt.toISOString()}`,
   );
 
+  await gmailSyncQueue.add(gmailSyncQueue.name, {
+    email,
+  });
+
   return {
     subscriptionId: watchResponse.historyId,
     expiresAt,
   };
 }
 
-async function setupOutlookSubscription(
-  email: string,
-): Promise<SubscriptionResult> {
+async function processOutlook(email: string): Promise<SubscriptionResult> {
   const outlookService = new OutlookApiService({ email });
   const subscription = await outlookService.createEmailSubscription();
 
@@ -52,6 +55,10 @@ async function setupOutlookSubscription(
   logger.info(
     `Outlook subscription ${subscription.isExisting ? "exists" : "created"} for ${email}`,
   );
+
+  await outlookSyncQueue.add(outlookSyncQueue.name, {
+    email,
+  });
 
   return {
     subscriptionId: subscription.subscriptionId,
@@ -91,8 +98,8 @@ async function processMailboxConnection(job: Job<MailboxConnectionData>) {
   // Setup subscription based on provider
   const { subscriptionId, expiresAt } =
     provider === "google"
-      ? await setupGmailWatch(email)
-      : await setupOutlookSubscription(email);
+      ? await processGmail(email)
+      : await processOutlook(email);
 
   // Update database
   await emailAccount.update({

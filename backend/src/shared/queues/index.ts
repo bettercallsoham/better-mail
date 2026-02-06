@@ -1,12 +1,9 @@
+export { webhookQueue } from "./handle-webhook.queue";
 
+export { gmailSyncQueue } from "./sync-gmail.queue";
 
-export { webhookQueue, webhookWorker } from "./handle-webhook.queue";
+export { outlookSyncQueue } from "./sync-outlook.queue";
 
-export { gmailSyncQueue, gmailSyncWorker } from "./sync-gmail.queue";
-
-export { outlookSyncQueue, outlookSyncWorker } from "./sync-outlook.queue";
-
-// Queue names for reference
 export const QUEUE_NAMES = {
   MAILBOX_CONNECTION: "mailbox-connection",
   WEBHOOK_PROCESSING: "webhook-processing",

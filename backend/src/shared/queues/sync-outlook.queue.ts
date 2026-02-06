@@ -2,11 +2,9 @@ import { Queue, Worker, Job } from "bullmq";
 import { redis } from "../config/redis";
 import { logger } from "../utils/logger";
 
-interface OutlookSyncData {
-  accountId: string;
+export interface OutlookSyncData {
   email: string;
-  deltaToken?: string;
-  fullSync?: boolean;
+  daysBack?: number;
 }
 
 export const outlookSyncQueue = new Queue<OutlookSyncData>("outlook-sync", {
@@ -25,36 +23,4 @@ export const outlookSyncQueue = new Queue<OutlookSyncData>("outlook-sync", {
       age: 24 * 3600,
     },
   },
-});
-
-export const outlookSyncWorker = new Worker<OutlookSyncData>(
-  "outlook-sync",
-  async (job: Job<OutlookSyncData>) => {
-    logger.info(`Syncing Outlook for ${job.data.email}`);
-
-    try {
-      const { accountId, email, deltaToken, fullSync } = job.data;
-
-      // Add your Outlook sync logic here
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      logger.info(`Successfully synced Outlook for ${email}`);
-      return { success: true, accountId, messagesSynced: 0 };
-    } catch (error) {
-      logger.error(`Failed to sync Outlook: ${error}`);
-      throw error;
-    }
-  },
-  {
-    connection: redis as any,
-    concurrency: 3,
-  },
-);
-
-outlookSyncWorker.on("completed", (job) => {
-  logger.info(`Outlook sync job ${job.id} completed`);
-});
-
-outlookSyncWorker.on("failed", (job, err) => {
-  logger.error(`Outlook sync job ${job?.id} failed: ${err.message}`);
 });
