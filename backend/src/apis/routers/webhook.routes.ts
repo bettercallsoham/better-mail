@@ -45,8 +45,11 @@ router.post("/", async (req, res) => {
 
 router.post("/outlook", async (req, res) => {
   try {
+    console.log("Webhook recieved outlook");
     // Validation handshake
     if (req.query.validationToken) {
+      console.log(" validation outlook");
+
       return res.status(200).send(req.query.validationToken);
     }
 
@@ -83,7 +86,7 @@ router.post("/outlook", async (req, res) => {
         mailboxId = data.mailboxId;
       } else {
         const account = await EmailAccount.findOne({
-          where: { subscription_id: subscriptionId, provider: "outlook" },
+          where: { subscription_id: subscriptionId, provider: "OUTLOOK" },
         });
 
         if (!account) {

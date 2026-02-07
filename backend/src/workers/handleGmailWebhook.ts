@@ -17,16 +17,16 @@ async function processGmailWebhook(job: Job<GmailWebhookJobData>) {
     `Processing Gmail webhook: ${email}, historyId: ${lastHistoryId}`,
   );
 
-  // Query mailboxId from DB
-  const emailAccount = await EmailAccount.findOne({
-    where: { email: email.toLowerCase(), provider: "gmail" },
-  });
+  //   // Query mailboxId from DB
+  //   const emailAccount = await EmailAccount.findOne({
+  //     where: { email: email.toLowerCase(), provider: "GOOGLE" },
+  //   });
 
-  if (!emailAccount) {
-    throw new Error(`Gmail account not found: ${email}`);
-  }
+  //   if (!emailAccount) {
+  //     throw new Error(`Gmail account not found: ${email}`);
+  //   }
 
-  const mailboxId = emailAccount.id;
+  //   const mailboxId = emailAccount.id;
   const gmailService = new GmailApiService({ email });
   const messages = await gmailService.fetchHistorySince(lastHistoryId);
 
@@ -35,9 +35,7 @@ async function processGmailWebhook(job: Job<GmailWebhookJobData>) {
     return { success: true, email, totalIndexed: 0 };
   }
 
-  const documents = messages.map((msg) =>
-    transformGmailToUnified(msg, mailboxId),
-  );
+  const documents = messages.map((msg) => transformGmailToUnified(msg, ""));
 
   await elasticService.bulkIndexEmails(documents);
 

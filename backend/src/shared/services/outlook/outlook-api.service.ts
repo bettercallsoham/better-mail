@@ -298,3 +298,4 @@ export class OutlookApiService {
     await client.delete(`/subscriptions/${subscriptionId}`);
   }
 }
+
