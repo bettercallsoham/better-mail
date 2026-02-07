@@ -2,7 +2,11 @@ import axios, { AxiosInstance } from "axios";
 import "dotenv/config";
 import redis from "../../config/redis";
 import { EmailAccount } from "../../models";
-import { OutlookMessage, OutlookAttachment } from "./interfaces";
+import {
+  OutlookMessage,
+  OutlookAttachment,
+  SendEmailInput,
+} from "./interfaces";
 
 export class OutlookApiService {
   private client?: AxiosInstance;
@@ -296,6 +300,205 @@ export class OutlookApiService {
   public async deleteSubscription(subscriptionId: string) {
     const client = await this.getClient();
     await client.delete(`/subscriptions/${subscriptionId}`);
+  }
+
+  private async sendNewMail(input: SendEmailInput): Promise<string> {
+    const client = await this.getClient();
+
+    const res = await client.post("/me/sendMail", {
+      message: {
+        subject: input.subject,
+        body: {
+          contentType: "HTML",
+          content: input.html,
+        },
+        toRecipients: input.to?.map((address) => ({
+          emailAddress: { address },
+        })),
+        ccRecipients: input.cc?.map((address) => ({
+          emailAddress: { address },
+        })),
+        bccRecipients: input.bcc?.map((address) => ({
+          emailAddress: { address },
+        })),
+        attachments: input.attachments?.map((a) => ({
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: a.name,
+          contentType: a.contentType,
+          contentBytes: a.contentBase64,
+        })),
+      },
+    });
+
+    return res.status.toString();
+  }
+
+  private async replyToMessage(
+    messageId: string,
+    input: SendEmailInput,
+  ): Promise<string> {
+    const client = await this.getClient();
+
+    // 1. Create reply draft
+    const draft = await client.post(`/me/messages/${messageId}/createReply`);
+
+    const draftId = draft.data.id;
+
+    // 2. Patch body / recipients / attachments
+    const updatePayload: any = {
+      body: {
+        contentType: "HTML",
+        content: input.html,
+      },
+    };
+
+    if (input.cc?.length) {
+      updatePayload.ccRecipients = input.cc.map((address) => ({
+        emailAddress: { address },
+      }));
+    }
+
+    await client.patch(`/me/messages/${draftId}`, updatePayload);
+
+    // 3. Add attachments separately if any
+    if (input.attachments?.length) {
+      for (const attachment of input.attachments) {
+        await client.post(`/me/messages/${draftId}/attachments`, {
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: attachment.name,
+          contentType: attachment.contentType,
+          contentBytes: attachment.contentBase64,
+        });
+      }
+    }
+
+    // 4. Send
+    await client.post(`/me/messages/${draftId}/send`);
+
+    return draftId;
+  }
+
+  private async replyAllToMessage(
+    messageId: string,
+    input: SendEmailInput,
+  ): Promise<string> {
+    const client = await this.getClient();
+
+    const draft = await client.post(`/me/messages/${messageId}/createReplyAll`);
+
+    const draftId = draft.data.id;
+
+    const updatePayload: any = {
+      body: {
+        contentType: "HTML",
+        content: input.html,
+      },
+    };
+
+    if (input.cc?.length) {
+      updatePayload.ccRecipients = input.cc.map((address) => ({
+        emailAddress: { address },
+      }));
+    }
+
+    await client.patch(`/me/messages/${draftId}`, updatePayload);
+
+    // Add attachments separately if any
+    if (input.attachments?.length) {
+      for (const attachment of input.attachments) {
+        await client.post(`/me/messages/${draftId}/attachments`, {
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: attachment.name,
+          contentType: attachment.contentType,
+          contentBytes: attachment.contentBase64,
+        });
+      }
+    }
+
+    await client.post(`/me/messages/${draftId}/send`);
+
+    return draftId;
+  }
+
+  private async forwardMessage(
+    messageId: string,
+    input: SendEmailInput,
+  ): Promise<string> {
+    const client = await this.getClient();
+
+    // 1. Create forward draft (Outlook automatically includes original message)
+    const draft = await client.post(`/me/messages/${messageId}/createForward`);
+    const draftId = draft.data.id;
+
+    // 2. Update draft with custom HTML and recipients
+    const updatePayload: any = {
+      body: {
+        contentType: "HTML",
+        content: input.html,
+      },
+      toRecipients: input.to?.map((address) => ({
+        emailAddress: { address },
+      })),
+    };
+
+    if (input.cc?.length) {
+      updatePayload.ccRecipients = input.cc.map((address) => ({
+        emailAddress: { address },
+      }));
+    }
+
+    if (input.bcc?.length) {
+      updatePayload.bccRecipients = input.bcc.map((address) => ({
+        emailAddress: { address },
+      }));
+    }
+
+    await client.patch(`/me/messages/${draftId}`, updatePayload);
+
+    // 3. Add additional attachments separately if any
+    if (input.attachments?.length) {
+      for (const attachment of input.attachments) {
+        await client.post(`/me/messages/${draftId}/attachments`, {
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: attachment.name,
+          contentType: attachment.contentType,
+          contentBytes: attachment.contentBase64,
+        });
+      }
+    }
+
+    // 4. Send
+    await client.post(`/me/messages/${draftId}/send`);
+
+    return draftId;
+  }
+
+  public async sendEmail(input: SendEmailInput): Promise<string> {
+    switch (input.mode) {
+      case "new":
+        return this.sendNewMail(input);
+
+      case "reply":
+        if (!input.replyToMessageId) {
+          throw new Error("replyToMessageId required");
+        }
+        return this.replyToMessage(input.replyToMessageId, input);
+
+      case "reply_all":
+        if (!input.replyToMessageId) {
+          throw new Error("replyToMessageId required");
+        }
+        return this.replyAllToMessage(input.replyToMessageId, input);
+
+      case "forward":
+        if (!input.replyToMessageId) {
+          throw new Error("replyToMessageId required for forward");
+        }
+        return this.forwardMessage(input.replyToMessageId, input);
+
+      default:
+        throw new Error(`Unsupported mode: ${input.mode}`);
+    }
   }
 }
 

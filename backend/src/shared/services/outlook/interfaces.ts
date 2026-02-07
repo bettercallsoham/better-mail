@@ -1,3 +1,5 @@
+import { OutlookApiService } from "./outlook-api.service";
+
 export interface OutlookAttachment {
   id: string;
   name: string;
@@ -8,6 +10,32 @@ export interface OutlookAttachment {
   "@odata.type": string;
   contentBytes?: string; // Base64 encoded (if fetched)
 }
+
+export interface OutlookEmailAttachment {
+  name: string;
+  contentType: string;
+  contentBase64: string;
+  size?: number;
+}
+
+export type SendEmailInput = {
+  mode: "new" | "reply" | "reply_all" | "forward";
+
+  from?: string; // Not used in Outlook (uses authenticated user)
+
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
+
+  subject?: string;
+  html: string;
+  text?: string;
+
+  // threading
+  replyToMessageId?: string; // Outlook message id
+
+  attachments?: OutlookEmailAttachment[];
+};
 
 export interface OutlookMessage {
   id: string;
@@ -52,3 +80,5 @@ export interface OutlookMessage {
     value: string;
   }[];
 }
+
+
