@@ -1,6 +1,54 @@
 import axios from "axios";
 import redis from "../../config/redis";
 import "dotenv/config";
+import { UnifiedEmailDocument } from "../../services/elastic/interface";
+import { OutlookMessage } from "../../services/outlook/interfaces";
+
+export function transformOutlookToUnified(
+  msg: OutlookMessage,
+  mailboxId: string,
+): UnifiedEmailDocument {
+  const parseAddress = (addr: any) => ({
+    name: addr?.emailAddress?.name,
+    email: addr?.emailAddress?.address || "",
+  });
+
+  return {
+    id: msg.id,
+    provider: "outlook",
+    providerMessageId: msg.id,
+    providerThreadId: msg.conversationId || msg.id,
+    mailboxId,
+
+    threadId: msg.conversationId || msg.id,
+    isThreadRoot: false,
+
+    receivedAt: msg.receivedDateTime,
+    sentAt: msg.sentDateTime || msg.receivedDateTime,
+    indexedAt: new Date().toISOString(),
+
+    from: parseAddress(msg.from),
+    to: (msg.toRecipients || []).map(parseAddress),
+    cc: (msg.ccRecipients || []).map(parseAddress),
+    bcc: [],
+
+    subject: msg.subject || "",
+    snippet: msg.bodyPreview || "",
+    bodyHtml: msg.body?.content || "",
+    searchText: `${msg.subject} ${msg.bodyPreview}`,
+
+    hasAttachments: msg.hasAttachments || false,
+    attachments: [],
+
+    isRead: false,
+    isStarred: false,
+    isArchived: false,
+    isDeleted: false,
+
+    labels: [],
+    providerLabels: [],
+  };
+}
 
 const tenantId = process.env.MICROSOFT_TENANT_ID;
 if (!tenantId) {
@@ -35,7 +83,7 @@ export async function refreshOutlookAccessToken({
     }),
     {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    }
+    },
   );
 
   const { access_token, refresh_token, expires_in } = response.data;

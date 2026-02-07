@@ -1,6 +1,5 @@
-import { Queue, Worker, Job } from "bullmq";
+import { Queue } from "bullmq";
 import { redis } from "../config/redis";
-import { logger } from "../utils/logger";
 
 export interface OutlookSyncData {
   email: string;

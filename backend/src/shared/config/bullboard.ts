@@ -3,7 +3,10 @@ import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { ExpressAdapter } from "@bull-board/express";
 import { Queue } from "bullmq";
 import { handleMailboxConnectionQueue } from "../queues/handle-mailbox-connection";
-import { webhookQueue } from "../queues/handle-webhook.queue";
+import {
+  gmailWebhookQueue,
+  outlookWebhookQueue,
+} from "../queues/handle-webhook.queue";
 import { gmailSyncQueue } from "../queues/sync-gmail.queue";
 import { outlookSyncQueue } from "../queues/sync-outlook.queue";
 
@@ -14,7 +17,8 @@ serverAdapter.setBasePath("/admin/queues");
 export const bullBoard = createBullBoard({
   queues: [
     new BullMQAdapter(handleMailboxConnectionQueue),
-    new BullMQAdapter(webhookQueue),
+    new BullMQAdapter(gmailWebhookQueue),
+    new BullMQAdapter(outlookWebhookQueue),
     new BullMQAdapter(gmailSyncQueue),
     new BullMQAdapter(outlookSyncQueue),
   ],

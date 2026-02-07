@@ -6,56 +6,11 @@ import { ElasticsearchService } from "../shared/services/elastic/elastic.service
 import { elasticClient } from "../shared/config/elastic";
 import { logger } from "../shared/utils/logger";
 import { UnifiedEmailDocument } from "../shared/services/elastic/interface";
-import { GmailMessage } from "../shared/services/gmail/interfaces";
 import { GmailSyncData } from "../shared/queues/sync-gmail.queue";
+import { transformGmailToUnified } from "../shared/utils/helpers/gmail-helper";
 
 const elasticService = new ElasticsearchService(elasticClient);
 const BATCH_SIZE = 100;
-
-function transformGmailToUnified(
-  msg: GmailMessage,
-  mailboxId: string,
-): UnifiedEmailDocument {
-  const headers = msg.payload?.headers || [];
-  const getHeader = (name: string) =>
-    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ||
-    "";
-
-  return {
-    id: msg.id,
-    provider: "gmail",
-    providerMessageId: msg.id,
-    providerThreadId: msg.threadId,
-    mailboxId,
-
-    threadId: msg.threadId,
-    isThreadRoot: false, // TODO: determine based on thread logic
-
-    receivedAt: new Date(parseInt(msg.internalDate)).toISOString(),
-    sentAt: new Date(parseInt(msg.internalDate)).toISOString(),
-    indexedAt: new Date().toISOString(),
-
-    from: { email: getHeader("From") },
-    to: [{ email: getHeader("To") }],
-    cc: [],
-    bcc: [],
-
-    subject: getHeader("Subject"),
-    snippet: msg.snippet || "",
-    searchText: `${getHeader("Subject")} ${msg.snippet}`,
-
-    hasAttachments: msg.payload?.parts?.some((p) => p.filename) || false,
-    attachments: [],
-
-    isRead: !msg.labelIds?.includes("UNREAD"),
-    isStarred: msg.labelIds?.includes("STARRED") || false,
-    isArchived: !msg.labelIds?.includes("INBOX"),
-    isDeleted: msg.labelIds?.includes("TRASH") || false,
-
-    labels: msg.labelIds || [],
-    providerLabels: msg.labelIds || [],
-  };
-}
 
 async function processGmailSync(job: Job<GmailSyncData>) {
   const { email, daysBack = 30 } = job.data;
@@ -77,6 +32,7 @@ async function processGmailSync(job: Job<GmailSyncData>) {
 
   const processBatch = async () => {
     if (batch.length > 0) {
+      job.log(JSON.stringify(batch));
       await elasticService.bulkIndexEmails(batch);
       totalSynced += batch.length;
       logger.info(

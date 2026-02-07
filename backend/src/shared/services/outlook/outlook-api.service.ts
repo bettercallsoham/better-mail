@@ -208,6 +208,26 @@ export class OutlookApiService {
 
   /* ===================== CORE ITERATOR ===================== */
 
+  /**
+   * Fetch a single message by ID
+   */
+  public async fetchMessageById(
+    messageId: string,
+  ): Promise<OutlookMessage | null> {
+    const client = await this.getClient();
+
+    try {
+      const res = await client.get(`/me/messages/${messageId}`);
+      return res.data as OutlookMessage;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        console.warn(`Message not found: ${messageId}`);
+        return null;
+      }
+      throw error;
+    }
+  }
+
   private async *iterateMessages(days: number, includeAttachments = false) {
     const client = await this.getClient();
 

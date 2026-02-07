@@ -6,55 +6,10 @@ import { ElasticsearchService } from "../shared/services/elastic/elastic.service
 import { elasticClient } from "../shared/config/elastic";
 import { logger } from "../shared/utils/logger";
 import { UnifiedEmailDocument } from "../shared/services/elastic/interface";
-import { OutlookMessage } from "../shared/services/outlook/interfaces";
 import { OutlookSyncData } from "../shared/queues/sync-outlook.queue";
+import { transformOutlookToUnified } from "../shared/utils/helpers/outlook-helper";
 
 const elasticService = new ElasticsearchService(elasticClient);
-
-function transformOutlookToUnified(
-  msg: OutlookMessage,
-  mailboxId: string,
-): UnifiedEmailDocument {
-  const parseAddress = (addr: any) => ({
-    name: addr?.emailAddress?.name,
-    email: addr?.emailAddress?.address || "",
-  });
-
-  return {
-    id: msg.id,
-    provider: "outlook",
-    providerMessageId: msg.id,
-    providerThreadId: msg.conversationId || msg.id,
-    mailboxId,
-
-    threadId: msg.conversationId || msg.id,
-    isThreadRoot: false, // TODO: determine based on thread logic
-
-    receivedAt: msg.receivedDateTime,
-    sentAt: msg.sentDateTime || msg.receivedDateTime,
-    indexedAt: new Date().toISOString(),
-
-    from: parseAddress(msg.from),
-    to: (msg.toRecipients || []).map(parseAddress),
-    cc: (msg.ccRecipients || []).map(parseAddress),
-    bcc: [],
-
-    subject: msg.subject || "",
-    snippet: msg.bodyPreview || "",
-    searchText: `${msg.subject} ${msg.bodyPreview}`,
-
-    hasAttachments: msg.hasAttachments || false,
-    attachments: [],
-
-    isRead: false,
-    isStarred: false,
-    isArchived: false,
-    isDeleted: false,
-
-    labels: [],
-    providerLabels: [],
-  };
-}
 
 async function processOutlookSync(job: Job<OutlookSyncData>) {
   const { email, daysBack = 30 } = job.data;

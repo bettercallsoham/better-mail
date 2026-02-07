@@ -98,6 +98,8 @@ export class ElasticsearchService {
           },
 
           subject: { type: "text", analyzer: "email_search" },
+          bodyText: { type: "text", analyzer: "email_search" },
+          bodyHtml: { type: "text", index: false },
           snippet: { type: "text", analyzer: "email_search" },
           searchText: { type: "text", analyzer: "email_search" },
 
@@ -118,7 +120,6 @@ export class ElasticsearchService {
           isArchived: { type: "boolean" },
           isDeleted: { type: "boolean" },
 
-          inboxState: { type: "keyword" },
           labels: { type: "keyword" },
           providerLabels: { type: "keyword" },
 

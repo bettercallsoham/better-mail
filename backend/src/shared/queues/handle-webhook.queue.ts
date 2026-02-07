@@ -1,27 +1,56 @@
-import { Queue, Worker, Job } from "bullmq";
+import { Queue } from "bullmq";
 import { redis } from "../config/redis";
-import { logger } from "../utils/logger";
 
-interface WebhookData {
-  event: string;
-  payload: Record<string, any>;
-  source: string;
+export interface GmailWebhookJobData {
+  email: string;
+  historyId: string;
+  lastHistoryId: string;
 }
 
-export const webhookQueue = new Queue<WebhookData>("webhook-processing", {
-  connection: redis as any,
-  defaultJobOptions: {
-    attempts: 5,
-    backoff: {
-      type: "exponential",
-      delay: 3000,
-    },
-    removeOnComplete: {
-      age: 3600,
-      count: 100,
-    },
-    removeOnFail: {
-      age: 24 * 3600,
+export interface OutlookWebhookJobData {
+  email: string;
+  mailboxId: string;
+  messageId: string;
+}
+
+export const gmailWebhookQueue = new Queue<GmailWebhookJobData>(
+  "gmail-webhook",
+  {
+    connection: redis as any,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: "exponential",
+        delay: 2000,
+      },
+      removeOnComplete: {
+        age: 3600,
+        count: 100,
+      },
+      removeOnFail: {
+        age: 24 * 3600,
+      },
     },
   },
-});
+);
+
+export const outlookWebhookQueue = new Queue<OutlookWebhookJobData>(
+  "outlook-webhook",
+  {
+    connection: redis as any,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: "exponential",
+        delay: 2000,
+      },
+      removeOnComplete: {
+        age: 3600,
+        count: 100,
+      },
+      removeOnFail: {
+        age: 24 * 3600,
+      },
+    },
+  },
+);

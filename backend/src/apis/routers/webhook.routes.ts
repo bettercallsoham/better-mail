@@ -1,6 +1,10 @@
 import { Router } from "express";
 import redis from "../../shared/config/redis";
-import { GmailApiService } from "../../shared/services/gmail/gmail-api.service";
+import { EmailAccount } from "../../shared/models";
+import {
+  gmailWebhookQueue,
+  outlookWebhookQueue,
+} from "../../shared/queues/handle-webhook.queue";
 
 const router = Router();
 
@@ -8,16 +12,11 @@ router.post("/", async (req, res) => {
   try {
     const message = req.body?.message;
 
-    console.log("-----------------------WEBHOOK RECIEVED----------------");
-    console.dir(req.body);
-
     if (!message?.data) {
-      console.log("No data in Pub/Sub message");
       return res.sendStatus(204);
     }
 
     const decoded = Buffer.from(message.data, "base64").toString("utf8");
-
     const payload = JSON.parse(decoded);
     const { emailAddress, historyId } = payload;
 
@@ -27,33 +26,29 @@ router.post("/", async (req, res) => {
       return res.sendStatus(200);
     }
 
+    // Enqueue webhook job (mailboxId will be queried in worker)
+    await gmailWebhookQueue.add("process-gmail-webhook", {
+      email: emailAddress,
+      historyId,
+      lastHistoryId,
+    });
+
+    // Update last history ID
     await redis.set(`history-id-${emailAddress}`, historyId);
-
-    const gs = new GmailApiService({ email: emailAddress });
-
-    const result = await gs.fetchHistorySince(lastHistoryId);
-
-    console.log(result);
 
     return res.sendStatus(200);
   } catch (err) {
-    console.error("Webhook error:", err);
+    console.error("Gmail webhook error:", err);
     return res.sendStatus(200);
   }
 });
 
 router.post("/outlook", async (req, res) => {
   try {
-    // 1️⃣ Validation handshake (MANDATORY)
+    // Validation handshake
     if (req.query.validationToken) {
-      console.log("🔐 Outlook webhook validation");
       return res.status(200).send(req.query.validationToken);
     }
-
-    console.log(
-      "----------------------- OUTLOOK WEBHOOK RECEIVED -----------------------",
-    );
-    console.dir(req.body, { depth: null });
 
     const notifications = req.body?.value;
 
@@ -62,42 +57,60 @@ router.post("/outlook", async (req, res) => {
     }
 
     for (const n of notifications) {
-      // 2️⃣ Security check
+      // Security check
       if (n.clientState !== process.env.OUTLOOK_CLIENT_STATE) {
-        console.warn("❌ Invalid clientState, ignoring");
+        console.warn("Invalid clientState, ignoring");
         continue;
       }
 
       const messageId = n.resourceData?.id;
-      const conversationId = n.resourceData?.conversationId;
+      const subscriptionId = n.subscriptionId;
 
-      if (!messageId) {
+      if (!messageId || !subscriptionId) {
         continue;
       }
 
-      console.log("📨 Outlook message change", {
-        changeType: n.changeType,
-        messageId,
-        conversationId,
-      });
+      // Get email and mailboxId from cache or DB
+      const cacheKey = `subscription:${subscriptionId}`;
+      let cached = await redis.get(cacheKey);
 
-      /**
-       * IMPORTANT:
-       * Do NOT fetch the email here.
-       * Enqueue a job instead.
-       *
-       * queue.add("fetch-outlook-message", {
-       *   messageId,
-       *   subscriptionId: n.subscriptionId
-       * });
-       */
+      let email: string;
+      let mailboxId: string;
+
+      if (cached) {
+        const data = JSON.parse(cached);
+        email = data.email;
+        mailboxId = data.mailboxId;
+      } else {
+        const account = await EmailAccount.findOne({
+          where: { subscription_id: subscriptionId, provider: "outlook" },
+        });
+
+        if (!account) {
+          console.error(
+            `Outlook account not found for subscription: ${subscriptionId}`,
+          );
+          continue;
+        }
+
+        email = account.email;
+        mailboxId = account.id;
+
+        // Cache for 1 hour
+        await redis.setex(cacheKey, 3600, JSON.stringify({ email, mailboxId }));
+      }
+
+      // Enqueue webhook job
+      await outlookWebhookQueue.add("process-outlook-webhook", {
+        email,
+        mailboxId,
+        messageId,
+      });
     }
 
-    // 3️⃣ Always ACK fast
     return res.sendStatus(202);
   } catch (err) {
-    console.error("🔥 Outlook webhook error:", err);
-    // NEVER return non-2xx or Graph will retry
+    console.error("Outlook webhook error:", err);
     return res.sendStatus(202);
   }
 });
