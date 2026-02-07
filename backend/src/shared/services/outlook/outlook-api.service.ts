@@ -11,6 +11,7 @@ import {
 export class OutlookApiService {
   private client?: AxiosInstance;
   private email: string;
+  private folderCache = new Map<string, string>();
 
   constructor({ email }: { email: string }) {
     this.email = email.toLowerCase();
@@ -500,5 +501,117 @@ export class OutlookApiService {
         throw new Error(`Unsupported mode: ${input.mode}`);
     }
   }
-}
 
+  private async patchMessage(
+    messageId: string,
+    body: Record<string, any>,
+  ): Promise<void> {
+    const client = await this.getClient();
+    await client.patch(`/me/messages/${messageId}`, body);
+  }
+
+  private async moveMessage(
+    messageId: string,
+    destinationFolderId: string,
+  ): Promise<void> {
+    const client = await this.getClient();
+    await client.post(`/me/messages/${messageId}/move`, {
+      destinationId: destinationFolderId,
+    });
+  }
+
+  async markRead(messageIds: string[]): Promise<void> {
+    for (const id of messageIds) {
+      await this.patchMessage(id, { isRead: true });
+    }
+  }
+
+  async markUnread(messageIds: string[]): Promise<void> {
+    for (const id of messageIds) {
+      await this.patchMessage(id, { isRead: false });
+    }
+  }
+
+  async star(messageIds: string[]): Promise<void> {
+    for (const id of messageIds) {
+      await this.patchMessage(id, {
+        flag: { flagStatus: "flagged" },
+      });
+    }
+  }
+
+  async unstar(messageIds: string[]): Promise<void> {
+    for (const id of messageIds) {
+      await this.patchMessage(id, {
+        flag: { flagStatus: "notFlagged" },
+      });
+    }
+  }
+  private async getFolderId(displayName: string): Promise<string> {
+    if (this.folderCache.has(displayName)) {
+      return this.folderCache.get(displayName)!;
+    }
+
+    const client = await this.getClient();
+    const res = await client.get("/me/mailFolders");
+
+    const folder = res.data.value.find(
+      (f: any) => f.displayName.toLowerCase() === displayName.toLowerCase(),
+    );
+
+    if (!folder) {
+      throw new Error(`Folder not found: ${displayName}`);
+    }
+
+    this.folderCache.set(displayName, folder.id);
+    return folder.id;
+  }
+
+  async archive(messageIds: string[]): Promise<void> {
+    const archiveFolderId = await this.getFolderId("Archive");
+
+    for (const id of messageIds) {
+      await this.moveMessage(id, archiveFolderId);
+    }
+  }
+
+  async unarchive(messageIds: string[]): Promise<void> {
+    const inboxFolderId = await this.getFolderId("Inbox");
+
+    for (const id of messageIds) {
+      await this.moveMessage(id, inboxFolderId);
+    }
+  }
+
+  async trash(messageIds: string[]): Promise<void> {
+    const client = await this.getClient();
+
+    for (const id of messageIds) {
+      await client.delete(`/me/messages/${id}`);
+    }
+  }
+
+  async restoreFromTrash(messageIds: string[]): Promise<void> {
+    const inboxFolderId = await this.getFolderId("Inbox");
+
+    for (const id of messageIds) {
+      await this.moveMessage(id, inboxFolderId);
+    }
+  }
+
+  async applyCategory(messageIds: string[], category: string): Promise<void> {
+    for (const id of messageIds) {
+      await this.patchMessage(id, {
+        categories: [category],
+      });
+    }
+  }
+
+  async removeCategory(messageIds: string[], category: string): Promise<void> {
+    for (const id of messageIds) {
+      await this.patchMessage(id, {
+        categories: [],
+      });
+    }
+  }
+}

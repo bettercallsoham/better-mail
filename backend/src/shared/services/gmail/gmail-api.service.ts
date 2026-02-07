@@ -356,4 +356,88 @@ export class GmailApiService {
 
     return res.data.id;
   }
+
+  private async modifyMessages(params: {
+    messageIds: string[];
+    addLabels?: string[];
+    removeLabels?: string[];
+  }): Promise<void> {
+    const client = await this.getClient();
+
+    await client.post("/users/me/messages/batchModify", {
+      ids: params.messageIds,
+      addLabelIds: params.addLabels,
+      removeLabelIds: params.removeLabels,
+    });
+  }
+
+  async markRead(messageIds: string[]): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      removeLabels: ["UNREAD"],
+    });
+  }
+
+  async markUnread(messageIds: string[]): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      addLabels: ["UNREAD"],
+    });
+  }
+
+  async archive(messageIds: string[]): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      removeLabels: ["INBOX"],
+    });
+  }
+
+  async unarchive(messageIds: string[]): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      addLabels: ["INBOX"],
+    });
+  }
+
+  async trash(messageIds: string[]): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      addLabels: ["TRASH"],
+      removeLabels: ["INBOX"],
+    });
+  }
+
+  async restoreFromTrash(messageIds: string[]): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      removeLabels: ["TRASH"],
+      addLabels: ["INBOX"],
+    });
+  }
+
+  async applyLabel(messageIds: string[], labelId: string): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      addLabels: [labelId],
+    });
+  }
+
+  async removeLabel(messageIds: string[], labelId: string): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      removeLabels: [labelId],
+    });
+  }
+
+  async createLabel(name: string): Promise<string> {
+    const client = await this.getClient();
+
+    const res = await client.post("/users/me/labels", {
+      name,
+      labelListVisibility: "labelShow",
+      messageListVisibility: "show",
+    });
+
+    return res.data.id;
+  }
 }
