@@ -2,7 +2,8 @@ import axios, { AxiosInstance } from "axios";
 import "dotenv/config";
 import redis from "../../config/redis";
 import { EmailAccount } from "../../models";
-import { GmailMessage } from "./interfaces";
+import { GmailMessage, SendEmailInput } from "./interfaces";
+import { Rfc822Builder } from "../RFC.service";
 
 export class GmailApiService {
   private client?: AxiosInstance;
@@ -188,5 +189,171 @@ export class GmailApiService {
     }
 
     return true;
+  }
+
+  private resolveRecipients(mode: "reply" | "reply_all", ctx: any, me: string) {
+    if (mode === "reply") {
+      return {
+        to: [ctx.replyTo || ctx.from],
+        cc: [],
+      };
+    }
+
+    // reply_all
+    const to = new Set<string>();
+    const cc = new Set<string>();
+
+    // Parse recipients from To and Cc headers (they are comma-separated strings)
+    const allRecipients = [
+      ...(ctx.to ? ctx.to.split(",").map((e: string) => e.trim()) : []),
+      ...(ctx.cc ? ctx.cc.split(",").map((e: string) => e.trim()) : []),
+    ];
+
+    allRecipients.forEach((email) => {
+      if (email && !email.toLowerCase().includes(me.split("@")[0])) {
+        cc.add(email);
+      }
+    });
+
+    to.add(ctx.replyTo || ctx.from);
+
+    return {
+      to: [...to],
+      cc: [...cc],
+    };
+  }
+
+  private async getReplyContext(messageId: string) {
+    const msg = await this.fetchMessage(messageId);
+
+    const headers = msg.payload.headers.reduce((acc: any, h: any) => {
+      acc[h.name.toLowerCase()] = h.value;
+      return acc;
+    }, {});
+
+    return {
+      threadId: msg.threadId,
+      messageId: headers["message-id"],
+      references: headers["references"] ? headers["references"].split(" ") : [],
+      from: headers["from"],
+      to: headers["to"],
+      cc: headers["cc"],
+      replyTo: headers["reply-to"],
+      subject: headers["subject"],
+      date: headers["date"],
+    };
+  }
+
+  private extractEmailBody(payload: any): string {
+    // If it's a simple message
+    if (payload.body?.data) {
+      return Buffer.from(payload.body.data, "base64").toString("utf-8");
+    }
+
+    // If it has parts, find the HTML or text part
+    if (payload.parts) {
+      for (const part of payload.parts) {
+        if (part.mimeType === "text/html" && part.body?.data) {
+          return Buffer.from(part.body.data, "base64").toString("utf-8");
+        }
+        // Recursively check nested parts
+        if (part.parts) {
+          const nested = this.extractEmailBody(part);
+          if (nested) return nested;
+        }
+      }
+      // Fallback to text/plain
+      for (const part of payload.parts) {
+        if (part.mimeType === "text/plain" && part.body?.data) {
+          const text = Buffer.from(part.body.data, "base64").toString("utf-8");
+          return text.replace(/\n/g, "<br>");
+        }
+      }
+    }
+
+    return "";
+  }
+
+  public async sendEmail(input: SendEmailInput): Promise<string> {
+    const client = await this.getClient();
+
+    let threadId: string | undefined;
+    let inReplyTo: string | undefined;
+    let references: string[] | undefined;
+    let to = input.to ?? [];
+    let cc = input.cc ?? [];
+    let subject = input.subject;
+    let html = input.html;
+
+    if (input.mode !== "new") {
+      const ctx = await this.getReplyContext(input.replyToMessageId!);
+
+      threadId = ctx.threadId;
+      inReplyTo = ctx.messageId;
+      references = [...ctx.references, ctx.messageId];
+
+      if (input.mode === "reply" || input.mode === "reply_all") {
+        const resolved = this.resolveRecipients(input.mode, ctx, this.email);
+        to = resolved.to;
+        cc = resolved.cc;
+      }
+
+      // Handle subject for reply/forward
+      if (!subject) {
+        if (input.mode === "forward") {
+          subject = ctx.subject?.startsWith("Fwd:")
+            ? ctx.subject
+            : `Fwd: ${ctx.subject}`;
+        } else {
+          // reply or reply_all
+          subject = ctx.subject?.startsWith("Re:")
+            ? ctx.subject
+            : `Re: ${ctx.subject}`;
+        }
+      }
+
+      // For forward, include original email content
+      if (input.mode === "forward") {
+        const msg = await this.fetchMessage(input.replyToMessageId!);
+        const originalBody = this.extractEmailBody(msg.payload);
+
+        html = `
+          ${input.html}
+          <br><br>
+          <div style="border-left: 2px solid #ccc; padding-left: 10px; margin-top: 20px;">
+            <p style="color: #666;">---------- Forwarded message ---------</p>
+            <p><strong>From:</strong> ${ctx.from}</p>
+            <p><strong>Date:</strong> ${ctx.date}</p>
+            <p><strong>Subject:</strong> ${ctx.subject}</p>
+            <p><strong>To:</strong> ${ctx.to}</p>
+            ${ctx.cc ? `<p><strong>Cc:</strong> ${ctx.cc}</p>` : ""}
+            <br>
+            ${originalBody}
+          </div>
+        `;
+      }
+    }
+
+    const raw = Rfc822Builder.build({
+      from: input.from,
+      to,
+      cc,
+      bcc: input.bcc,
+      subject: subject ?? "(no subject)",
+      html,
+      inReplyTo,
+      references,
+      attachments: input.attachments,
+    });
+
+    const res = await client.post("/users/me/messages/send", {
+      raw: Buffer.from(raw)
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_"),
+      threadId,
+    });
+
+    return res.data.id;
   }
 }
