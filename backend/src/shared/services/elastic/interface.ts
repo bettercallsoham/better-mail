@@ -54,6 +54,10 @@ export interface UnifiedEmailDocument {
   labels: string[];
   providerLabels: string[];
 
+  // ---- Inbox Zero ----
+  inboxState?: "INBOX" | "ARCHIVED" | "SNOOZED" | "DONE";
+  snoozeUntil?: string;
+
   // ---- Search / AI ----
   searchText: string;
   embedding?: number[];

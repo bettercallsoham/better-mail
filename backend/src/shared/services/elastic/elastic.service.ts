@@ -123,6 +123,9 @@ export class ElasticsearchService {
           labels: { type: "keyword" },
           providerLabels: { type: "keyword" },
 
+          inboxState: { type: "keyword" },
+          snoozeUntil: { type: "date" },
+
           embedding: {
             type: "dense_vector",
             dims: 1536,
@@ -547,6 +550,91 @@ export class ElasticsearchService {
       },
       labels,
     };
+  }
+
+  /**
+   * Get inbox zero emails - INBOX state or unsnoozed emails
+   */
+  async getInboxZeroEmails(params: {
+    emailAddresses: string[];
+    size?: number;
+    cursor?: { receivedAt: string; id: string };
+  }) {
+    const { emailAddresses, size = 20, cursor } = params;
+
+    const result = await this.client.search({
+      index: this.EMAILS_INDEX,
+      size,
+      query: {
+        bool: {
+          filter: [
+            { terms: { emailAddress: emailAddresses } },
+            { term: { isDeleted: false } },
+          ],
+          should: [
+            // Emails explicitly in INBOX state
+            { term: { inboxState: "INBOX" } },
+            // Snoozed emails that have passed their snooze time
+            {
+              bool: {
+                filter: [
+                  { term: { inboxState: "SNOOZED" } },
+                  { range: { snoozeUntil: { lte: "now" } } },
+                ],
+              },
+            },
+            // Emails without inboxState (legacy, treat as INBOX)
+          ],
+          minimum_should_match: 1,
+        },
+      },
+      sort: [{ receivedAt: "desc" }, { id: "asc" }],
+      ...(cursor && {
+        search_after: [cursor.receivedAt, cursor.id],
+      }),
+    });
+
+    const hits = result.hits.hits;
+
+    return {
+      emails: hits.map((hit) => hit._source as UnifiedEmailDocument),
+      total: (result.hits.total as any).value,
+      nextCursor:
+        hits.length === size
+          ? {
+              receivedAt: (hits[hits.length - 1]._source as any).receivedAt,
+              id: (hits[hits.length - 1]._source as any).id,
+            }
+          : null,
+    };
+  }
+
+  /**
+   * Update inbox state for emails
+   */
+  async updateInboxState(params: {
+    provider: string;
+    providerMessageIds: string[];
+    inboxState: "INBOX" | "ARCHIVED" | "SNOOZED" | "DONE";
+    snoozeUntil?: string;
+  }): Promise<{ updated: number; errors: any[] }> {
+    const { provider, providerMessageIds, inboxState, snoozeUntil } = params;
+
+    const updates: Partial<UnifiedEmailDocument> = { inboxState };
+
+    // Set or clear snoozeUntil based on state
+    if (inboxState === "SNOOZED" && snoozeUntil) {
+      updates.snoozeUntil = snoozeUntil;
+    } else if (inboxState !== "SNOOZED") {
+      // Clear snooze when moving to any other state
+      updates.snoozeUntil = undefined;
+    }
+
+    return this.bulkUpdateEmails({
+      provider,
+      providerMessageIds,
+      updates,
+    });
   }
 
   /**

@@ -27,7 +27,9 @@ async function processGmailWebhook(job: Job<GmailWebhookJobData>) {
     return { success: true, email, totalIndexed: 0 };
   }
 
-  const documents = messages.map((msg) => transformGmailToUnified(msg, email));
+  const documents = messages.map((msg) =>
+    transformGmailToUnified(msg, email, true),
+  );
 
   await elasticService.bulkIndexEmails(documents);
 

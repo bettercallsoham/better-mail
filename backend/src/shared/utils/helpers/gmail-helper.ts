@@ -46,13 +46,14 @@ function extractGmailBody(payload: any): string {
 export function transformGmailToUnified(
   msg: GmailMessage,
   emailAddress: string,
+  isWebhook: boolean = false,
 ): UnifiedEmailDocument {
   const headers = msg.payload?.headers || [];
   const getHeader = (name: string) =>
     headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ||
     "";
 
-  return {
+  const doc: UnifiedEmailDocument = {
     id: msg.id,
     emailAddress,
     provider: "gmail",
@@ -87,4 +88,11 @@ export function transformGmailToUnified(
     labels: msg.labelIds || [],
     providerLabels: msg.labelIds || [],
   };
+
+  // Only set inboxState for webhook emails (new arrivals)
+  if (isWebhook) {
+    doc.inboxState = "INBOX";
+  }
+
+  return doc;
 }

@@ -523,103 +523,228 @@ function getElasticUpdates(
   }
 }
 
-export const searchEmails = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user?.id;
-  const {
-    query,
-    from: fromEmail,
-    size,
-    cursor,
-    isRead,
-    isStarred,
-    isArchived,
-    hasAttachments,
-    filterFrom,
-    filterTo,
-    labels,
-    dateFrom,
-    dateTo,
-  } = req.query;
-
-  if (!userId) {
-    return res.status(401).json({
-      success: false,
-      message: "User not authenticated",
-    });
-  }
-
-  // Get user's emails (uses cache)
-  const { emails: emailAddresses, error } = await getUserEmails(
-    userId,
-    fromEmail as string | undefined,
-  );
-
-  if (error || emailAddresses.length === 0) {
-    return res.status(403).json({
-      success: false,
-      message: error || "No connected email accounts found",
-    });
-  }
-
-  try {
-    const elasticService = new ElasticsearchService(elasticClient);
-
-    // Parse cursor if provided
-    let parsedCursor;
-    if (cursor && typeof cursor === "string") {
-      try {
-        parsedCursor = JSON.parse(cursor);
-      } catch (e) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid cursor format",
-        });
-      }
-    }
-
-    // Parse labels if provided
-    let parsedLabels;
-    if (labels && typeof labels === "string") {
-      try {
-        parsedLabels = JSON.parse(labels);
-      } catch (e) {
-        parsedLabels = [labels];
-      }
-    }
-
-    const result = await elasticService.searchEmails({
-      emailAddresses,
-      query: query as string,
-      size: size ? parseInt(size as string) : 20,
-      cursor: parsedCursor,
-      filters: {
-        isRead: isRead !== undefined ? isRead === "true" : undefined,
-        isStarred: isStarred !== undefined ? isStarred === "true" : undefined,
-        isArchived:
-          isArchived !== undefined ? isArchived === "true" : undefined,
-        hasAttachments:
-          hasAttachments !== undefined ? hasAttachments === "true" : undefined,
-        from: filterFrom as string | undefined,
-        to: filterTo as string | undefined,
-        labels: parsedLabels,
-        dateFrom: dateFrom as string | undefined,
-        dateTo: dateTo as string | undefined,
-      },
-    });
-
-    res.json({
-      success: true,
+export const searchEmails = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const {
       query,
-      total: result.total,
-      emails: result.emails,
-      nextCursor: result.nextCursor,
-    });
-  } catch (error: any) {
-    console.error("Search failed:", error);
+      from: fromEmail,
+      size,
+      cursor,
+      isRead,
+      isStarred,
+      isArchived,
+      hasAttachments,
+      filterFrom,
+      filterTo,
+      labels,
+      dateFrom,
+      dateTo,
+    } = req.query;
 
-    res.status(500).json({
-      success: false,
-      message: error.message || "Search failed",
-    });
-  }
-}, "searchEmails");
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    // Get user's emails (uses cache)
+    const { emails: emailAddresses, error } = await getUserEmails(
+      userId,
+      fromEmail as string | undefined,
+    );
+
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts found",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+
+      // Parse cursor if provided
+      let parsedCursor;
+      if (cursor && typeof cursor === "string") {
+        try {
+          parsedCursor = JSON.parse(cursor);
+        } catch (e) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor format",
+          });
+        }
+      }
+
+      // Parse labels if provided
+      let parsedLabels;
+      if (labels && typeof labels === "string") {
+        try {
+          parsedLabels = JSON.parse(labels);
+        } catch (e) {
+          parsedLabels = [labels];
+        }
+      }
+
+      const result = await elasticService.searchEmails({
+        emailAddresses,
+        query: query as string,
+        size: size ? parseInt(size as string) : 20,
+        cursor: parsedCursor,
+        filters: {
+          isRead: isRead !== undefined ? isRead === "true" : undefined,
+          isStarred: isStarred !== undefined ? isStarred === "true" : undefined,
+          isArchived:
+            isArchived !== undefined ? isArchived === "true" : undefined,
+          hasAttachments:
+            hasAttachments !== undefined
+              ? hasAttachments === "true"
+              : undefined,
+          from: filterFrom as string | undefined,
+          to: filterTo as string | undefined,
+          labels: parsedLabels,
+          dateFrom: dateFrom as string | undefined,
+          dateTo: dateTo as string | undefined,
+        },
+      });
+
+      res.json({
+        success: true,
+        query,
+        total: result.total,
+        emails: result.emails,
+        nextCursor: result.nextCursor,
+      });
+    } catch (error: any) {
+      console.error("Search failed:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Search failed",
+      });
+    }
+  },
+  "searchEmails",
+);
+
+export const getInboxZero = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { from: fromEmail, size, cursor } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    // Get user's emails (uses cache)
+    const { emails: emailAddresses, error } = await getUserEmails(
+      userId,
+      fromEmail as string | undefined,
+    );
+
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts found",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+
+      // Parse cursor if provided
+      let parsedCursor;
+      if (cursor && typeof cursor === "string") {
+        try {
+          parsedCursor = JSON.parse(cursor);
+        } catch (e) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor format",
+          });
+        }
+      }
+
+      const result = await elasticService.getInboxZeroEmails({
+        emailAddresses,
+        size: size ? parseInt(size as string) : 20,
+        cursor: parsedCursor,
+      });
+
+      res.json({
+        success: true,
+        total: result.total,
+        emails: result.emails,
+        nextCursor: result.nextCursor,
+      });
+    } catch (error: any) {
+      console.error("Failed to fetch inbox zero emails:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to fetch inbox zero emails",
+      });
+    }
+  },
+  "getInboxZero",
+);
+
+export const updateInboxState = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { email, provider, messageIds, action, snoozeUntil } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    // Verify user owns the email (uses cache)
+    const { emails: emailAddresses, error } = await getUserEmails(
+      userId,
+      email,
+    );
+
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "You don't have access to this email account",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+      const esProvider = provider === "GOOGLE" ? "gmail" : "outlook";
+
+      const result = await elasticService.updateInboxState({
+        provider: esProvider,
+        providerMessageIds: messageIds,
+        inboxState: action,
+        snoozeUntil,
+      });
+
+      res.json({
+        success: true,
+        action,
+        updated: result.updated,
+        errors: result.errors,
+        messageIds,
+      });
+    } catch (error: any) {
+      console.error("Failed to update inbox state:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to update inbox state",
+      });
+    }
+  },
+  "updateInboxState",
+);

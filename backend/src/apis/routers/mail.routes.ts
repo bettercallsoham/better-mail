@@ -38,6 +38,13 @@ router.get(
   mailController.searchEmails,
 );
 
+router.get(
+  "/inbox-zero",
+  verifyAccessToken(),
+  mailValidator.validateGetInboxZero,
+  mailController.getInboxZero,
+);
+
 router.get("/user-plan", verifyAccessToken());
 
 router.post(
@@ -58,6 +65,13 @@ router.post(
   verifyAccessToken(),
   mailValidator.validateEmailAction,
   mailController.emailAction,
+);
+
+router.post(
+  "/inbox-state",
+  verifyAccessToken(),
+  mailValidator.validateUpdateInboxState,
+  mailController.updateInboxState,
 );
 
 export default router;

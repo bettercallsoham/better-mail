@@ -325,3 +325,64 @@ export const validateSearch = [
 
   handleValidationErrors,
 ];
+
+export const validateGetInboxZero = [
+  query("from")
+    .optional()
+    .isEmail()
+    .withMessage("Invalid from email format")
+    .normalizeEmail(),
+
+  query("size")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("size must be between 1 and 100"),
+
+  query("cursor").optional().isString().withMessage("cursor must be a string"),
+
+  handleValidationErrors,
+];
+
+export const validateUpdateInboxState = [
+  body("email")
+    .exists()
+    .withMessage("from email is required")
+    .isEmail()
+    .withMessage("Invalid from email format")
+    .normalizeEmail(),
+
+  body("provider")
+    .exists()
+    .withMessage("provider is required")
+    .isIn(["GOOGLE", "OUTLOOK"])
+    .withMessage("provider must be either 'GOOGLE' or 'OUTLOOK'"),
+
+  body("messageIds")
+    .exists()
+    .withMessage("messageIds is required")
+    .isArray({ min: 1 })
+    .withMessage("messageIds must be a non-empty array")
+    .custom((value) => {
+      return value.every((id: string) => typeof id === "string");
+    })
+    .withMessage("messageIds must be an array of strings"),
+
+  body("action")
+    .exists()
+    .withMessage("action is required")
+    .isIn(["INBOX", "ARCHIVED", "SNOOZED", "DONE"])
+    .withMessage("action must be one of: INBOX, ARCHIVED, SNOOZED, DONE"),
+
+  body("snoozeUntil")
+    .optional()
+    .isISO8601()
+    .withMessage("snoozeUntil must be a valid ISO 8601 date")
+    .custom((value, { req }) => {
+      if (req.body.action === "SNOOZED" && !value) {
+        throw new Error("snoozeUntil is required when action is SNOOZED");
+      }
+      return true;
+    }),
+
+  handleValidationErrors,
+];

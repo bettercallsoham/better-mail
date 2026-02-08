@@ -7,13 +7,14 @@ import { OutlookMessage } from "../../services/outlook/interfaces";
 export function transformOutlookToUnified(
   msg: OutlookMessage,
   emailAddress: string,
+  isWebhook: boolean = false,
 ): UnifiedEmailDocument {
   const parseAddress = (addr: any) => ({
     name: addr?.emailAddress?.name,
     email: addr?.emailAddress?.address || "",
   });
 
-  return {
+  const doc: UnifiedEmailDocument = {
     id: msg.id,
     emailAddress,
     provider: "outlook",
@@ -48,6 +49,13 @@ export function transformOutlookToUnified(
     labels: [],
     providerLabels: [],
   };
+
+  // Only set inboxState for webhook emails (new arrivals)
+  if (isWebhook) {
+    doc.inboxState = "INBOX";
+  }
+
+  return doc;
 }
 
 const tenantId = process.env.MICROSOFT_TENANT_ID;

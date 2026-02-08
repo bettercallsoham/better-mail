@@ -23,7 +23,7 @@ async function processOutlookWebhook(job: Job<OutlookWebhookJobData>) {
     return { success: false, email, messageId };
   }
 
-  const document = transformOutlookToUnified(message, email);
+  const document = transformOutlookToUnified(message, email, true);
   await elasticService.indexEmail(document);
 
   logger.info(`Outlook webhook processed: ${email}, messageId: ${messageId}`);
