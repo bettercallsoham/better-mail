@@ -1,7 +1,7 @@
 import { User } from "./user-model";
 import { Subscription } from "./subscription-model";
 import { Plan } from "./plan-model";
-import { EmailAccount } from "./emailAccount-model";
+import { EmailAccount } from "./emailAccount.model";
 import { EmailEngineInstance } from "./emailengine-model";
 
 User.hasMany(Subscription, {

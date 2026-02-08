@@ -227,6 +227,7 @@ export class ElasticsearchService {
   /**
    * Search emails
    */
+  
   async searchEmails(query: {
     mailboxId: string;
     searchText?: string;
@@ -266,4 +267,87 @@ export class ElasticsearchService {
       })),
     };
   }
+
+  /**
+   * Top level thread Emails
+   */
+
+  async getInboxThreads(params: {
+  mailboxId: string;
+  size?: number;
+  cursor?: { receivedAt: string; id: string };
+}) {
+  const { mailboxId, size = 20, cursor } = params;
+
+  const result = await this.client.search({
+    index: this.EMAILS_INDEX,
+    size,
+    query: {
+      bool: {
+        filter: [
+          { term: { mailboxId } },
+          { term: { isDeleted: false } },
+        ],
+      },
+    },
+    sort: [
+      { receivedAt: "desc" },
+      { id: "asc" }, // tiebreaker
+    ],
+    collapse: {
+      field: "threadId",
+      inner_hits: [
+        {
+          name: "thread_state",
+          size: 10, // small number is enough
+          _source: ["isRead", "isStarred"],
+        },
+      ],
+    },
+    ...(cursor && {
+      search_after: [cursor.receivedAt, cursor.id],
+    }),
+  });
+
+  const hits = result.hits.hits;
+
+  return {
+    threads: hits.map((hit) => {
+      const source = hit._source as UnifiedEmailDocument;
+      const states =
+        hit.inner_hits?.thread_state?.hits.hits ?? [];
+
+      return {
+        threadId: source.threadId,
+
+        // latest email info
+        latestEmailId: hit._id,
+        subject: source.subject,
+        snippet: source.snippet,
+        receivedAt: source.receivedAt,
+
+        from: source.from,
+        to: source.to,
+
+        // thread-level flags
+        isUnread: states.some(
+          (s) => s._source?.isRead === false,
+        ),
+        isStarred: states.some(
+          (s) => s._source?.isStarred === true,
+        ),
+      };
+    }),
+
+    nextCursor:
+      hits.length > 0
+        ? {
+            receivedAt:
+              (hits[hits.length - 1]._source as any).receivedAt,
+            id: hits[hits.length - 1]._id,
+          }
+        : null,
+  };
+}
+
 }
