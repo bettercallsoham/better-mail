@@ -278,18 +278,21 @@ export class ElasticsearchService {
    */
 
   async getInboxThreads(params: {
-    mailboxId: string;
+    emailAddresses: string[];
     size?: number;
     cursor?: { receivedAt: string; id: string };
   }) {
-    const { mailboxId, size = 20, cursor } = params;
+    const { emailAddresses, size = 20, cursor } = params;
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
       size,
       query: {
         bool: {
-          filter: [{ term: { mailboxId } }, { term: { isDeleted: false } }],
+          filter: [
+            { terms: { emailAddress: emailAddresses } },
+            { term: { isDeleted: false } },
+          ],
         },
       },
       sort: [
@@ -343,6 +346,39 @@ export class ElasticsearchService {
               id: hits[hits.length - 1]._id,
             }
           : null,
+    };
+  }
+
+  /**
+   * Get all emails in a specific thread
+   */
+  async getEmailsByThreadId(params: {
+    threadId: string;
+    emailAddresses: string[];
+  }) {
+    const { threadId, emailAddresses } = params;
+
+    const result = await this.client.search({
+      index: this.EMAILS_INDEX,
+      size: 100, // Get all emails in thread (max 100)
+      query: {
+        bool: {
+          filter: [
+            { term: { threadId } },
+            { terms: { emailAddress: emailAddresses } },
+            { term: { isDeleted: false } },
+          ],
+        },
+      },
+      sort: [{ receivedAt: "asc" }], // Chronological order for thread view
+    });
+
+    return {
+      total: result.hits.total,
+      emails: result.hits.hits.map((hit) => ({
+        ...(hit._source as UnifiedEmailDocument),
+        id: hit._id as string,
+      })),
     };
   }
 }

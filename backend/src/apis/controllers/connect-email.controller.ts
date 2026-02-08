@@ -8,6 +8,7 @@ import { GoogleOAuthService } from "../services/oauth/google-oauth.service";
 import { OutlookOAuthService } from "../services/oauth/outlook-oauth.service";
 import redis from "../../shared/config/redis";
 import { handleMailboxConnectionQueue } from "../../shared/queues/handle-mailbox-connection";
+import { invalidateUserEmailsCache } from "../utils/email-helper";
 
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined");
@@ -120,6 +121,9 @@ export const gmailConnectCallback = asyncHandler(async (req, res) => {
     email: identity.email,
   });
 
+  // Invalidate user's email cache since they connected a new email
+  await invalidateUserEmailsCache(userId);
+
   res.json({
     success: true,
     message: "Gmail connected successfully",
@@ -192,6 +196,9 @@ export const outlookConnectCallback = asyncHandler(
       provider: "outlook",
       email: identity.email,
     });
+
+    // Invalidate user's email cache since they connected a new email
+    await invalidateUserEmailsCache(userId);
 
     res.json({
       success: true,

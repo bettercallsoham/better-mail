@@ -17,12 +17,36 @@ const handleValidationErrors = (
 };
 
 export const validateGetThreadEmails = [
-  body("mailboxId")
+  query("email")
     .optional()
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+
+  query("size")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("Size must be between 1 and 100"),
+
+  query("cursor").optional().isString().withMessage("Cursor must be a string"),
+
+  handleValidationErrors,
+];
+
+export const validateGetThreadById = [
+  param("threadId")
+    .exists()
+    .withMessage("threadId is required")
     .isString()
-    .withMessage("mailboxId must be a string")
-    .isLength({ min: 3, max: 100 })
-    .withMessage("mailboxId must be between 3 and 100 characters"),
+    .withMessage("threadId must be a string")
+    .notEmpty()
+    .withMessage("threadId cannot be empty"),
+
+  query("email")
+    .optional()
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
 
   handleValidationErrors,
 ];

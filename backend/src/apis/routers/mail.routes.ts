@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { verifyAccessToken } from "../middleware/auth";
 import * as mailController from "../controllers/mail.controller";
+import * as mailValidator from "../validators/mail.validator";
 const router = Router();
 
 router.get(
@@ -9,7 +10,19 @@ router.get(
   mailController.getConnectedMailboxes,
 );
 
-router.get("/thread-emails", verifyAccessToken());
+router.get(
+  "/thread-emails",
+  verifyAccessToken(),
+  mailValidator.validateGetThreadEmails,
+  mailController.getThreadEmails,
+);
+
+router.get(
+  "/thread/:threadId",
+  verifyAccessToken(),
+  mailValidator.validateGetThreadById,
+  mailController.getEmailsByThreadId,
+);
 
 router.get("/folders", verifyAccessToken());
 
