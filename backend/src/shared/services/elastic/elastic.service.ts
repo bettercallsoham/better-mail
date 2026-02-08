@@ -381,4 +381,69 @@ export class ElasticsearchService {
       })),
     };
   }
+
+  /**
+   * Get folder/label counts using aggregations
+   * Returns both system folders (unread, starred, etc.) and all labels with counts
+   */
+  async getFolderCounts(emailAddresses: string[]) {
+    const result = await this.client.search({
+      index: this.EMAILS_INDEX,
+      size: 0, // Don't return documents, only aggregations
+      query: {
+        bool: {
+          filter: [
+            { terms: { emailAddress: emailAddresses } },
+            { term: { isDeleted: false } },
+          ],
+        },
+      },
+      aggs: {
+        unread: {
+          filter: { term: { isRead: false } },
+        },
+        starred: {
+          filter: { term: { isStarred: true } },
+        },
+        archived: {
+          filter: { term: { isArchived: true } },
+        },
+        inbox: {
+          filter: { term: { labels: "INBOX" } },
+        },
+        sent: {
+          filter: { term: { labels: "SENT" } },
+        },
+        important: {
+          filter: { term: { labels: "IMPORTANT" } },
+        },
+        all_labels: {
+          terms: {
+            field: "labels",
+            size: 50,
+          },
+        },
+      },
+    });
+
+    const aggs = result.aggregations as any;
+
+    // Extract label counts from terms aggregation
+    const labels = aggs.all_labels.buckets.map((bucket: any) => ({
+      label: bucket.key,
+      count: bucket.doc_count,
+    }));
+
+    return {
+      system: {
+        unread: aggs.unread.doc_count,
+        starred: aggs.starred.doc_count,
+        archived: aggs.archived.doc_count,
+        inbox: aggs.inbox.doc_count,
+        sent: aggs.sent.doc_count,
+        important: aggs.important.doc_count,
+      },
+      labels,
+    };
+  }
 }

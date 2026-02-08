@@ -50,3 +50,13 @@ export const validateGetThreadById = [
 
   handleValidationErrors,
 ];
+
+export const validateGetFolders = [
+  query("email")
+    .optional()
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+
+  handleValidationErrors,
+];

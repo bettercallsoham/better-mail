@@ -140,3 +140,55 @@ export const getEmailsByThreadId = asyncHandler(
   },
   "getEmailsByThreadId",
 );
+
+export const getFolders = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const { email } = req.query;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "User not authenticated",
+    });
+  }
+
+  // Get emails with caching
+  const { emails: emailAddresses, error } = await getUserEmails(
+    userId,
+    email as string | undefined,
+  );
+
+  if (error) {
+    return res.status(403).json({
+      success: false,
+      message: error,
+    });
+  }
+
+  if (emailAddresses.length === 0) {
+    return res.json({
+      success: true,
+      data: {
+        system: {
+          unread: 0,
+          starred: 0,
+          archived: 0,
+          inbox: 0,
+          sent: 0,
+          important: 0,
+        },
+        labels: [],
+      },
+      message: "No connected email accounts",
+    });
+  }
+
+  const elasticService = new ElasticsearchService(elasticClient);
+
+  const folderCounts = await elasticService.getFolderCounts(emailAddresses);
+
+  res.json({
+    success: true,
+    data: folderCounts,
+  });
+}, "getFolders");

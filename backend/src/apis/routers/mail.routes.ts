@@ -24,7 +24,12 @@ router.get(
   mailController.getEmailsByThreadId,
 );
 
-router.get("/folders", verifyAccessToken());
+router.get(
+  "/folders",
+  verifyAccessToken(),
+  mailValidator.validateGetFolders,
+  mailController.getFolders,
+);
 
 router.get("/search", verifyAccessToken());
 
