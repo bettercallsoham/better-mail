@@ -26,7 +26,6 @@ async function processGmailSync(job: Job<GmailSyncData>) {
   }
 
   const gmailService = new GmailApiService({ email });
-  const mailboxId = emailAccount.id;
   let batch: UnifiedEmailDocument[] = [];
   let totalSynced = 0;
 
@@ -44,7 +43,7 @@ async function processGmailSync(job: Job<GmailSyncData>) {
 
   try {
     await gmailService.fetchLastNDaysEmails(daysBack, async (msg) => {
-      batch.push(transformGmailToUnified(msg, mailboxId));
+      batch.push(transformGmailToUnified(msg, email));
 
       if (batch.length >= BATCH_SIZE) {
         await processBatch();

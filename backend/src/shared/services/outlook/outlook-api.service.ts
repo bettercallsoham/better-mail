@@ -114,21 +114,38 @@ export class OutlookApiService {
       Date.now() + 6 * 24 * 60 * 60 * 1000,
     ).toISOString();
 
-    const res = await client.post(
-      "/subscriptions",
-      {
-        changeType: "created,updated",
-        resource: "me/messages",
-        notificationUrl: process.env.OUTLOOK_WEBHOOK_URL,
-        expirationDateTime: expirationDate,
-        clientState: process.env.OUTLOOK_CLIENT_STATE,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
+    let res;
+    try {
+      res = await client.post(
+        "/subscriptions",
+        {
+          changeType: "created,updated",
+          resource: "me/messages",
+          notificationUrl: process.env.OUTLOOK_WEBHOOK_URL,
+          expirationDateTime: expirationDate,
+          clientState: process.env.OUTLOOK_CLIENT_STATE,
         },
-      },
-    );
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    } catch (error: any) {
+      console.error("Outlook subscription creation error:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        request: {
+          changeType: "created,updated",
+          resource: "me/messages",
+          notificationUrl: process.env.OUTLOOK_WEBHOOK_URL,
+          expirationDateTime: expirationDate,
+          clientState: process.env.OUTLOOK_CLIENT_STATE,
+        },
+      });
+      throw error;
+    }
 
     // Save subscription details to database
     await account.update({

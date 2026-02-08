@@ -6,11 +6,12 @@ import { elasticClient } from "../shared/config/elastic";
 import { logger } from "../shared/utils/logger";
 import { OutlookWebhookJobData } from "../shared/queues/handle-webhook.queue";
 import { transformOutlookToUnified } from "../shared/utils/helpers/outlook-helper";
+import { EmailAccount } from "../shared/models";
 
 const elasticService = new ElasticsearchService(elasticClient);
 
 async function processOutlookWebhook(job: Job<OutlookWebhookJobData>) {
-  const { email, mailboxId, messageId } = job.data;
+  const { email, messageId } = job.data;
 
   logger.info(`Processing Outlook webhook: ${email}, messageId: ${messageId}`);
 
@@ -22,7 +23,7 @@ async function processOutlookWebhook(job: Job<OutlookWebhookJobData>) {
     return { success: false, email, messageId };
   }
 
-  const document = transformOutlookToUnified(message, mailboxId);
+  const document = transformOutlookToUnified(message, email);
   await elasticService.indexEmail(document);
 
   logger.info(`Outlook webhook processed: ${email}, messageId: ${messageId}`);

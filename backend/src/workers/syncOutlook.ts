@@ -8,6 +8,7 @@ import { logger } from "../shared/utils/logger";
 import { UnifiedEmailDocument } from "../shared/services/elastic/interface";
 import { OutlookSyncData } from "../shared/queues/sync-outlook.queue";
 import { transformOutlookToUnified } from "../shared/utils/helpers/outlook-helper";
+import { OutlookMessage } from "../shared/services/outlook/interfaces";
 
 const elasticService = new ElasticsearchService(elasticClient);
 
@@ -25,7 +26,6 @@ async function processOutlookSync(job: Job<OutlookSyncData>) {
   }
 
   const outlookService = new OutlookApiService({ email });
-  const mailboxId = emailAccount.id;
   let batch: UnifiedEmailDocument[] = [];
   let totalSynced = 0;
 
@@ -42,8 +42,8 @@ async function processOutlookSync(job: Job<OutlookSyncData>) {
 
   try {
     await outlookService.fetchLastNDaysEmails(daysBack, {
-      onMessage: async (msg) => {
-        batch.push(transformOutlookToUnified(msg, mailboxId));
+      onMessage: async (msg: OutlookMessage) => {
+        batch.push(transformOutlookToUnified(msg, email));
 
         // Index every 50 emails (as API returns them)
         if (batch.length >= 50) {

@@ -9,7 +9,6 @@ export interface GmailWebhookJobData {
 
 export interface OutlookWebhookJobData {
   email: string;
-  mailboxId: string;
   messageId: string;
 }
 

@@ -20,21 +20,31 @@ router.post("/", async (req, res) => {
     const payload = JSON.parse(decoded);
     const { emailAddress, historyId } = payload;
 
-    const lastHistoryId = await redis.get(`history-id-${emailAddress}`);
+    const lastHistoryId = await redis.get(`gmail:history:${emailAddress}`);
+
+    // Initialize on first webhook
     if (!lastHistoryId) {
-      await redis.set(`history-id-${emailAddress}`, historyId);
+      await redis.set(`gmail:history:${emailAddress}`, historyId);
+      console.log(
+        `Initialized Gmail history for ${emailAddress}: ${historyId}`,
+      );
       return res.sendStatus(200);
     }
 
-    // Enqueue webhook job (mailboxId will be queried in worker)
+    // Skip if we've already processed this or a newer historyId
+    if (parseInt(historyId) <= parseInt(lastHistoryId)) {
+      console.log(
+        `Skipping old historyId ${historyId} (current: ${lastHistoryId}) for ${emailAddress}`,
+      );
+      return res.sendStatus(200);
+    }
+
+    // Enqueue webhook job
     await gmailWebhookQueue.add("process-gmail-webhook", {
       email: emailAddress,
       historyId,
       lastHistoryId,
     });
-
-    // Update last history ID
-    await redis.set(`history-id-${emailAddress}`, historyId);
 
     return res.sendStatus(200);
   } catch (err) {
@@ -78,12 +88,10 @@ router.post("/outlook", async (req, res) => {
       let cached = await redis.get(cacheKey);
 
       let email: string;
-      let mailboxId: string;
 
       if (cached) {
         const data = JSON.parse(cached);
         email = data.email;
-        mailboxId = data.mailboxId;
       } else {
         const account = await EmailAccount.findOne({
           where: { subscription_id: subscriptionId, provider: "OUTLOOK" },
@@ -97,16 +105,14 @@ router.post("/outlook", async (req, res) => {
         }
 
         email = account.email;
-        mailboxId = account.id;
 
         // Cache for 1 hour
-        await redis.setex(cacheKey, 3600, JSON.stringify({ email, mailboxId }));
+        await redis.setex(cacheKey, 3600, JSON.stringify({ email }));
       }
 
       // Enqueue webhook job
       await outlookWebhookQueue.add("process-outlook-webhook", {
         email,
-        mailboxId,
         messageId,
       });
     }

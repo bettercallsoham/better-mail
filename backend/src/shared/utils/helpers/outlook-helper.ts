@@ -6,7 +6,7 @@ import { OutlookMessage } from "../../services/outlook/interfaces";
 
 export function transformOutlookToUnified(
   msg: OutlookMessage,
-  mailboxId: string,
+  emailAddress: string,
 ): UnifiedEmailDocument {
   const parseAddress = (addr: any) => ({
     name: addr?.emailAddress?.name,
@@ -15,10 +15,10 @@ export function transformOutlookToUnified(
 
   return {
     id: msg.id,
+    emailAddress,
     provider: "outlook",
     providerMessageId: msg.id,
     providerThreadId: msg.conversationId || msg.id,
-    mailboxId,
 
     threadId: msg.conversationId || msg.id,
     isThreadRoot: false,

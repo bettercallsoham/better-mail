@@ -131,6 +131,9 @@ export class GmailApiService {
 
           const msg = await this.fetchMessage(messageId);
 
+          // Skip if message was not found (deleted or inaccessible)
+          if (!msg) continue;
+
           if (onMessage) {
             await onMessage(msg);
           } else {
@@ -163,14 +166,23 @@ export class GmailApiService {
     };
   }
 
-  private async fetchMessage(messageId: string): Promise<GmailMessage> {
+  private async fetchMessage(messageId: string): Promise<GmailMessage | null> {
     const client = await this.getClient();
 
-    const res = await client.get(`/users/me/messages/${messageId}`, {
-      params: { format: "full" },
-    });
+    try {
+      const res = await client.get(`/users/me/messages/${messageId}`, {
+        params: { format: "full" },
+      });
 
-    return res.data;
+      return res.data;
+    } catch (error: any) {
+      // Message might have been deleted or is no longer accessible
+      if (error.response?.status === 404) {
+        console.warn(`Message not found: ${messageId}`);
+        return null;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -182,6 +194,9 @@ export class GmailApiService {
   ): Promise<boolean> {
     for await (const messageId of this.iterateMessageIds(days)) {
       const message = await this.fetchMessage(messageId);
+
+      // Skip if message was not found (deleted or inaccessible)
+      if (!message) continue;
 
       if (onMessage) {
         await onMessage(message);
@@ -225,6 +240,10 @@ export class GmailApiService {
 
   private async getReplyContext(messageId: string) {
     const msg = await this.fetchMessage(messageId);
+
+    if (!msg) {
+      throw new Error(`Message not found: ${messageId}`);
+    }
 
     const headers = msg.payload.headers.reduce((acc: any, h: any) => {
       acc[h.name.toLowerCase()] = h.value;
@@ -315,6 +334,13 @@ export class GmailApiService {
       // For forward, include original email content
       if (input.mode === "forward") {
         const msg = await this.fetchMessage(input.replyToMessageId!);
+
+        if (!msg) {
+          throw new Error(
+            `Message not found for forwarding: ${input.replyToMessageId}`,
+          );
+        }
+
         const originalBody = this.extractEmailBody(msg.payload);
 
         html = `

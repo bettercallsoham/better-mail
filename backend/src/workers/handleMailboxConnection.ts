@@ -27,7 +27,7 @@ async function processGmail(email: string): Promise<SubscriptionResult> {
 
   // Cache history ID for incremental sync
   await redis.setex(
-    `gmail:historyId:${email}`,
+    `gmail:history:${email}`,
     SEVEN_DAYS_IN_SECONDS,
     watchResponse.historyId,
   );

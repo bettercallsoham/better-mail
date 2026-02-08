@@ -11,38 +11,31 @@ import { transformGmailToUnified } from "../shared/utils/helpers/gmail-helper";
 const elasticService = new ElasticsearchService(elasticClient);
 
 async function processGmailWebhook(job: Job<GmailWebhookJobData>) {
-  const { email, lastHistoryId } = job.data;
+  const { email, historyId, lastHistoryId } = job.data;
 
   logger.info(
-    `Processing Gmail webhook: ${email}, historyId: ${lastHistoryId}`,
+    `Processing Gmail webhook: ${email}, from historyId ${lastHistoryId} to ${historyId}`,
   );
 
-  // Query mailboxId from DB
-  const emailAccount = await EmailAccount.findOne({
-    where: { email: email.toLowerCase(), provider: "GOOGLE" },
-  });
-
-  if (!emailAccount) {
-    throw new Error(`Gmail account not found: ${email}`);
-  }
-
-  const mailboxId = emailAccount.id;
   const gmailService = new GmailApiService({ email });
   const messages = await gmailService.fetchHistorySince(lastHistoryId);
 
   if (!messages || messages.length === 0) {
     logger.info(`No new messages for ${email}`);
+    // Still update historyId to prevent reprocessing
+    await redis.set(`gmail:history:${email}`, historyId);
     return { success: true, email, totalIndexed: 0 };
   }
 
-  const documents = messages.map((msg) =>
-    transformGmailToUnified(msg, mailboxId),
-  );
+  const documents = messages.map((msg) => transformGmailToUnified(msg, email));
 
   await elasticService.bulkIndexEmails(documents);
 
+  // Update historyId AFTER successful indexing
+  await redis.set(`gmail:history:${email}`, historyId);
+
   logger.info(
-    `Gmail webhook processed: ${email}, indexed ${documents.length} emails`,
+    `Gmail webhook processed: ${email}, indexed ${documents.length} emails, updated historyId to ${historyId}`,
   );
 
   return {

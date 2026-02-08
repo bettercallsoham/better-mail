@@ -15,10 +15,10 @@ export interface EmailAttachment {
 
 export interface UnifiedEmailDocument {
   id: string;
+  emailAddress: string;
   provider: EmailProvider;
   providerMessageId: string;
   providerThreadId: string;
-  mailboxId: string;
 
   // ---- Threading ----
   threadId: string;
@@ -76,7 +76,7 @@ export interface ThreadReminder {
 
 export interface ThreadDocument {
   threadId: string;
-  mailboxId: string;
+  emailAddress: string;
 
   notes?: string;
   requiresAction: boolean;

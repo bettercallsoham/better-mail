@@ -55,7 +55,7 @@ export class ElasticsearchService {
         dynamic: "strict",
         properties: {
           id: { type: "keyword" },
-          mailboxId: { type: "keyword" },
+          emailAddress: { type: "keyword" },
           provider: { type: "keyword" },
 
           providerMessageId: { type: "keyword" },
@@ -155,7 +155,7 @@ export class ElasticsearchService {
         dynamic: "strict",
         properties: {
           threadId: { type: "keyword" },
-          mailboxId: { type: "keyword" },
+          emailAddress: { type: "keyword" },
 
           notes: { type: "text" },
           requiresAction: { type: "boolean" },
@@ -179,11 +179,13 @@ export class ElasticsearchService {
 
   /**
    * Single insert - for real-time webhooks
+   * Uses composite ID (provider_messageId) for deduplication
    */
   async indexEmail(email: UnifiedEmailDocument): Promise<void> {
+    const compositeId = `${email.provider}_${email.providerMessageId}`;
     await this.client.index({
       index: this.EMAILS_INDEX,
-      id: email.id,
+      id: compositeId,
       document: email,
     });
   }
@@ -195,10 +197,13 @@ export class ElasticsearchService {
   async bulkIndexEmails(emails: UnifiedEmailDocument[]): Promise<void> {
     if (emails.length === 0) return;
 
-    const operations = emails.flatMap((email) => [
-      { index: { _index: this.EMAILS_INDEX, _id: email.id } },
-      email,
-    ]);
+    const operations = emails.flatMap((email) => {
+      const compositeId = `${email.provider}_${email.providerMessageId}`;
+      return [
+        { index: { _index: this.EMAILS_INDEX, _id: compositeId } },
+        email,
+      ];
+    });
 
     const result = await this.client.bulk({ operations });
 
@@ -225,18 +230,18 @@ export class ElasticsearchService {
   }
 
   /**
-   * Search emails
+   * Search emails by email addresses (for a user's connected accounts)
    */
-  
+
   async searchEmails(query: {
-    mailboxId: string;
+    emailAddresses: string[];
     searchText?: string;
     from?: number;
     size?: number;
   }) {
-    const { mailboxId, searchText, from = 0, size = 20 } = query;
+    const { emailAddresses, searchText, from = 0, size = 20 } = query;
 
-    const must: any[] = [{ term: { mailboxId } }];
+    const must: any[] = [{ terms: { emailAddress: emailAddresses } }];
 
     if (searchText) {
       must.push({
@@ -273,81 +278,71 @@ export class ElasticsearchService {
    */
 
   async getInboxThreads(params: {
-  mailboxId: string;
-  size?: number;
-  cursor?: { receivedAt: string; id: string };
-}) {
-  const { mailboxId, size = 20, cursor } = params;
+    mailboxId: string;
+    size?: number;
+    cursor?: { receivedAt: string; id: string };
+  }) {
+    const { mailboxId, size = 20, cursor } = params;
 
-  const result = await this.client.search({
-    index: this.EMAILS_INDEX,
-    size,
-    query: {
-      bool: {
-        filter: [
-          { term: { mailboxId } },
-          { term: { isDeleted: false } },
+    const result = await this.client.search({
+      index: this.EMAILS_INDEX,
+      size,
+      query: {
+        bool: {
+          filter: [{ term: { mailboxId } }, { term: { isDeleted: false } }],
+        },
+      },
+      sort: [
+        { receivedAt: "desc" },
+        { id: "asc" }, // tiebreaker
+      ],
+      collapse: {
+        field: "threadId",
+        inner_hits: [
+          {
+            name: "thread_state",
+            size: 10, // small number is enough
+            _source: ["isRead", "isStarred"],
+          },
         ],
       },
-    },
-    sort: [
-      { receivedAt: "desc" },
-      { id: "asc" }, // tiebreaker
-    ],
-    collapse: {
-      field: "threadId",
-      inner_hits: [
-        {
-          name: "thread_state",
-          size: 10, // small number is enough
-          _source: ["isRead", "isStarred"],
-        },
-      ],
-    },
-    ...(cursor && {
-      search_after: [cursor.receivedAt, cursor.id],
-    }),
-  });
+      ...(cursor && {
+        search_after: [cursor.receivedAt, cursor.id],
+      }),
+    });
 
-  const hits = result.hits.hits;
+    const hits = result.hits.hits;
 
-  return {
-    threads: hits.map((hit) => {
-      const source = hit._source as UnifiedEmailDocument;
-      const states =
-        hit.inner_hits?.thread_state?.hits.hits ?? [];
+    return {
+      threads: hits.map((hit) => {
+        const source = hit._source as UnifiedEmailDocument;
+        const states = hit.inner_hits?.thread_state?.hits.hits ?? [];
 
-      return {
-        threadId: source.threadId,
+        return {
+          threadId: source.threadId,
 
-        // latest email info
-        latestEmailId: hit._id,
-        subject: source.subject,
-        snippet: source.snippet,
-        receivedAt: source.receivedAt,
+          // latest email info
+          latestEmailId: hit._id,
+          subject: source.subject,
+          snippet: source.snippet,
+          receivedAt: source.receivedAt,
 
-        from: source.from,
-        to: source.to,
+          from: source.from,
+          to: source.to,
 
-        // thread-level flags
-        isUnread: states.some(
-          (s) => s._source?.isRead === false,
-        ),
-        isStarred: states.some(
-          (s) => s._source?.isStarred === true,
-        ),
-      };
-    }),
+          // thread-level flags
+          isUnread: states.some((s) => s._source?.isRead === false),
+          isStarred: states.some((s) => s._source?.isStarred === true),
+        };
+      }),
 
-    nextCursor:
-      hits.length > 0
-        ? {
-            receivedAt:
-              (hits[hits.length - 1]._source as any).receivedAt,
-            id: hits[hits.length - 1]._id,
-          }
-        : null,
-  };
-}
-
+      nextCursor:
+        hits.length > 0
+          ? {
+              receivedAt: (hits[hits.length - 1]._source as any).receivedAt,
+              id: hits[hits.length - 1]._id,
+            }
+          : null,
+    };
+  }
 }

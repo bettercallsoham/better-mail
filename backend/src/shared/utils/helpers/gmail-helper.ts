@@ -45,7 +45,7 @@ function extractGmailBody(payload: any): string {
 
 export function transformGmailToUnified(
   msg: GmailMessage,
-  mailboxId: string,
+  emailAddress: string,
 ): UnifiedEmailDocument {
   const headers = msg.payload?.headers || [];
   const getHeader = (name: string) =>
@@ -54,10 +54,10 @@ export function transformGmailToUnified(
 
   return {
     id: msg.id,
+    emailAddress,
     provider: "gmail",
     providerMessageId: msg.id,
     providerThreadId: msg.threadId,
-    mailboxId,
 
     threadId: msg.threadId,
     isThreadRoot: false,
