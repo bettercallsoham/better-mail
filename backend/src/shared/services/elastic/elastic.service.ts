@@ -230,46 +230,148 @@ export class ElasticsearchService {
   }
 
   /**
-   * Search emails by email addresses (for a user's connected accounts)
+   * Powerful search with filters, pagination, and relevance scoring
    */
-
-  async searchEmails(query: {
+  async searchEmails(params: {
     emailAddresses: string[];
-    searchText?: string;
-    from?: number;
+    query: string;
     size?: number;
+    cursor?: { score: number; receivedAt: string; id: string };
+    filters?: {
+      isRead?: boolean;
+      isStarred?: boolean;
+      isArchived?: boolean;
+      hasAttachments?: boolean;
+      from?: string;
+      to?: string;
+      labels?: string[];
+      dateFrom?: string;
+      dateTo?: string;
+    };
   }) {
-    const { emailAddresses, searchText, from = 0, size = 20 } = query;
+    const { emailAddresses, query, size = 20, cursor, filters = {} } = params;
 
-    const must: any[] = [{ terms: { emailAddress: emailAddresses } }];
+    // Build filter conditions
+    const mustFilters: any[] = [
+      { terms: { emailAddress: emailAddresses } },
+      { term: { isDeleted: false } },
+    ];
 
-    if (searchText) {
-      must.push({
-        multi_match: {
-          query: searchText,
-          fields: ["subject^3", "searchText^2", "snippet"],
-          fuzziness: "AUTO",
-        },
+    if (filters.isRead !== undefined) {
+      mustFilters.push({ term: { isRead: filters.isRead } });
+    }
+    if (filters.isStarred !== undefined) {
+      mustFilters.push({ term: { isStarred: filters.isStarred } });
+    }
+    if (filters.isArchived !== undefined) {
+      mustFilters.push({ term: { isArchived: filters.isArchived } });
+    }
+    if (filters.hasAttachments !== undefined) {
+      mustFilters.push({ term: { hasAttachments: filters.hasAttachments } });
+    }
+    if (filters.from) {
+      mustFilters.push({
+        match: { "from.email": { query: filters.from, operator: "and" } },
       });
+    }
+    if (filters.to) {
+      mustFilters.push({
+        match: { "to.email": { query: filters.to, operator: "and" } },
+      });
+    }
+    if (filters.labels && filters.labels.length > 0) {
+      mustFilters.push({ terms: { labels: filters.labels } });
+    }
+    if (filters.dateFrom || filters.dateTo) {
+      const dateRange: any = {};
+      if (filters.dateFrom) dateRange.gte = filters.dateFrom;
+      if (filters.dateTo) dateRange.lte = filters.dateTo;
+      mustFilters.push({ range: { receivedAt: dateRange } });
     }
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
-      from,
       size,
-      query: { bool: { must } },
-      sort: [{ receivedAt: "desc" }],
+      query: {
+        bool: {
+          must: [
+            {
+              bool: {
+                should: [
+                  // Exact + fuzzy matching (primary)
+                  {
+                    multi_match: {
+                      query,
+                      fields: [
+                        "subject^3",
+                        "bodyText^2",
+                        "searchText^2",
+                        "snippet",
+                        "from.email",
+                        "to.email",
+                        "cc.email",
+                      ],
+                      type: "best_fields",
+                      operator: "or",
+                      fuzziness: "AUTO",
+                    },
+                  },
+                  // Prefix matching (for partial words like "insta") - only text fields
+                  {
+                    multi_match: {
+                      query,
+                      fields: [
+                        "subject^2",
+                        "bodyText^1.5",
+                        "searchText^1.5",
+                        "snippet",
+                      ],
+                      type: "phrase_prefix",
+                    },
+                  },
+                  // Wildcard for very partial matches
+                  {
+                    query_string: {
+                      query: `*${query}*`,
+                      fields: ["subject^1.5", "bodyText", "searchText"],
+                      default_operator: "OR",
+                    },
+                  },
+                ],
+                minimum_should_match: 1,
+              },
+            },
+          ],
+          filter: mustFilters,
+        },
+      },
+      sort: [
+        { _score: { order: "desc" } },
+        { receivedAt: { order: "desc" } },
+        { id: { order: "asc" } },
+      ],
+      ...(cursor && {
+        search_after: [cursor.score, cursor.receivedAt, cursor.id],
+      }),
     });
 
+    const hits = result.hits.hits;
+
     return {
-      total:
-        typeof result.hits.total === "number"
-          ? result.hits.total
-          : result.hits.total?.value || 0,
-      emails: result.hits.hits.map((hit) => ({
+      emails: hits.map((hit) => ({
+        _id: hit._id,
+        score: hit._score,
         ...(hit._source as UnifiedEmailDocument),
-        id: hit._id as string,
       })),
+      total: (result.hits.total as any).value,
+      nextCursor:
+        hits.length === size
+          ? {
+              score: hits[hits.length - 1]._score,
+              receivedAt: (hits[hits.length - 1]._source as any).receivedAt,
+              id: (hits[hits.length - 1]._source as any).id,
+            }
+          : null,
     };
   }
 

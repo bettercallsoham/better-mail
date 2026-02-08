@@ -522,3 +522,104 @@ function getElasticUpdates(
       return null;
   }
 }
+
+export const searchEmails = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const {
+    query,
+    from: fromEmail,
+    size,
+    cursor,
+    isRead,
+    isStarred,
+    isArchived,
+    hasAttachments,
+    filterFrom,
+    filterTo,
+    labels,
+    dateFrom,
+    dateTo,
+  } = req.query;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "User not authenticated",
+    });
+  }
+
+  // Get user's emails (uses cache)
+  const { emails: emailAddresses, error } = await getUserEmails(
+    userId,
+    fromEmail as string | undefined,
+  );
+
+  if (error || emailAddresses.length === 0) {
+    return res.status(403).json({
+      success: false,
+      message: error || "No connected email accounts found",
+    });
+  }
+
+  try {
+    const elasticService = new ElasticsearchService(elasticClient);
+
+    // Parse cursor if provided
+    let parsedCursor;
+    if (cursor && typeof cursor === "string") {
+      try {
+        parsedCursor = JSON.parse(cursor);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cursor format",
+        });
+      }
+    }
+
+    // Parse labels if provided
+    let parsedLabels;
+    if (labels && typeof labels === "string") {
+      try {
+        parsedLabels = JSON.parse(labels);
+      } catch (e) {
+        parsedLabels = [labels];
+      }
+    }
+
+    const result = await elasticService.searchEmails({
+      emailAddresses,
+      query: query as string,
+      size: size ? parseInt(size as string) : 20,
+      cursor: parsedCursor,
+      filters: {
+        isRead: isRead !== undefined ? isRead === "true" : undefined,
+        isStarred: isStarred !== undefined ? isStarred === "true" : undefined,
+        isArchived:
+          isArchived !== undefined ? isArchived === "true" : undefined,
+        hasAttachments:
+          hasAttachments !== undefined ? hasAttachments === "true" : undefined,
+        from: filterFrom as string | undefined,
+        to: filterTo as string | undefined,
+        labels: parsedLabels,
+        dateFrom: dateFrom as string | undefined,
+        dateTo: dateTo as string | undefined,
+      },
+    });
+
+    res.json({
+      success: true,
+      query,
+      total: result.total,
+      emails: result.emails,
+      nextCursor: result.nextCursor,
+    });
+  } catch (error: any) {
+    console.error("Search failed:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Search failed",
+    });
+  }
+}, "searchEmails");

@@ -254,3 +254,74 @@ export const validateEmailAction = [
 
   handleValidationErrors,
 ];
+
+export const validateSearch = [
+  query("query")
+    .exists()
+    .withMessage("search query is required")
+    .isString()
+    .withMessage("query must be a string")
+    .isLength({ min: 1 })
+    .withMessage("query cannot be empty")
+    .trim(),
+
+  query("from")
+    .optional()
+    .isEmail()
+    .withMessage("Invalid from email format")
+    .normalizeEmail(),
+
+  query("size")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("size must be between 1 and 100"),
+
+  query("cursor").optional().isString().withMessage("cursor must be a string"),
+
+  query("isRead")
+    .optional()
+    .isIn(["true", "false"])
+    .withMessage("isRead must be 'true' or 'false'"),
+
+  query("isStarred")
+    .optional()
+    .isIn(["true", "false"])
+    .withMessage("isStarred must be 'true' or 'false'"),
+
+  query("isArchived")
+    .optional()
+    .isIn(["true", "false"])
+    .withMessage("isArchived must be 'true' or 'false'"),
+
+  query("hasAttachments")
+    .optional()
+    .isIn(["true", "false"])
+    .withMessage("hasAttachments must be 'true' or 'false'"),
+
+  query("filterFrom")
+    .optional()
+    .isString()
+    .withMessage("filterFrom must be a string"),
+
+  query("filterTo")
+    .optional()
+    .isString()
+    .withMessage("filterTo must be a string"),
+
+  query("labels")
+    .optional()
+    .isString()
+    .withMessage("labels must be a JSON string or single label"),
+
+  query("dateFrom")
+    .optional()
+    .isISO8601()
+    .withMessage("dateFrom must be a valid ISO 8601 date"),
+
+  query("dateTo")
+    .optional()
+    .isISO8601()
+    .withMessage("dateTo must be a valid ISO 8601 date"),
+
+  handleValidationErrors,
+];

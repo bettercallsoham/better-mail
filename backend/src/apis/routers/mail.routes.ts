@@ -31,7 +31,12 @@ router.get(
   mailController.getFolders,
 );
 
-router.get("/search", verifyAccessToken());
+router.get(
+  "/search",
+  verifyAccessToken(),
+  mailValidator.validateSearch,
+  mailController.searchEmails,
+);
 
 router.get("/user-plan", verifyAccessToken());
 
