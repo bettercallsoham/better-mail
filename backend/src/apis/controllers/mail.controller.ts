@@ -4,6 +4,8 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { Request, Response } from "express";
 import { getUserEmails } from "../utils/email-helper";
 import { EmailAccount } from "../../shared/models";
+import { OutlookApiService } from "../../shared/services/outlook/outlook-api.service";
+import { GmailApiService } from "../../shared/services/gmail/gmail-api.service";
 
 export const getConnectedMailboxes = asyncHandler(
   async (req: Request, res: Response) => {
@@ -192,3 +194,222 @@ export const getFolders = asyncHandler(async (req: Request, res: Response) => {
     data: folderCounts,
   });
 }, "getFolders");
+
+export const replyEmail = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const {
+      from,
+      provider,
+      replyToMessageId,
+      html,
+      mode = "reply",
+      to,
+      cc,
+      bcc,
+      subject,
+      attachments,
+    } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    // Verify user owns the from email (uses cache)
+    const { emails: emailAddresses, error } = await getUserEmails(
+      userId,
+      from,
+    );
+
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "You don't have access to this email account",
+      });
+    }
+
+    try {
+      let messageId: string;
+
+      console.log(`[replyEmail] Provider: ${provider}, From: ${from}`);
+      console.log(`[replyEmail] Mode: ${mode}, ReplyToMessageId: ${replyToMessageId}`);
+      console.log(`[replyEmail] Recipients - To: ${JSON.stringify(to)}, CC: ${JSON.stringify(cc)}, BCC: ${JSON.stringify(bcc)}`);
+
+      if (provider === "GOOGLE") {
+      
+        const gmailService = new GmailApiService({ email: from });
+
+        messageId = await gmailService.sendEmail({
+          mode,
+          from,
+          to,
+          cc,
+          bcc,
+          subject,
+          html,
+          replyToMessageId,
+          attachments,
+        });
+
+        console.log(`[replyEmail] Gmail SUCCESS. MessageId: ${messageId}`);
+      } else if (provider === "OUTLOOK") {
+     
+        const outlookService = new OutlookApiService({ email: from });
+
+        console.log(`[replyEmail] Calling Outlook API...`);
+        messageId = await outlookService.sendEmail({
+          mode,
+          from,
+          to,
+          cc,
+          bcc,
+          subject,
+          html,
+          replyToMessageId,
+          attachments,
+        });
+
+        console.log(`[replyEmail] Outlook SUCCESS. MessageId: ${messageId}`);
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Unsupported email provider",
+        });
+      }
+
+      res.json({
+        success: true,
+        data: { messageId },
+        message: "Email sent successfully",
+      });
+    } catch (error: any) {
+      console.error("Failed to send reply:", error);
+
+      // Handle specific error cases
+      if (error.response?.status === 401 || error.message?.includes("token")) {
+        return res.status(401).json({
+          success: false,
+          message: "Email authentication expired. Please reconnect your account.",
+        });
+      }
+
+      if (error.response?.status === 429) {
+        return res.status(429).json({
+          success: false,
+          message: "Rate limit exceeded. Please try again later.",
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to send email",
+      });
+    }
+  },
+  "replyEmail",
+);
+
+export const sendEmail = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const {
+      from,
+      provider,
+      to,
+      subject,
+      html,
+      cc,
+      bcc,
+      attachments,
+    } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    // Verify user owns the from email (uses cache)
+    const { emails: emailAddresses, error } = await getUserEmails(
+      userId,
+      from,
+    );
+
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "You don't have access to this email account",
+      });
+    }
+
+    try {
+      let messageId: string;
+
+      if (provider === "GOOGLE") {
+        const gmailService = new GmailApiService({ email: from });
+
+        messageId = await gmailService.sendEmail({
+          mode: "new",
+          from,
+          to,
+          cc,
+          bcc,
+          subject,
+          html,
+          attachments,
+        });
+      } else if (provider === "OUTLOOK") {
+        const outlookService = new OutlookApiService({ email: from });
+
+        messageId = await outlookService.sendEmail({
+          mode: "new",
+          from,
+          to,
+          cc,
+          bcc,
+          subject,
+          html,
+          attachments,
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Unsupported email provider",
+        });
+      }
+
+      res.json({
+        success: true,
+        data: { messageId },
+        message: "Email sent successfully",
+      });
+    } catch (error: any) {
+      console.error("Failed to send email:", error);
+
+      // Handle specific error cases
+      if (error.response?.status === 401 || error.message?.includes("token")) {
+        return res.status(401).json({
+          success: false,
+          message: "Email authentication expired. Please reconnect your account.",
+        });
+      }
+
+      if (error.response?.status === 429) {
+        return res.status(429).json({
+          success: false,
+          message: "Rate limit exceeded. Please try again later.",
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to send email",
+      });
+    }
+  },
+  "sendEmail",
+);

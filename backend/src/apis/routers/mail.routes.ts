@@ -35,8 +35,18 @@ router.get("/search", verifyAccessToken());
 
 router.get("/user-plan", verifyAccessToken());
 
-router.post("/send-new-email", verifyAccessToken());
-router.post("/reply-email", verifyAccessToken());
+router.post(
+  "/send-new-email",
+  verifyAccessToken(),
+  mailValidator.validateSendEmail,
+  mailController.sendEmail,
+);
+router.post(
+  "/reply-email",
+  verifyAccessToken(),
+  mailValidator.validateReplyEmail,
+  mailController.replyEmail,
+);
 
 router.post("/email-action", verifyAccessToken());
 // router.post("create-label", );
