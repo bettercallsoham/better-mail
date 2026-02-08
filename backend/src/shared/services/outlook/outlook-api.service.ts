@@ -377,7 +377,9 @@ export class OutlookApiService {
       updatePayload.ccRecipients = input.cc.map((address) => ({
         emailAddress: { address },
       }));
-      console.log(`[Outlook] Adding CC recipients: ${JSON.stringify(input.cc)}`);
+      console.log(
+        `[Outlook] Adding CC recipients: ${JSON.stringify(input.cc)}`,
+      );
     }
 
     console.log(`[Outlook] Patching draft with payload...`);
@@ -385,7 +387,9 @@ export class OutlookApiService {
 
     // 3. Add attachments separately if any
     if (input.attachments?.length) {
-      console.log(`[Outlook] Adding ${input.attachments.length} attachments...`);
+      console.log(
+        `[Outlook] Adding ${input.attachments.length} attachments...`,
+      );
       for (const attachment of input.attachments) {
         await client.post(`/me/messages/${draftId}/attachments`, {
           "@odata.type": "#microsoft.graph.fileAttachment",
