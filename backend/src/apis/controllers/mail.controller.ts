@@ -1,5 +1,6 @@
 import { elasticClient } from "../../shared/config/elastic";
 import { ElasticsearchService } from "../../shared/services/elastic/elastic.service";
+import { UnifiedEmailDocument } from "../../shared/services/elastic/interface";
 import { asyncHandler } from "../utils/asyncHandler";
 import { Request, Response } from "express";
 import { getUserEmails } from "../utils/email-helper";
@@ -230,14 +231,6 @@ export const replyEmail = asyncHandler(async (req: Request, res: Response) => {
   try {
     let messageId: string;
 
-    console.log(`[replyEmail] Provider: ${provider}, From: ${from}`);
-    console.log(
-      `[replyEmail] Mode: ${mode}, ReplyToMessageId: ${replyToMessageId}`,
-    );
-    console.log(
-      `[replyEmail] Recipients - To: ${JSON.stringify(to)}, CC: ${JSON.stringify(cc)}, BCC: ${JSON.stringify(bcc)}`,
-    );
-
     if (provider === "GOOGLE") {
       const gmailService = new GmailApiService({ email: from });
 
@@ -252,12 +245,9 @@ export const replyEmail = asyncHandler(async (req: Request, res: Response) => {
         replyToMessageId,
         attachments,
       });
-
-      console.log(`[replyEmail] Gmail SUCCESS. MessageId: ${messageId}`);
     } else if (provider === "OUTLOOK") {
       const outlookService = new OutlookApiService({ email: from });
 
-      console.log(`[replyEmail] Calling Outlook API...`);
       messageId = await outlookService.sendEmail({
         mode,
         from,
@@ -269,8 +259,6 @@ export const replyEmail = asyncHandler(async (req: Request, res: Response) => {
         replyToMessageId,
         attachments,
       });
-
-      console.log(`[replyEmail] Outlook SUCCESS. MessageId: ${messageId}`);
     } else {
       return res.status(400).json({
         success: false,
@@ -394,3 +382,143 @@ export const sendEmail = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 }, "sendEmail");
+
+export const emailAction = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const { from, provider, messageIds, action } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "User not authenticated",
+    });
+  }
+
+  // Verify user owns the email (uses cache)
+  const { emails: emailAddresses, error } = await getUserEmails(userId, from);
+
+  if (error || emailAddresses.length === 0) {
+    return res.status(403).json({
+      success: false,
+      message: error || "You don't have access to this email account",
+    });
+  }
+
+  try {
+    // Execute action on provider API
+    if (provider === "GOOGLE") {
+      const gmailService = new GmailApiService({ email: from });
+
+      switch (action) {
+        case "mark_read":
+          await gmailService.markRead(messageIds);
+          break;
+        case "mark_unread":
+          await gmailService.markUnread(messageIds);
+          break;
+        case "star":
+          await gmailService.star(messageIds);
+          break;
+        case "unstar":
+          await gmailService.unstar(messageIds);
+          break;
+        case "archive":
+          await gmailService.archive(messageIds);
+          break;
+        case "unarchive":
+          await gmailService.unarchive(messageIds);
+          break;
+        case "delete":
+          await gmailService.trash(messageIds);
+          break;
+      }
+    } else if (provider === "OUTLOOK") {
+      const outlookService = new OutlookApiService({ email: from });
+
+      switch (action) {
+        case "mark_read":
+          await outlookService.markRead(messageIds);
+          break;
+        case "mark_unread":
+          await outlookService.markUnread(messageIds);
+          break;
+        case "star":
+          await outlookService.star(messageIds);
+          break;
+        case "unstar":
+          await outlookService.unstar(messageIds);
+          break;
+        case "archive":
+          await outlookService.archive(messageIds);
+          break;
+        case "delete":
+          await outlookService.trash(messageIds);
+          break;
+        case "unarchive":
+          await outlookService.unarchive(messageIds);
+          break;
+      }
+    }
+
+    // Update Elasticsearch with action results
+    const elasticService = new ElasticsearchService(elasticClient);
+    const updates = getElasticUpdates(action);
+
+    if (updates) {
+      const esProvider = provider === "GOOGLE" ? "gmail" : "outlook";
+      await elasticService.bulkUpdateEmails({
+        provider: esProvider,
+        providerMessageIds: messageIds,
+        updates,
+      });
+    }
+
+    res.json({
+      success: true,
+      action,
+      updated: messageIds.length,
+      messageIds,
+    });
+  } catch (error: any) {
+    console.error("Failed to perform email action:", error);
+
+    // Handle specific error cases
+    if (error.response?.status === 401 || error.message?.includes("token")) {
+      return res.status(401).json({
+        success: false,
+        message: "Email authentication expired. Please reconnect your account.",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to perform action",
+    });
+  }
+}, "emailAction");
+
+/**
+ * Helper: Map action to Elasticsearch field updates
+ */
+function getElasticUpdates(
+  action: string,
+): Partial<UnifiedEmailDocument> | null {
+  switch (action) {
+    case "mark_read":
+      return { isRead: true };
+    case "mark_unread":
+      return { isRead: false };
+    case "star":
+      return { isStarred: true };
+    case "unstar":
+      return { isStarred: false };
+    case "archive":
+      return { isArchived: true };
+    case "unarchive":
+      return { isArchived: false };
+    case "delete":
+      return { isDeleted: true };
+    default:
+      return null;
+  }
+}

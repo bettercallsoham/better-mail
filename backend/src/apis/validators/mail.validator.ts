@@ -213,3 +213,44 @@ export const validateSendEmail = [
 
   handleValidationErrors,
 ];
+
+export const validateEmailAction = [
+  body("from")
+    .exists()
+    .withMessage("from email is required")
+    .isEmail()
+    .withMessage("Invalid from email format")
+    .normalizeEmail(),
+
+  body("provider")
+    .exists()
+    .withMessage("provider is required")
+    .isIn(["GOOGLE", "OUTLOOK"])
+    .withMessage("provider must be either 'GOOGLE' or 'OUTLOOK'"),
+
+  body("messageIds")
+    .exists()
+    .withMessage("messageIds is required")
+    .isArray({ min: 1 })
+    .withMessage("messageIds must be a non-empty array")
+    .custom((value) => {
+      return value.every((id: string) => typeof id === "string");
+    })
+    .withMessage("messageIds must be an array of strings"),
+
+  body("action")
+    .exists()
+    .withMessage("action is required")
+    .isIn([
+      "mark_read",
+      "mark_unread",
+      "star",
+      "unstar",
+      "archive",
+      "unarchive",
+      "delete",
+    ])
+    .withMessage("Invalid action type"),
+
+  handleValidationErrors,
+];

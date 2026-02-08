@@ -446,4 +446,35 @@ export class ElasticsearchService {
       labels,
     };
   }
+
+  /**
+   * Bulk update multiple emails
+   * Returns count of successful updates
+   */
+  async bulkUpdateEmails(params: {
+    provider: string;
+    providerMessageIds: string[];
+    updates: Partial<UnifiedEmailDocument>;
+  }): Promise<{ updated: number; errors: any[] }> {
+    const { provider, providerMessageIds, updates } = params;
+
+    const operations = providerMessageIds.flatMap((msgId) => [
+      { update: { _index: this.EMAILS_INDEX, _id: `${provider}_${msgId}` } },
+      { doc: updates },
+    ]);
+
+    const result = await this.client.bulk({ operations });
+
+    const errors = result.items
+      .map((item: any, idx: number) => ({
+        messageId: providerMessageIds[Math.floor(idx / 2)],
+        error: item.update?.error,
+      }))
+      .filter((item) => item.error);
+
+    return {
+      updated: providerMessageIds.length - errors.length,
+      errors,
+    };
+  }
 }

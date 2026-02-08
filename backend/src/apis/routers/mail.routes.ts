@@ -48,7 +48,11 @@ router.post(
   mailController.replyEmail,
 );
 
-router.post("/email-action", verifyAccessToken());
-// router.post("create-label", );
+router.post(
+  "/email-action",
+  verifyAccessToken(),
+  mailValidator.validateEmailAction,
+  mailController.emailAction,
+);
 
 export default router;

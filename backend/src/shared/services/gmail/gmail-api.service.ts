@@ -441,6 +441,20 @@ export class GmailApiService {
     });
   }
 
+  async star(messageIds: string[]): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      addLabels: ["STARRED"],
+    });
+  }
+
+  async unstar(messageIds: string[]): Promise<void> {
+    await this.modifyMessages({
+      messageIds,
+      removeLabels: ["STARRED"],
+    });
+  }
+
   async applyLabel(messageIds: string[], labelId: string): Promise<void> {
     await this.modifyMessages({
       messageIds,
