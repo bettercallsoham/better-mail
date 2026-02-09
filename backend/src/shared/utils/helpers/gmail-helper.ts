@@ -85,6 +85,8 @@ export function transformGmailToUnified(
     isArchived: !msg.labelIds?.includes("INBOX"),
     isDeleted: msg.labelIds?.includes("TRASH") || false,
 
+    isDraft: false,
+
     labels: msg.labelIds || [],
     providerLabels: msg.labelIds || [],
   };

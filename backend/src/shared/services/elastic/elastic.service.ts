@@ -127,6 +127,15 @@ export class ElasticsearchService {
           labels: { type: "keyword" },
           providerLabels: { type: "keyword" },
 
+          // ---- Drafts ----
+          isDraft: { type: "boolean" },
+          draftData: {
+            properties: {
+              providerDraftId: { type: "keyword" },
+              lastEditedAt: { type: "date" },
+            },
+          },
+
           inboxState: { type: "keyword" },
           snoozeUntil: { type: "date" },
 
@@ -309,20 +318,6 @@ export class ElasticsearchService {
   }
 
   /**
-   * Update single email
-   */
-  async updateEmail(
-    id: string,
-    updates: Partial<UnifiedEmailDocument>,
-  ): Promise<void> {
-    await this.client.update({
-      index: this.EMAILS_INDEX,
-      id,
-      doc: updates,
-    });
-  }
-
-  /**
    * Powerful search with filters, pagination, and relevance scoring
    */
   async searchEmails(params: {
@@ -382,59 +377,62 @@ export class ElasticsearchService {
       mustFilters.push({ range: { receivedAt: dateRange } });
     }
 
+    // Build query based on whether search text is provided
+    const queryClause: any = query && query.trim()
+      ? {
+          bool: {
+            should: [
+              // Exact + fuzzy matching (primary)
+              {
+                multi_match: {
+                  query,
+                  fields: [
+                    "subject^3",
+                    "bodyText^2",
+                    "searchText^2",
+                    "snippet",
+                    "from.email",
+                    "to.email",
+                    "cc.email",
+                  ],
+                  type: "best_fields",
+                  operator: "or",
+                  fuzziness: "AUTO",
+                },
+              },
+              // Prefix matching (for partial words like "insta") - only text fields
+              {
+                multi_match: {
+                  query,
+                  fields: [
+                    "subject^2",
+                    "bodyText^1.5",
+                    "searchText^1.5",
+                    "snippet",
+                  ],
+                  type: "phrase_prefix",
+                },
+              },
+              // Wildcard for very partial matches
+              {
+                query_string: {
+                  query: `*${query}*`,
+                  fields: ["subject^1.5", "bodyText", "searchText"],
+                  default_operator: "OR",
+                },
+              },
+            ],
+            minimum_should_match: 1,
+          },
+        }
+      : { match_all: {} }; // Use match_all when no query text
+
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
       size,
       query: {
         bool: {
-          must: [
-            {
-              bool: {
-                should: [
-                  // Exact + fuzzy matching (primary)
-                  {
-                    multi_match: {
-                      query,
-                      fields: [
-                        "subject^3",
-                        "bodyText^2",
-                        "searchText^2",
-                        "snippet",
-                        "from.email",
-                        "to.email",
-                        "cc.email",
-                      ],
-                      type: "best_fields",
-                      operator: "or",
-                      fuzziness: "AUTO",
-                    },
-                  },
-                  // Prefix matching (for partial words like "insta") - only text fields
-                  {
-                    multi_match: {
-                      query,
-                      fields: [
-                        "subject^2",
-                        "bodyText^1.5",
-                        "searchText^1.5",
-                        "snippet",
-                      ],
-                      type: "phrase_prefix",
-                    },
-                  },
-                  // Wildcard for very partial matches
-                  {
-                    query_string: {
-                      query: `*${query}*`,
-                      fields: ["subject^1.5", "bodyText", "searchText"],
-                      default_operator: "OR",
-                    },
-                  },
-                ],
-                minimum_should_match: 1,
-              },
-            },
-          ],
+          must: [queryClause],
           filter: mustFilters,
         },
       },
@@ -612,6 +610,9 @@ export class ElasticsearchService {
         important: {
           filter: { term: { labels: "IMPORTANT" } },
         },
+        drafts: {
+          filter: { term: { isDraft: true } },
+        },
         all_labels: {
           terms: {
             field: "labels",
@@ -637,6 +638,7 @@ export class ElasticsearchService {
         inbox: aggs.inbox.doc_count,
         sent: aggs.sent.doc_count,
         important: aggs.important.doc_count,
+        drafts: aggs.drafts.doc_count,
       },
       labels,
     };
@@ -705,7 +707,7 @@ export class ElasticsearchService {
   async updateInboxState(params: {
     provider: string;
     providerMessageIds: string[];
-    inboxState: "INBOX" | "ARCHIVED" | "SNOOZED" | "DONE";
+    inboxState: "INBOX" | "ARCHIVED" | "SNOOZED" | "DONE" | "DRAFT";
     snoozeUntil?: string;
   }): Promise<{ updated: number; errors: any[] }> {
     const { provider, providerMessageIds, inboxState, snoozeUntil } = params;
@@ -939,5 +941,296 @@ export class ElasticsearchService {
         ._source as import("./interface").SearchHistoryDocument),
       searchCount: bucket.search_count.value,
     }));
+  }
+
+  // --------------------
+  // EMAIL OPERATIONS (Generic - handles drafts too)
+  // --------------------
+
+  async saveDraft(draft: UnifiedEmailDocument): Promise<void> {
+    const compositeId = `${draft.provider}_${draft.providerMessageId}`;
+    await this.client.index({
+      index: this.EMAILS_INDEX,
+      id: compositeId,
+      document: draft,
+    });
+  }
+
+  async getEmailById(
+    id: string,
+    emailAddresses: string[],
+  ): Promise<UnifiedEmailDocument | null> {
+    try {
+      const result = await this.client.get({
+        index: this.EMAILS_INDEX,
+        id,
+      });
+
+      const email = result._source as UnifiedEmailDocument;
+
+      // Verify ownership
+      if (!emailAddresses.includes(email.emailAddress)) {
+        return null;
+      }
+
+      return email;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async updateEmail(
+    id: string,
+    updates: Partial<UnifiedEmailDocument>,
+  ): Promise<void> {
+    const updateDoc: any = { ...updates };
+
+    // If updating a draft, update lastEditedAt
+    if (updates.isDraft !== false) {
+      updateDoc["draftData.lastEditedAt"] = new Date().toISOString();
+    }
+
+    await this.client.update({
+      index: this.EMAILS_INDEX,
+      id,
+      doc: updateDoc,
+    });
+  }
+
+  async deleteEmail(id: string): Promise<void> {
+    await this.client.delete({
+      index: this.EMAILS_INDEX,
+      id,
+    });
+  }
+
+  // --------------------
+  // ANALYTICS OPERATIONS
+  // --------------------
+
+  async getAnalyticsOverview(
+    emailAddresses: string[],
+    period: "daily" | "weekly" | "monthly",
+  ): Promise<import("./interface").AnalyticsOverview> {
+    const dateRange = this.getDateRange(period);
+
+    const result = await this.client.search({
+      index: this.EMAILS_INDEX,
+      query: {
+        bool: {
+          must: [
+            {
+              bool: {
+                should: [
+                  { terms: { "to.email": emailAddresses } },
+                  { terms: { "from.email": emailAddresses } },
+                ],
+              },
+            },
+            {
+              range: { receivedAt: { gte: dateRange.from, lte: dateRange.to } },
+            },
+            { term: { isDraft: false } }, // Exclude drafts
+          ],
+        },
+      },
+      size: 0,
+      aggs: {
+        received: {
+          filter: { terms: { "to.email": emailAddresses } },
+        },
+        sent: {
+          filter: { terms: { "from.email": emailAddresses } },
+        },
+        read: {
+          filter: {
+            bool: {
+              must: [
+                { terms: { "to.email": emailAddresses } },
+                { term: { isRead: true } },
+              ],
+            },
+          },
+        },
+        archived: {
+          filter: {
+            bool: {
+              must: [
+                { terms: { emailAddress: emailAddresses } },
+                { term: { inboxState: "ARCHIVED" } },
+              ],
+            },
+          },
+        },
+        deleted: {
+          filter: {
+            bool: {
+              must: [
+                { terms: { emailAddress: emailAddresses } },
+                { term: { isDeleted: true } },
+              ],
+            },
+          },
+        },
+        starred: {
+          filter: {
+            bool: {
+              must: [
+                { terms: { emailAddress: emailAddresses } },
+                { term: { isStarred: true } },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    const aggs = result.aggregations as any;
+    const receivedCount = aggs.received.doc_count;
+    const readCount = aggs.read.doc_count;
+
+    return {
+      period,
+      dateRange,
+      metrics: {
+        received: receivedCount,
+        sent: aggs.sent.doc_count,
+        read: readCount,
+        readRate: receivedCount > 0 ? (readCount / receivedCount) * 100 : 0,
+        archived: aggs.archived.doc_count,
+        deleted: aggs.deleted.doc_count,
+        starred: aggs.starred.doc_count,
+      },
+    };
+  }
+
+  async getTimePatterns(
+    emailAddresses: string[],
+    period: "weekly" | "monthly",
+  ): Promise<import("./interface").TimePatterns> {
+    const dateRange = this.getDateRange(period);
+
+    const result = await this.client.search({
+      index: this.EMAILS_INDEX,
+      query: {
+        bool: {
+          must: [
+            { terms: { emailAddress: emailAddresses } },
+            {
+              range: { receivedAt: { gte: dateRange.from, lte: dateRange.to } },
+            },
+            { term: { isDraft: false } },
+          ],
+        },
+      },
+      size: 0,
+      aggs: {
+        by_hour: {
+          date_histogram: {
+            field: "receivedAt",
+            calendar_interval: "hour",
+            format: "H",
+          },
+        },
+        by_day: {
+          date_histogram: {
+            field: "receivedAt",
+            calendar_interval: "day",
+            format: "EEEE",
+          },
+        },
+      },
+    });
+
+    const hourlyBuckets = (result.aggregations?.by_hour as any)?.buckets || [];
+    const dailyBuckets = (result.aggregations?.by_day as any)?.buckets || [];
+
+    // Process hourly distribution
+    const hourlyDistribution: Record<string, number> = {};
+    for (let i = 0; i < 24; i++) {
+      hourlyDistribution[i.toString()] = 0;
+    }
+    hourlyBuckets.forEach((bucket: any) => {
+      const hour = bucket.key_as_string;
+      hourlyDistribution[hour] =
+        (hourlyDistribution[hour] || 0) + bucket.doc_count;
+    });
+
+    // Process daily distribution
+    const dailyDistribution: Record<string, number> = {};
+    dailyBuckets.forEach((bucket: any) => {
+      const day = bucket.key_as_string;
+      dailyDistribution[day] = (dailyDistribution[day] || 0) + bucket.doc_count;
+    });
+
+    // Find peak hours
+    const peakHours = Object.entries(hourlyDistribution)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([hour, count]) => ({
+        hour: parseInt(hour),
+        count,
+        label: `${hour}:00`,
+      }));
+
+    // Find busiest and quietest days
+    const sortedDays = Object.entries(dailyDistribution).sort(
+      ([, a], [, b]) => b - a,
+    );
+    const busiestDay = sortedDays[0]?.[0] || "N/A";
+    const quietestDay = sortedDays[sortedDays.length - 1]?.[0] || "N/A";
+
+    // Calculate average emails per hour for different time periods
+    const avgEmailsPerHour: Record<string, number> = {
+      "9-12": this.calculateAvgForHours(hourlyDistribution, 9, 12),
+      "12-17": this.calculateAvgForHours(hourlyDistribution, 12, 17),
+      "17-22": this.calculateAvgForHours(hourlyDistribution, 17, 22),
+    };
+
+    return {
+      hourlyDistribution,
+      dailyDistribution,
+      peakHours,
+      busiestDay,
+      quietestDay,
+      avgEmailsPerHour,
+    };
+  }
+
+  private getDateRange(period: "daily" | "weekly" | "monthly"): {
+    from: string;
+    to: string;
+  } {
+    const now = new Date();
+    const to = now.toISOString();
+    let from: Date;
+
+    switch (period) {
+      case "daily":
+        from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case "weekly":
+        from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "monthly":
+        from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+    }
+
+    return { from: from.toISOString(), to };
+  }
+
+  private calculateAvgForHours(
+    hourlyDistribution: Record<string, number>,
+    startHour: number,
+    endHour: number,
+  ): number {
+    let total = 0;
+    let count = 0;
+    for (let i = startHour; i < endHour; i++) {
+      total += hourlyDistribution[i.toString()] || 0;
+      count++;
+    }
+    return count > 0 ? Math.round(total / count) : 0;
   }
 }

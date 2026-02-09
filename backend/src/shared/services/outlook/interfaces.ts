@@ -46,6 +46,7 @@ export interface OutlookMessage {
 
   subject: string;
   bodyPreview: string;
+  isDraft?: boolean; // Outlook draft flag
 
   from?: {
     emailAddress: {

@@ -631,4 +631,84 @@ export class OutlookApiService {
       });
     }
   }
+
+  // --------------------
+  // DRAFT OPERATIONS
+  // --------------------
+
+  async createDraft(input: SendEmailInput): Promise<string> {
+    const client = await this.getClient();
+
+    const body: any = {
+      subject: input.subject,
+      body: {
+        contentType: input.html ? "HTML" : "Text",
+        content: input.html || input.text || "",
+      },
+      toRecipients: (input.to || []).map((email) => ({
+        emailAddress: { address: email },
+      })),
+    };
+
+    if (input.cc && input.cc.length > 0) {
+      body.ccRecipients = input.cc.map((email) => ({
+        emailAddress: { address: email },
+      }));
+    }
+
+    if (input.bcc && input.bcc.length > 0) {
+      body.bccRecipients = input.bcc.map((email) => ({
+        emailAddress: { address: email },
+      }));
+    }
+
+    const res = await client.post("/me/messages", body);
+    return res.data.id; // Returns draft ID
+  }
+
+  async updateDraft(draftId: string, input: SendEmailInput): Promise<void> {
+    const client = await this.getClient();
+
+    const body: any = {
+      subject: input.subject,
+      body: {
+        contentType: input.html ? "HTML" : "Text",
+        content: input.html || input.text || "",
+      },
+      toRecipients: (input.to || []).map((email) => ({
+        emailAddress: { address: email },
+      })),
+    };
+
+    if (input.cc && input.cc.length > 0) {
+      body.ccRecipients = input.cc.map((email) => ({
+        emailAddress: { address: email },
+      }));
+    }
+
+    if (input.bcc && input.bcc.length > 0) {
+      body.bccRecipients = input.bcc.map((email) => ({
+        emailAddress: { address: email },
+      }));
+    }
+
+    await client.patch(`/me/messages/${draftId}`, body);
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    const client = await this.getClient();
+    await client.delete(`/me/messages/${draftId}`);
+  }
+
+  async sendDraft(draftId: string): Promise<string> {
+    const client = await this.getClient();
+    await client.post(`/me/messages/${draftId}/send`);
+    return draftId; // Outlook doesn't return new ID, same message becomes sent
+  }
+
+  async getDraft(draftId: string): Promise<any> {
+    const client = await this.getClient();
+    const res = await client.get(`/me/messages/${draftId}`);
+    return res.data;
+  }
 }

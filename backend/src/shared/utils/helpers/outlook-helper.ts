@@ -14,6 +14,8 @@ export function transformOutlookToUnified(
     email: addr?.emailAddress?.address || "",
   });
 
+  const isDraft = msg.isDraft === true;
+
   const doc: UnifiedEmailDocument = {
     id: msg.id,
     emailAddress,
@@ -46,12 +48,20 @@ export function transformOutlookToUnified(
     isArchived: false,
     isDeleted: false,
 
-    labels: [],
-    providerLabels: [],
+    isDraft,
+
+    labels: isDraft ? ["DRAFT"] : [],
+    providerLabels: isDraft ? ["DRAFT"] : [],
   };
 
-  // Only set inboxState for webhook emails (new arrivals)
-  if (isWebhook) {
+  // Set inboxState based on draft status or webhook
+  if (isDraft) {
+    doc.inboxState = "DRAFT";
+    doc.draftData = {
+      providerDraftId: msg.id,
+      lastEditedAt: msg.receivedDateTime,
+    };
+  } else if (isWebhook) {
     doc.inboxState = "INBOX";
   }
 

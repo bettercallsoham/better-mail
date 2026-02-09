@@ -54,8 +54,15 @@ export interface UnifiedEmailDocument {
   labels: string[];
   providerLabels: string[];
 
+  // ---- Drafts ----
+  isDraft: boolean;
+  draftData?: {
+    providerDraftId?: string; // Gmail/Outlook draft ID
+    lastEditedAt: string;
+  };
+
   // ---- Inbox Zero ----
-  inboxState?: "INBOX" | "ARCHIVED" | "SNOOZED" | "DONE";
+  inboxState?: "INBOX" | "ARCHIVED" | "SNOOZED" | "DONE" | "DRAFT";
   snoozeUntil?: string;
 
   // ---- Search / AI ----
@@ -137,4 +144,30 @@ export interface SearchHistoryDocument {
   executionTimeMs: number;
   emailAddresses: string[];
   searchedAt: string;
+}
+// --------------------
+// Analytics Interfaces
+// --------------------
+
+export interface AnalyticsOverview {
+  period: "daily" | "weekly" | "monthly";
+  dateRange: { from: string; to: string };
+  metrics: {
+    received: number;
+    sent: number;
+    read: number;
+    readRate: number;
+    archived: number;
+    deleted: number;
+    starred: number;
+  };
+}
+
+export interface TimePatterns {
+  hourlyDistribution: Record<string, number>;
+  dailyDistribution: Record<string, number>;
+  peakHours: Array<{ hour: number; count: number; label: string }>;
+  busiestDay: string;
+  quietestDay: string;
+  avgEmailsPerHour: Record<string, number>;
 }

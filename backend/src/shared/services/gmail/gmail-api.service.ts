@@ -480,4 +480,91 @@ export class GmailApiService {
 
     return res.data.id;
   }
+
+  // --------------------
+  // DRAFT OPERATIONS
+  // --------------------
+
+  async createDraft(input: SendEmailInput): Promise<string> {
+    const client = await this.getClient();
+
+    const raw = Rfc822Builder.build({
+      from: this.email,
+      to: input.to || [],
+      cc: input.cc || [],
+      bcc: input.bcc || [],
+      subject: input.subject || "",
+      html: input.html || input.text || "",
+    });
+
+    const res = await client.post("/users/me/drafts", {
+      message: {
+        raw: Buffer.from(raw)
+          .toString("base64")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, ""),
+      },
+    });
+
+    console.log("Gmail createDraft response:", {
+      draftId: res.data.id,
+      messageId: res.data.message?.id,
+      fullResponse: JSON.stringify(res.data, null, 2),
+    });
+
+    return res.data.id; // Returns draft ID
+  }
+
+  async updateDraft(draftId: string, input: SendEmailInput): Promise<void> {
+    const client = await this.getClient();
+
+    const raw = Rfc822Builder.build({
+      from: this.email,
+      to: input.to || [],
+      cc: input.cc || [],
+      bcc: input.bcc || [],
+      subject: input.subject || "",
+      html: input.html || input.text || "",
+    });
+
+    await client.put(`/users/me/drafts/${draftId}`, {
+      message: {
+        raw: Buffer.from(raw)
+          .toString("base64")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, ""),
+      },
+    });
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    const client = await this.getClient();
+    await client.delete(`/users/me/drafts/${draftId}`);
+  }
+
+  async sendDraft(draftId: string): Promise<string> {
+    const client = await this.getClient();
+    try {
+      const res = await client.post(`/users/me/drafts/${draftId}/send`, {});
+      return res.data.id; // Returns sent message ID
+    } catch (error: any) {
+      console.error("Gmail sendDraft error:", {
+        draftId,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+      });
+      throw error;
+    }
+  }
+
+  async getDraft(draftId: string): Promise<any> {
+    const client = await this.getClient();
+    const res = await client.get(`/users/me/drafts/${draftId}`, {
+      params: { format: "full" },
+    });
+    return res.data;
+  }
 }

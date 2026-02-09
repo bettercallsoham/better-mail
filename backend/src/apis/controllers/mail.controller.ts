@@ -1084,3 +1084,507 @@ export const getRecentSearches = asyncHandler(
   },
   "getRecentSearches",
 );
+
+// --------------------
+// DRAFT CONTROLLERS
+// --------------------
+
+export const createDraft = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const { from, provider, to, cc, bcc, subject, html, text, threadId } =
+    req.body;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "User not authenticated",
+    });
+  }
+
+  try {
+    // Verify ownership
+    const { emails: emailAddresses, error: emailError } =
+      await getUserEmails(userId);
+    if (emailError || !emailAddresses.includes(from.toLowerCase())) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have access to this email account",
+      });
+    }
+
+    const providerKey = provider === "GOOGLE" ? "gmail" : "outlook";
+    let providerDraftId: string;
+
+    if (providerKey === "gmail") {
+      const gmailService = new GmailApiService({ email: from });
+      providerDraftId = await gmailService.createDraft({
+        mode: "new",
+        from,
+        to,
+        cc,
+        bcc,
+        subject,
+        html,
+        text,
+      });
+    } else {
+      const outlookService = new OutlookApiService({ email: from });
+      providerDraftId = await outlookService.createDraft({
+        mode: "new",
+        from,
+        to,
+        cc,
+        bcc,
+        subject,
+        html,
+        text,
+      });
+    }
+
+    // Index draft in Elasticsearch
+    const elasticService = new ElasticsearchService(elasticClient);
+    const draftDoc: UnifiedEmailDocument = {
+      id: `${providerKey}_${providerDraftId}`,
+      emailAddress: from.toLowerCase(),
+      provider: providerKey,
+      providerMessageId: providerDraftId,
+      providerThreadId: threadId || "",
+      threadId: threadId || `draft_${Date.now()}`,
+      isThreadRoot: !threadId,
+      receivedAt: new Date().toISOString(),
+      sentAt: new Date().toISOString(),
+      indexedAt: new Date().toISOString(),
+      from: { email: from.toLowerCase() },
+      to: to.map((email: string) => ({ email: email.toLowerCase() })),
+      cc: cc ? cc.map((email: string) => ({ email: email.toLowerCase() })) : [],
+      bcc: bcc
+        ? bcc.map((email: string) => ({ email: email.toLowerCase() }))
+        : [],
+      subject,
+      bodyText: text,
+      bodyHtml: html,
+      snippet: text?.substring(0, 200) || html?.substring(0, 200) || "",
+      hasAttachments: false,
+      attachments: [],
+      isRead: true,
+      isStarred: false,
+      isArchived: false,
+      isDeleted: false,
+      labels: ["DRAFT"],
+      providerLabels: ["DRAFT"],
+      isDraft: true,
+      draftData: {
+        providerDraftId,
+        lastEditedAt: new Date().toISOString(),
+      },
+      inboxState: "DRAFT",
+      searchText: `${subject} ${text || html || ""}`,
+    };
+
+    await elasticService.saveDraft(draftDoc);
+
+    res.json({
+      success: true,
+      data: {
+        id: draftDoc.id,
+        providerDraftId,
+      },
+    });
+  } catch (error: any) {
+    console.error("Failed to create draft:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create draft",
+    });
+  }
+}, "createDraft");
+
+export const sendDraft = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const id = req.params.id as string;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "User not authenticated",
+    });
+  }
+
+  try {
+    const { emails: emailAddresses, error } = await getUserEmails(userId);
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
+    }
+
+    const elasticService = new ElasticsearchService(elasticClient);
+
+    // Get existing draft
+    const existingDraft = await elasticService.getEmailById(id, emailAddresses);
+
+    if (!existingDraft || !existingDraft.isDraft) {
+      return res.status(404).json({
+        success: false,
+        message: "Draft not found",
+      });
+    }
+
+    const providerDraftId = existingDraft.draftData?.providerDraftId;
+    if (!providerDraftId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid draft: missing provider draft ID",
+      });
+    }
+
+    console.log("Sending draft:", {
+      elasticsearchId: id,
+      providerDraftId,
+      provider: existingDraft.provider,
+      emailAddress: existingDraft.emailAddress,
+      draftData: existingDraft.draftData,
+    });
+
+    // Send via provider
+    let sentMessageId: string;
+    if (existingDraft.provider === "gmail") {
+      const gmailService = new GmailApiService({
+        email: existingDraft.emailAddress,
+      });
+      sentMessageId = await gmailService.sendDraft(providerDraftId);
+    } else {
+      const outlookService = new OutlookApiService({
+        email: existingDraft.emailAddress,
+      });
+      sentMessageId = await outlookService.sendDraft(providerDraftId);
+    }
+
+    // Update in Elasticsearch: convert draft to sent email
+    await elasticService.updateEmail(id, {
+      isDraft: false,
+      draftData: undefined,
+      labels: ["SENT"],
+      providerLabels: ["SENT"],
+      sentAt: new Date().toISOString(),
+    });
+
+    res.json({
+      success: true,
+      message: "Draft sent successfully",
+      data: {
+        sentMessageId,
+      },
+    });
+  } catch (error: any) {
+    console.error("Failed to send draft:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send draft",
+    });
+  }
+}, "sendDraft");
+
+// --------------------
+// GENERIC EMAIL OPERATIONS (Handles drafts too)
+// --------------------
+
+export const getEmailById = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const id = req.params.id as string;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    try {
+      const { emails: emailAddresses, error } = await getUserEmails(userId);
+      if (error || emailAddresses.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: error || "No connected email accounts",
+        });
+      }
+
+      const elasticService = new ElasticsearchService(elasticClient);
+      const email = await elasticService.getEmailById(id, emailAddresses);
+
+      if (!email) {
+        return res.status(404).json({
+          success: false,
+          message: "Email not found",
+        });
+      }
+
+      res.json({
+        success: true,
+        data: email,
+      });
+    } catch (error: any) {
+      console.error("Failed to get email:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get email",
+      });
+    }
+  },
+  "getEmailById",
+);
+
+export const getEmailsByFolder = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { folder } = req.params;
+    const { email, size, cursor } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    try {
+      const { emails: emailAddresses, error } = await getUserEmails(
+        userId,
+        email as string | undefined,
+      );
+
+      if (error || emailAddresses.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: error || "No connected email accounts",
+        });
+      }
+
+      const elasticService = new ElasticsearchService(elasticClient);
+
+      // Parse cursor if provided
+      let parsedCursor;
+      if (cursor && typeof cursor === "string") {
+        try {
+          parsedCursor = JSON.parse(cursor);
+        } catch (e) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor format",
+          });
+        }
+      }
+
+      // Use search with label filter
+      const folderName = Array.isArray(folder) ? folder[0] : folder;
+      const result = await elasticService.searchEmails({
+        emailAddresses,
+        query: "", // Empty query for all emails in folder
+        size: size ? parseInt(size as string) : 20,
+        cursor: parsedCursor,
+        filters: {
+          labels: [folderName.toUpperCase()], // Convert to uppercase (DRAFT, INBOX, SENT, etc.)
+        },
+      });
+
+      res.json({
+        success: true,
+        folder: folderName,
+        total: result.total,
+        emails: result.emails,
+        nextCursor: result.nextCursor,
+      });
+    } catch (error: any) {
+      console.error("Failed to get emails by folder:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get emails by folder",
+      });
+    }
+  },
+  "getEmailsByFolder",
+);
+
+export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const id = req.params.id as string;
+  const { to, cc, bcc, subject, html, text } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "User not authenticated",
+    });
+  }
+
+  try {
+    const { emails: emailAddresses, error } = await getUserEmails(userId);
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
+    }
+
+    const elasticService = new ElasticsearchService(elasticClient);
+
+    // Get existing email
+    const existingEmail = await elasticService.getEmailById(id, emailAddresses);
+
+    if (!existingEmail) {
+      return res.status(404).json({
+        success: false,
+        message: "Email not found",
+      });
+    }
+
+    // If it's a draft, also update provider
+    if (existingEmail.isDraft) {
+      const providerDraftId = existingEmail.draftData?.providerDraftId;
+      if (!providerDraftId) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid draft: missing provider draft ID",
+        });
+      }
+
+      // Update draft at provider
+      if (existingEmail.provider === "gmail") {
+        const gmailService = new GmailApiService({
+          email: existingEmail.emailAddress,
+        });
+        await gmailService.updateDraft(providerDraftId, {
+          mode: "new",
+          from: existingEmail.emailAddress,
+          to: to || existingEmail.to.map((t) => t.email),
+          cc: cc || existingEmail.cc?.map((c) => c.email),
+          bcc: bcc || existingEmail.bcc?.map((b) => b.email),
+          subject: subject || existingEmail.subject,
+          html: html || existingEmail.bodyHtml,
+          text: text || existingEmail.bodyText,
+        });
+      } else {
+        const outlookService = new OutlookApiService({
+          email: existingEmail.emailAddress,
+        });
+        await outlookService.updateDraft(providerDraftId, {
+          mode: "new",
+          from: existingEmail.emailAddress,
+          to: to || existingEmail.to.map((t) => t.email),
+          cc: cc || existingEmail.cc?.map((c) => c.email),
+          bcc: bcc || existingEmail.bcc?.map((b) => b.email),
+          subject: subject || existingEmail.subject,
+          html: html || existingEmail.bodyHtml,
+          text: text || existingEmail.bodyText,
+        });
+      }
+    }
+
+    // Update in Elasticsearch
+    const updates: any = {};
+    if (to)
+      updates.to = to.map((email: string) => ({ email: email.toLowerCase() }));
+    if (cc)
+      updates.cc = cc.map((email: string) => ({ email: email.toLowerCase() }));
+    if (bcc)
+      updates.bcc = bcc.map((email: string) => ({
+        email: email.toLowerCase(),
+      }));
+    if (subject) updates.subject = subject;
+    if (html) updates.bodyHtml = html;
+    if (text) updates.bodyText = text;
+    if (subject || text || html) {
+      updates.searchText = `${subject || existingEmail.subject} ${text || html || existingEmail.bodyText || existingEmail.bodyHtml || ""}`;
+    }
+
+    await elasticService.updateEmail(id, updates);
+
+    res.json({
+      success: true,
+      message: "Email updated successfully",
+    });
+  } catch (error: any) {
+    console.error("Failed to update email:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update email",
+    });
+  }
+}, "updateEmail");
+
+export const deleteEmail = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const id = req.params.id as string;
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "User not authenticated",
+    });
+  }
+
+  try {
+    const { emails: emailAddresses, error } = await getUserEmails(userId);
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
+    }
+
+    const elasticService = new ElasticsearchService(elasticClient);
+
+    // Get existing email
+    const existingEmail = await elasticService.getEmailById(id, emailAddresses);
+
+    if (!existingEmail) {
+      return res.status(404).json({
+        success: false,
+        message: "Email not found",
+      });
+    }
+
+    // If it's a draft, delete from provider
+    if (existingEmail.isDraft) {
+      const providerDraftId = existingEmail.draftData?.providerDraftId;
+      if (providerDraftId) {
+        // Delete from provider
+        if (existingEmail.provider === "gmail") {
+          const gmailService = new GmailApiService({
+            email: existingEmail.emailAddress,
+          });
+          await gmailService.deleteDraft(providerDraftId);
+        } else {
+          const outlookService = new OutlookApiService({
+            email: existingEmail.emailAddress,
+          });
+          await outlookService.deleteDraft(providerDraftId);
+        }
+      }
+      // Delete from Elasticsearch
+      await elasticService.deleteEmail(id);
+    } else {
+      // Regular email: just mark as deleted
+      await elasticService.updateEmail(id, { isDeleted: true });
+    }
+
+    res.json({
+      success: true,
+      message: "Email deleted successfully",
+    });
+  } catch (error: any) {
+    console.error("Failed to delete email:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to delete email",
+    });
+  }
+}, "deleteEmail");

@@ -61,6 +61,31 @@ export const validateGetFolders = [
   handleValidationErrors,
 ];
 
+export const validateGetEmailsByFolder = [
+  param("folder")
+    .exists()
+    .withMessage("folder is required")
+    .isString()
+    .withMessage("folder must be a string")
+    .notEmpty()
+    .withMessage("folder cannot be empty"),
+
+  query("email")
+    .optional()
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+
+  query("size")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("Size must be between 1 and 100"),
+
+  query("cursor").optional().isString().withMessage("Cursor must be a string"),
+
+  handleValidationErrors,
+];
+
 export const validateReplyEmail = [
   body("from")
     .exists()
@@ -463,6 +488,117 @@ export const validateUpdateSavedSearch = [
     .withMessage("color must be a string")
     .matches(/^#[0-9A-Fa-f]{6}$/)
     .withMessage("color must be a valid hex color (e.g., #FF5733)"),
+
+  handleValidationErrors,
+];
+
+// --------------------
+// DRAFT VALIDATORS
+// --------------------
+
+export const validateCreateDraft = [
+  body("from")
+    .exists()
+    .withMessage("from email is required")
+    .isEmail()
+    .withMessage("Invalid from email format")
+    .normalizeEmail(),
+
+  body("provider")
+    .exists()
+    .withMessage("provider is required")
+    .isIn(["GOOGLE", "OUTLOOK"])
+    .withMessage("provider must be either 'GOOGLE' or 'OUTLOOK'"),
+
+  body("to")
+    .exists()
+    .withMessage("to is required")
+    .isArray({ min: 1 })
+    .withMessage("to must be an array with at least one email"),
+
+  body("to.*")
+    .isEmail()
+    .withMessage("Each recipient in to must be a valid email")
+    .normalizeEmail(),
+
+  body("cc").optional().isArray().withMessage("cc must be an array"),
+
+  body("cc.*")
+    .isEmail()
+    .withMessage("Each recipient in cc must be a valid email")
+    .normalizeEmail(),
+
+  body("bcc").optional().isArray().withMessage("bcc must be an array"),
+
+  body("bcc.*")
+    .isEmail()
+    .withMessage("Each recipient in bcc must be a valid email")
+    .normalizeEmail(),
+
+  body("subject")
+    .exists()
+    .withMessage("subject is required")
+    .isString()
+    .withMessage("subject must be a string")
+    .notEmpty()
+    .withMessage("subject cannot be empty"),
+
+  body("html").optional().isString().withMessage("html must be a string"),
+
+  body("text").optional().isString().withMessage("text must be a string"),
+
+  body("threadId")
+    .optional()
+    .isString()
+    .withMessage("threadId must be a string"),
+
+  handleValidationErrors,
+];
+
+export const validateUpdateDraft = [
+  param("id")
+    .exists()
+    .withMessage("Draft ID is required")
+    .isString()
+    .withMessage("Draft ID must be a string"),
+
+  body("to")
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage("to must be an array with at least one email"),
+
+  body("to.*")
+    .optional()
+    .isEmail()
+    .withMessage("Each recipient in to must be a valid email")
+    .normalizeEmail(),
+
+  body("cc").optional().isArray().withMessage("cc must be an array"),
+
+  body("cc.*")
+    .optional()
+    .isEmail()
+    .withMessage("Each recipient in cc must be a valid email")
+    .normalizeEmail(),
+
+  body("bcc").optional().isArray().withMessage("bcc must be an array"),
+
+  body("bcc.*")
+    .optional()
+    .isEmail()
+    .withMessage("Each recipient in bcc must be a valid email")
+    .normalizeEmail(),
+
+  body("subject")
+    .optional()
+    .isString()
+    .withMessage("subject must be a string")
+    .notEmpty()
+    .withMessage("subject cannot be empty"),
+
+  body("html").optional().isString().withMessage("html must be a string"),
+
+  body("text").optional().isString().withMessage("text must be a string"),
 
   handleValidationErrors,
 ];

@@ -32,6 +32,13 @@ router.get(
 );
 
 router.get(
+  "/folder/:folder",
+  verifyAccessToken(),
+  mailValidator.validateGetEmailsByFolder,
+  mailController.getEmailsByFolder,
+);
+
+router.get(
   "/search",
   verifyAccessToken(),
   mailValidator.validateSearch,
@@ -111,5 +118,33 @@ router.delete(
   verifyAccessToken(),
   mailController.deleteSavedSearch,
 );
+
+// --------------------
+// DRAFT ROUTES (Specialized endpoints)
+// --------------------
+
+router.post(
+  "/drafts",
+  verifyAccessToken(),
+  mailValidator.validateCreateDraft,
+  mailController.createDraft,
+);
+
+router.post("/drafts/:id/send", verifyAccessToken(), mailController.sendDraft);
+
+// --------------------
+// GENERIC EMAIL ROUTES (Handles drafts too)
+// --------------------
+
+router.get("/emails/:id", verifyAccessToken(), mailController.getEmailById);
+
+router.patch(
+  "/emails/:id",
+  verifyAccessToken(),
+  mailValidator.validateUpdateDraft, // Reuse same validation
+  mailController.updateEmail,
+);
+
+router.delete("/emails/:id", verifyAccessToken(), mailController.deleteEmail);
 
 export default router;
