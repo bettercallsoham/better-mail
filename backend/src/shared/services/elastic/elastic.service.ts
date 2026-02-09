@@ -378,54 +378,55 @@ export class ElasticsearchService {
     }
 
     // Build query based on whether search text is provided
-    const queryClause: any = query && query.trim()
-      ? {
-          bool: {
-            should: [
-              // Exact + fuzzy matching (primary)
-              {
-                multi_match: {
-                  query,
-                  fields: [
-                    "subject^3",
-                    "bodyText^2",
-                    "searchText^2",
-                    "snippet",
-                    "from.email",
-                    "to.email",
-                    "cc.email",
-                  ],
-                  type: "best_fields",
-                  operator: "or",
-                  fuzziness: "AUTO",
+    const queryClause: any =
+      query && query.trim()
+        ? {
+            bool: {
+              should: [
+                // Exact + fuzzy matching (primary)
+                {
+                  multi_match: {
+                    query,
+                    fields: [
+                      "subject^3",
+                      "bodyText^2",
+                      "searchText^2",
+                      "snippet",
+                      "from.email",
+                      "to.email",
+                      "cc.email",
+                    ],
+                    type: "best_fields",
+                    operator: "or",
+                    fuzziness: "AUTO",
+                  },
                 },
-              },
-              // Prefix matching (for partial words like "insta") - only text fields
-              {
-                multi_match: {
-                  query,
-                  fields: [
-                    "subject^2",
-                    "bodyText^1.5",
-                    "searchText^1.5",
-                    "snippet",
-                  ],
-                  type: "phrase_prefix",
+                // Prefix matching (for partial words like "insta") - only text fields
+                {
+                  multi_match: {
+                    query,
+                    fields: [
+                      "subject^2",
+                      "bodyText^1.5",
+                      "searchText^1.5",
+                      "snippet",
+                    ],
+                    type: "phrase_prefix",
+                  },
                 },
-              },
-              // Wildcard for very partial matches
-              {
-                query_string: {
-                  query: `*${query}*`,
-                  fields: ["subject^1.5", "bodyText", "searchText"],
-                  default_operator: "OR",
+                // Wildcard for very partial matches
+                {
+                  query_string: {
+                    query: `*${query}*`,
+                    fields: ["subject^1.5", "bodyText", "searchText"],
+                    default_operator: "OR",
+                  },
                 },
-              },
-            ],
-            minimum_should_match: 1,
-          },
-        }
-      : { match_all: {} }; // Use match_all when no query text
+              ],
+              minimum_should_match: 1,
+            },
+          }
+        : { match_all: {} }; // Use match_all when no query text
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
