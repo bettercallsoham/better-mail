@@ -20,20 +20,23 @@ export interface SearchHistoryData {
   emailAddresses: string[];
 }
 
-export const searchHistoryQueue = new Queue<SearchHistoryData>("search-history", {
-  connection: redis as any,
-  defaultJobOptions: {
-    attempts: 2,
-    backoff: {
-      type: "exponential",
-      delay: 5000,
-    },
-    removeOnComplete: {
-      age: 3600, // 1 hour
-      count: 100,
-    },
-    removeOnFail: {
-      age: 24 * 3600, // 1 day
+export const searchHistoryQueue = new Queue<SearchHistoryData>(
+  "search-history",
+  {
+    connection: redis as any,
+    defaultJobOptions: {
+      attempts: 2,
+      backoff: {
+        type: "exponential",
+        delay: 5000,
+      },
+      removeOnComplete: {
+        age: 3600, // 1 hour
+        count: 100,
+      },
+      removeOnFail: {
+        age: 24 * 3600, // 1 day
+      },
     },
   },
-});
+);

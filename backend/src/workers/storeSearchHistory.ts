@@ -8,7 +8,14 @@ import { SearchHistoryData } from "../shared/queues/search-history.queue";
 const elasticService = new ElasticsearchService(elasticClient);
 
 async function processSearchHistory(job: Job<SearchHistoryData>) {
-  const { userId, searchText, filters, resultsCount, executionTimeMs, emailAddresses } = job.data;
+  const {
+    userId,
+    searchText,
+    filters,
+    resultsCount,
+    executionTimeMs,
+    emailAddresses,
+  } = job.data;
 
   logger.info(`Storing search history for user: ${userId}`);
 
@@ -44,7 +51,7 @@ export const searchHistoryWorker = new Worker<SearchHistoryData>(
       max: 100, // Max 100 jobs
       duration: 1000, // Per second
     },
-  }
+  },
 );
 
 searchHistoryWorker.on("completed", (job) => {
