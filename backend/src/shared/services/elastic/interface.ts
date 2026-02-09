@@ -89,3 +89,52 @@ export interface ThreadDocument {
 
   lastActivityAt: string;
 }
+
+// --------------------
+// Saved Search Document
+// --------------------
+
+export interface SavedSearchFilters {
+  isRead?: boolean;
+  isStarred?: boolean;
+  isArchived?: boolean;
+  hasAttachments?: boolean;
+  from?: string;
+  to?: string;
+  labels?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface SavedSearchDocument {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  query: {
+    searchText: string;
+    filters?: SavedSearchFilters;
+    emailAddresses?: string[];
+  };
+  usageCount: number;
+  lastUsedAt?: string;
+  isPinned: boolean;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// --------------------
+// Search History Document
+// --------------------
+
+export interface SearchHistoryDocument {
+  id: string;
+  userId: string;
+  searchText: string;
+  filters?: SavedSearchFilters;
+  resultsCount: number;
+  executionTimeMs: number;
+  emailAddresses: string[];
+  searchedAt: string;
+}

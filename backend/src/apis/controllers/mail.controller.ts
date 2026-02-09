@@ -7,6 +7,7 @@ import { getUserEmails } from "../utils/email-helper";
 import { EmailAccount } from "../../shared/models";
 import { OutlookApiService } from "../../shared/services/outlook/outlook-api.service";
 import { GmailApiService } from "../../shared/services/gmail/gmail-api.service";
+import { searchHistoryQueue } from "../../shared/queues";
 
 export const getConnectedMailboxes = asyncHandler(
   async (req: Request, res: Response) => {
@@ -588,6 +589,9 @@ export const searchEmails = asyncHandler(
         }
       }
 
+      // Track search execution time
+      const startTime = Date.now();
+
       const result = await elasticService.searchEmails({
         emailAddresses,
         query: query as string,
@@ -609,6 +613,35 @@ export const searchEmails = asyncHandler(
           dateTo: dateTo as string | undefined,
         },
       });
+
+      const executionTimeMs = Date.now() - startTime;
+
+      // Add to queue for async storage (truly non-blocking)
+      searchHistoryQueue
+        .add("store-search", {
+          userId,
+          searchText: query as string,
+          filters: {
+            isRead: isRead !== undefined ? isRead === "true" : undefined,
+            isStarred:
+              isStarred !== undefined ? isStarred === "true" : undefined,
+            isArchived:
+              isArchived !== undefined ? isArchived === "true" : undefined,
+            hasAttachments:
+              hasAttachments !== undefined
+                ? hasAttachments === "true"
+                : undefined,
+            from: filterFrom as string | undefined,
+            to: filterTo as string | undefined,
+            labels: parsedLabels,
+            dateFrom: dateFrom as string | undefined,
+            dateTo: dateTo as string | undefined,
+          },
+          resultsCount: result.total,
+          executionTimeMs,
+          emailAddresses,
+        })
+        .catch((err) => console.error("Failed to queue search history:", err));
 
       res.json({
         success: true,
@@ -747,4 +780,307 @@ export const updateInboxState = asyncHandler(
     }
   },
   "updateInboxState",
+);
+
+export const createSavedSearch = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { name, description, query, isPinned, color } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+      const id = `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      const doc = {
+        id,
+        userId,
+        name,
+        description,
+        query,
+        usageCount: 0,
+        isPinned: isPinned || false,
+        color,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await elasticService.createSavedSearch(doc);
+
+      res.status(201).json({
+        success: true,
+        data: doc,
+      });
+    } catch (error: any) {
+      console.error("Failed to create saved search:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to create saved search",
+      });
+    }
+  },
+  "createSavedSearch",
+);
+
+export const getSavedSearches = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+      const searches = await elasticService.getSavedSearchesByUser(userId);
+
+      res.json({
+        success: true,
+        data: searches,
+      });
+    } catch (error: any) {
+      console.error("Failed to get saved searches:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get saved searches",
+      });
+    }
+  },
+  "getSavedSearches",
+);
+
+export const updateSavedSearch = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const updates = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    if (!id || Array.isArray(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid search ID",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+      const success = await elasticService.updateSavedSearch(
+        id,
+        userId,
+        updates,
+      );
+
+      if (!success) {
+        return res.status(404).json({
+          success: false,
+          message: "Saved search not found or access denied",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Saved search updated",
+      });
+    } catch (error: any) {
+      console.error("Failed to update saved search:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to update saved search",
+      });
+    }
+  },
+  "updateSavedSearch",
+);
+
+export const deleteSavedSearch = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    if (!id || Array.isArray(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid search ID",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+      const success = await elasticService.deleteSavedSearch(id, userId);
+
+      if (!success) {
+        return res.status(404).json({
+          success: false,
+          message: "Saved search not found or access denied",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Saved search deleted",
+      });
+    } catch (error: any) {
+      console.error("Failed to delete saved search:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to delete saved search",
+      });
+    }
+  },
+  "deleteSavedSearch",
+);
+
+export const executeSavedSearch = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const { size, cursor } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    if (!id || Array.isArray(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid search ID",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+
+      // Get saved search
+      const savedSearch = await elasticService.getSavedSearchById(id, userId);
+
+      if (!savedSearch) {
+        return res.status(404).json({
+          success: false,
+          message: "Saved search not found or access denied",
+        });
+      }
+
+      // Increment usage
+      await elasticService.incrementSearchUsage(id);
+
+      // Parse cursor
+      let parsedCursor;
+      if (cursor && typeof cursor === "string") {
+        try {
+          parsedCursor = JSON.parse(cursor);
+        } catch (e) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor format",
+          });
+        }
+      }
+
+      // Get email addresses (use saved or user's all accounts)
+      let emailAddresses = savedSearch.query.emailAddresses;
+      if (!emailAddresses || emailAddresses.length === 0) {
+        const { emails, error } = await getUserEmails(userId);
+        if (error || emails.length === 0) {
+          return res.status(403).json({
+            success: false,
+            message: error || "No connected email accounts found",
+          });
+        }
+        emailAddresses = emails;
+      }
+
+      // Execute search
+      const result = await elasticService.searchEmails({
+        emailAddresses,
+        query: savedSearch.query.searchText,
+        size: size ? parseInt(size as string) : 20,
+        cursor: parsedCursor,
+        filters: savedSearch.query.filters,
+      });
+
+      res.json({
+        success: true,
+        savedSearch: {
+          id: savedSearch.id,
+          name: savedSearch.name,
+        },
+        total: result.total,
+        emails: result.emails,
+        nextCursor: result.nextCursor,
+      });
+    } catch (error: any) {
+      console.error("Failed to execute saved search:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to execute saved search",
+      });
+    }
+  },
+  "executeSavedSearch",
+);
+
+export const getRecentSearches = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { limit } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+      const searches = await elasticService.getRecentSearches(
+        userId,
+        limit ? parseInt(limit as string) : 10,
+      );
+
+      res.json({
+        success: true,
+        data: searches,
+      });
+    } catch (error: any) {
+      console.error("Failed to get recent searches:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get recent searches",
+      });
+    }
+  },
+  "getRecentSearches",
 );

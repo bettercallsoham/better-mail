@@ -93,8 +93,8 @@ export const validateReplyEmail = [
 
   body("mode")
     .optional()
-    .isIn(["reply", "reply_all"])
-    .withMessage("mode must be either 'reply' or 'reply_all'"),
+    .isIn(["reply", "reply_all", "forward"])
+    .withMessage("mode must be either 'reply', 'reply_all', or 'forward'"),
 
   body("to")
     .optional()
@@ -383,6 +383,86 @@ export const validateUpdateInboxState = [
       }
       return true;
     }),
+
+  handleValidationErrors,
+];
+
+export const validateCreateSavedSearch = [
+  body("name")
+    .exists()
+    .withMessage("name is required")
+    .isString()
+    .withMessage("name must be a string")
+    .isLength({ min: 1, max: 100 })
+    .withMessage("name must be between 1 and 100 characters")
+    .trim(),
+
+  body("description")
+    .optional()
+    .isString()
+    .withMessage("description must be a string")
+    .isLength({ max: 500 })
+    .withMessage("description must be at most 500 characters")
+    .trim(),
+
+  body("query")
+    .exists()
+    .withMessage("query is required")
+    .isObject()
+    .withMessage("query must be an object"),
+
+  body("query.searchText")
+    .exists()
+    .withMessage("query.searchText is required")
+    .isString()
+    .withMessage("query.searchText must be a string")
+    .trim(),
+
+  body("isPinned")
+    .optional()
+    .isBoolean()
+    .withMessage("isPinned must be a boolean"),
+
+  body("color")
+    .optional()
+    .isString()
+    .withMessage("color must be a string")
+    .matches(/^#[0-9A-Fa-f]{6}$/)
+    .withMessage("color must be a valid hex color (e.g., #FF5733)"),
+
+  handleValidationErrors,
+];
+
+export const validateUpdateSavedSearch = [
+  body("name")
+    .optional()
+    .isString()
+    .withMessage("name must be a string")
+    .isLength({ min: 1, max: 100 })
+    .withMessage("name must be between 1 and 100 characters")
+    .trim(),
+
+  body("description")
+    .optional()
+    .isString()
+    .withMessage("description must be a string")
+    .isLength({ max: 500 })
+    .withMessage("description must be at most 500 characters")
+    .trim(),
+
+  body("query").optional().isObject().withMessage("query must be an object"),
+
+  body("isPinned")
+    .optional()
+    .isBoolean()
+    .withMessage("isPinned must be a boolean"),
+
+  body("color")
+    .optional()
+    .isString()
+    .withMessage("color must be a string")
+    .matches(/^#[0-9A-Fa-f]{6}$/)
+    .withMessage("color must be a valid hex color (e.g., #FF5733)"),
 
   handleValidationErrors,
 ];

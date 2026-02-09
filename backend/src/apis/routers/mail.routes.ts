@@ -45,6 +45,24 @@ router.get(
   mailController.getInboxZero,
 );
 
+router.get(
+  "/saved-searches",
+  verifyAccessToken(),
+  mailController.getSavedSearches,
+);
+
+router.get(
+  "/saved-searches/:id/execute",
+  verifyAccessToken(),
+  mailController.executeSavedSearch,
+);
+
+router.get(
+  "/recent-searches",
+  verifyAccessToken(),
+  mailController.getRecentSearches,
+);
+
 router.get("/user-plan", verifyAccessToken());
 
 router.post(
@@ -72,6 +90,26 @@ router.post(
   verifyAccessToken(),
   mailValidator.validateUpdateInboxState,
   mailController.updateInboxState,
+);
+
+router.post(
+  "/saved-searches",
+  verifyAccessToken(),
+  mailValidator.validateCreateSavedSearch,
+  mailController.createSavedSearch,
+);
+
+router.put(
+  "/saved-searches/:id",
+  verifyAccessToken(),
+  mailValidator.validateUpdateSavedSearch,
+  mailController.updateSavedSearch,
+);
+
+router.delete(
+  "/saved-searches/:id",
+  verifyAccessToken(),
+  mailController.deleteSavedSearch,
 );
 
 export default router;

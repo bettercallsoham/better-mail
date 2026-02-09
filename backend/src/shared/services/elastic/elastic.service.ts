@@ -7,6 +7,8 @@ export class ElasticsearchService {
 
   private readonly EMAILS_INDEX = "emails_v1";
   private readonly THREADS_INDEX = "threads_v1";
+  private readonly SAVED_SEARCHES_INDEX = "saved_searches_v1";
+  private readonly SEARCH_HISTORY_INDEX = "search_history_v1";
 
   constructor(client: Client) {
     this.client = client;
@@ -19,6 +21,8 @@ export class ElasticsearchService {
   async ensureIndexes(): Promise<void> {
     await this.ensureEmailsIndex();
     await this.ensureThreadsIndex();
+    await this.ensureSavedSearchesIndex();
+    await this.ensureSearchHistoryIndex();
   }
 
   // --------------------
@@ -171,6 +175,92 @@ export class ElasticsearchService {
           },
 
           lastActivityAt: { type: "date" },
+        },
+      },
+    });
+  }
+
+  // --------------------
+  // Saved Searches index
+  // --------------------
+
+  private async ensureSavedSearchesIndex(): Promise<void> {
+    const exists = await this.client.indices.exists({
+      index: this.SAVED_SEARCHES_INDEX,
+    });
+
+    if (exists) return;
+
+    await this.client.indices.create({
+      index: this.SAVED_SEARCHES_INDEX,
+      settings: {
+        number_of_shards: 1,
+        number_of_replicas: 1,
+      },
+      mappings: {
+        dynamic: false, // Allow child objects to control their own dynamic behavior
+        properties: {
+          id: { type: "keyword" },
+          userId: { type: "keyword" },
+          name: {
+            type: "text",
+            fields: {
+              keyword: { type: "keyword" },
+            },
+          },
+          description: { type: "text" },
+          query: {
+            type: "object",
+            enabled: true,
+            dynamic: true, // Allow any nested fields in query object
+          },
+          usageCount: { type: "integer" },
+          lastUsedAt: { type: "date" },
+          isPinned: { type: "boolean" },
+          color: { type: "keyword" },
+          createdAt: { type: "date" },
+          updatedAt: { type: "date" },
+        },
+      },
+    });
+  }
+
+  // --------------------
+  // Search History index
+  // --------------------
+
+  private async ensureSearchHistoryIndex(): Promise<void> {
+    const exists = await this.client.indices.exists({
+      index: this.SEARCH_HISTORY_INDEX,
+    });
+
+    if (exists) return;
+
+    await this.client.indices.create({
+      index: this.SEARCH_HISTORY_INDEX,
+      settings: {
+        number_of_shards: 1,
+        number_of_replicas: 1,
+      },
+      mappings: {
+        dynamic: "strict",
+        properties: {
+          id: { type: "keyword" },
+          userId: { type: "keyword" },
+          searchText: {
+            type: "text",
+            fields: {
+              keyword: { type: "keyword" },
+            },
+          },
+          filters: {
+            type: "object",
+            enabled: true,
+          },
+          resultsCount: { type: "integer" },
+          executionTimeMs: { type: "integer" },
+          emailAddresses: { type: "keyword" },
+          searchedAt: { type: "date" },
         },
       },
     });
@@ -666,5 +756,188 @@ export class ElasticsearchService {
       updated: providerMessageIds.length - errors.length,
       errors,
     };
+  }
+
+  // --------------------
+  // SAVED SEARCHES OPERATIONS
+  // --------------------
+
+  async createSavedSearch(
+    doc: import("./interface").SavedSearchDocument,
+  ): Promise<void> {
+    await this.client.index({
+      index: this.SAVED_SEARCHES_INDEX,
+      id: doc.id,
+      document: doc,
+    });
+  }
+
+  async getSavedSearchesByUser(
+    userId: string,
+  ): Promise<import("./interface").SavedSearchDocument[]> {
+    const result = await this.client.search({
+      index: this.SAVED_SEARCHES_INDEX,
+      query: {
+        term: { userId },
+      },
+      sort: [
+        { isPinned: "desc" },
+        { lastUsedAt: "desc" },
+        { createdAt: "desc" },
+      ],
+      size: 100,
+    });
+
+    return result.hits.hits.map(
+      (hit) => hit._source as import("./interface").SavedSearchDocument,
+    );
+  }
+
+  async getSavedSearchById(
+    id: string,
+    userId: string,
+  ): Promise<import("./interface").SavedSearchDocument | null> {
+    try {
+      const result = await this.client.get({
+        index: this.SAVED_SEARCHES_INDEX,
+        id,
+      });
+
+      const doc = result._source as import("./interface").SavedSearchDocument;
+      if (doc.userId !== userId) {
+        return null; // Not owned by user
+      }
+
+      return doc;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async updateSavedSearch(
+    id: string,
+    userId: string,
+    updates: Partial<import("./interface").SavedSearchDocument>,
+  ): Promise<boolean> {
+    try {
+      // Verify ownership first
+      const existing = await this.getSavedSearchById(id, userId);
+      if (!existing) {
+        return false;
+      }
+
+      await this.client.update({
+        index: this.SAVED_SEARCHES_INDEX,
+        id,
+        doc: { ...updates, updatedAt: new Date().toISOString() },
+      });
+
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async deleteSavedSearch(id: string, userId: string): Promise<boolean> {
+    try {
+      // Verify ownership first
+      const existing = await this.getSavedSearchById(id, userId);
+      if (!existing) {
+        return false;
+      }
+
+      await this.client.delete({
+        index: this.SAVED_SEARCHES_INDEX,
+        id,
+      });
+
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async incrementSearchUsage(id: string): Promise<void> {
+    try {
+      await this.client.update({
+        index: this.SAVED_SEARCHES_INDEX,
+        id,
+        script: {
+          source:
+            "ctx._source.usageCount++; ctx._source.lastUsedAt = params.now",
+          params: {
+            now: new Date().toISOString(),
+          },
+        },
+      });
+    } catch (error) {
+      // Silently fail if search doesn't exist
+    }
+  }
+
+  // --------------------
+  // SEARCH HISTORY OPERATIONS
+  // --------------------
+
+  async addSearchHistory(
+    doc: import("./interface").SearchHistoryDocument,
+  ): Promise<void> {
+    // Store ALL searches with unique IDs for frequency tracking and analytics
+    await this.client.index({
+      index: this.SEARCH_HISTORY_INDEX,
+      id: doc.id, // ID generated by worker with timestamp for uniqueness
+      document: doc,
+    });
+  }
+
+  async getRecentSearches(
+    userId: string,
+    limit: number = 10,
+  ): Promise<
+    Array<import("./interface").SearchHistoryDocument & { searchCount: number }>
+  > {
+    // Use aggregations to deduplicate by searchText and show most recent with count
+    const result = await this.client.search({
+      index: this.SEARCH_HISTORY_INDEX,
+      query: {
+        term: { userId },
+      },
+      size: 0, // Don't return raw hits
+      aggs: {
+        unique_searches: {
+          terms: {
+            field: "searchText.keyword",
+            size: limit * 2, // Get more to ensure we have enough after filtering
+            order: { latest_search: "desc" },
+          },
+          aggs: {
+            latest_search: {
+              max: {
+                field: "searchedAt",
+              },
+            },
+            search_count: {
+              value_count: {
+                field: "searchText.keyword",
+              },
+            },
+            latest_doc: {
+              top_hits: {
+                size: 1,
+                sort: [{ searchedAt: "desc" }],
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const buckets =
+      (result.aggregations?.unique_searches as any)?.buckets || [];
+    return buckets.slice(0, limit).map((bucket: any) => ({
+      ...(bucket.latest_doc.hits.hits[0]
+        ._source as import("./interface").SearchHistoryDocument),
+      searchCount: bucket.search_count.value,
+    }));
   }
 }
