@@ -7,8 +7,7 @@ import { Op } from "sequelize";
 export interface CreateTemplateData {
   name: string;
   subject: string;
-  bodyHtml: string;
-  bodyText: string;
+  body?: string;
   variables?: TemplateVariable[];
   category?: string;
   tags?: string[];
@@ -17,8 +16,7 @@ export interface CreateTemplateData {
 export interface UpdateTemplateData {
   name?: string;
   subject?: string;
-  bodyHtml?: string;
-  bodyText?: string;
+  body?: string;
   variables?: TemplateVariable[];
   category?: string;
   tags?: string[];
@@ -44,8 +42,7 @@ export class EmailTemplateService {
       userId,
       name: data.name,
       subject: data.subject,
-      bodyHtml: data.bodyHtml,
-      bodyText: data.bodyText,
+      body: data.body || null,
       variables: data.variables || [],
       category: data.category || null,
       tags: data.tags || [],
@@ -134,14 +131,13 @@ export class EmailTemplateService {
     // Update fields
     if (data.name !== undefined) template.name = data.name;
     if (data.subject !== undefined) template.subject = data.subject;
-    if (data.bodyHtml !== undefined) template.bodyHtml = data.bodyHtml;
-    if (data.bodyText !== undefined) template.bodyText = data.bodyText;
+    if (data.body !== undefined) template.body = data.body || null;
     if (data.variables !== undefined) template.variables = data.variables;
     if (data.category !== undefined) template.category = data.category;
     if (data.tags !== undefined) template.tags = data.tags;
 
     // Increment version on content changes
-    if (data.subject || data.bodyHtml || data.bodyText) {
+    if (data.subject || data.body !== undefined) {
       template.version = template.version + 1;
     }
 
@@ -182,8 +178,7 @@ export class EmailTemplateService {
       userId,
       name: newName || `${template.name} (Copy)`,
       subject: template.subject,
-      bodyHtml: template.bodyHtml,
-      bodyText: template.bodyText,
+      body: template.body,
       variables: template.variables,
       category: template.category,
       tags: template.tags,

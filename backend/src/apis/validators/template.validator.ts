@@ -35,21 +35,7 @@ export const validateCreateTemplate = [
     .isLength({ min: 1, max: 500 })
     .withMessage("Subject must be between 1 and 500 characters"),
 
-  body("bodyHtml")
-    .exists()
-    .withMessage("HTML body is required")
-    .isString()
-    .withMessage("HTML body must be a string")
-    .notEmpty()
-    .withMessage("HTML body cannot be empty"),
-
-  body("bodyText")
-    .exists()
-    .withMessage("Text body is required")
-    .isString()
-    .withMessage("Text body must be a string")
-    .notEmpty()
-    .withMessage("Text body cannot be empty"),
+  body("body").optional().isString().withMessage("Body must be a string"),
 
   body("variables")
     .optional()
@@ -108,19 +94,7 @@ export const validateUpdateTemplate = [
     .isLength({ min: 1, max: 500 })
     .withMessage("Subject must be between 1 and 500 characters"),
 
-  body("bodyHtml")
-    .optional()
-    .isString()
-    .withMessage("HTML body must be a string")
-    .notEmpty()
-    .withMessage("HTML body cannot be empty"),
-
-  body("bodyText")
-    .optional()
-    .isString()
-    .withMessage("Text body must be a string")
-    .notEmpty()
-    .withMessage("Text body cannot be empty"),
+  body("body").optional().isString().withMessage("Body must be a string"),
 
   body("variables")
     .optional()

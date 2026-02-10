@@ -23,8 +23,7 @@ class EmailTemplate extends Model<
   declare userId: ForeignKey<string>;
   declare name: string;
   declare subject: string;
-  declare bodyHtml: string;
-  declare bodyText: string;
+  declare body: CreationOptional<string | null>;
   declare variables: CreationOptional<TemplateVariable[]>;
   declare category: CreationOptional<string | null>;
   declare tags: CreationOptional<string[]>;
@@ -60,16 +59,12 @@ EmailTemplate.init(
       type: DataTypes.STRING(500),
       allowNull: false,
     },
-    bodyHtml: {
+    body: {
       type: DataTypes.TEXT,
-      allowNull: false,
-      field: "body_html",
+      allowNull: true,
+      field: "body",
     },
-    bodyText: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      field: "body_text",
-    },
+
     variables: {
       type: DataTypes.JSONB,
       allowNull: false,
@@ -122,10 +117,13 @@ EmailTemplate.init(
     updatedAt: "updatedAt",
     indexes: [
       {
-        fields: ["user_id"],
+        unique: true,
+        fields: ["user_id", "name"],
+        name: "unique_user_template_name",
       },
       {
         fields: ["name"],
+        name: "idx_template_name",
       },
     ],
   },

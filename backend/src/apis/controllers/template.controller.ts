@@ -17,14 +17,12 @@ export const createTemplate = asyncHandler(
       });
     }
 
-    const { name, subject, bodyHtml, bodyText, variables, category, tags } =
-      req.body;
+    const { name, subject, body, variables, category, tags } = req.body;
 
     const template = await emailTemplateService.createTemplate(userId, {
       name,
       subject,
-      bodyHtml,
-      bodyText,
+      body,
       variables,
       category,
       tags,
@@ -138,8 +136,7 @@ export const updateTemplate = asyncHandler(
     }
 
     const templateId = parseInt(req.params.id as string);
-    const { name, subject, bodyHtml, bodyText, variables, category, tags } =
-      req.body;
+    const { name, subject, body, variables, category, tags } = req.body;
 
     const template = await emailTemplateService.updateTemplate(
       templateId,
@@ -147,8 +144,7 @@ export const updateTemplate = asyncHandler(
       {
         name,
         subject,
-        bodyHtml,
-        bodyText,
+        body,
         variables,
         category,
         tags,
