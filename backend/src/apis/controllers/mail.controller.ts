@@ -1444,46 +1444,52 @@ export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    // If it's a draft, also update provider
-    if (existingEmail.isDraft) {
-      const providerDraftId = existingEmail.draftData?.providerDraftId;
-      if (!providerDraftId) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid draft: missing provider draft ID",
-        });
-      }
+    // Only drafts can be edited
+    if (!existingEmail.isDraft) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot edit sent/received emails. Only drafts can be edited.",
+      });
+    }
 
-      // Update draft at provider
-      if (existingEmail.provider === "gmail") {
-        const gmailService = new GmailApiService({
-          email: existingEmail.emailAddress,
-        });
-        await gmailService.updateDraft(providerDraftId, {
-          mode: "new",
-          from: existingEmail.emailAddress,
-          to: to || existingEmail.to.map((t) => t.email),
-          cc: cc || existingEmail.cc?.map((c) => c.email),
-          bcc: bcc || existingEmail.bcc?.map((b) => b.email),
-          subject: subject || existingEmail.subject,
-          html: html || existingEmail.bodyHtml,
-          text: text || existingEmail.bodyText,
-        });
-      } else {
-        const outlookService = new OutlookApiService({
-          email: existingEmail.emailAddress,
-        });
-        await outlookService.updateDraft(providerDraftId, {
-          mode: "new",
-          from: existingEmail.emailAddress,
-          to: to || existingEmail.to.map((t) => t.email),
-          cc: cc || existingEmail.cc?.map((c) => c.email),
-          bcc: bcc || existingEmail.bcc?.map((b) => b.email),
-          subject: subject || existingEmail.subject,
-          html: html || existingEmail.bodyHtml,
-          text: text || existingEmail.bodyText,
-        });
-      }
+    // Update draft at provider
+    const providerDraftId = existingEmail.draftData?.providerDraftId;
+    if (!providerDraftId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid draft: missing provider draft ID",
+      });
+    }
+
+    // Update draft at provider
+    if (existingEmail.provider === "gmail") {
+      const gmailService = new GmailApiService({
+        email: existingEmail.emailAddress,
+      });
+      await gmailService.updateDraft(providerDraftId, {
+        mode: "new",
+        from: existingEmail.emailAddress,
+        to: to || existingEmail.to.map((t) => t.email),
+        cc: cc || existingEmail.cc?.map((c) => c.email),
+        bcc: bcc || existingEmail.bcc?.map((b) => b.email),
+        subject: subject || existingEmail.subject,
+        html: html || existingEmail.bodyHtml,
+        text: text || existingEmail.bodyText,
+      });
+    } else {
+      const outlookService = new OutlookApiService({
+        email: existingEmail.emailAddress,
+      });
+      await outlookService.updateDraft(providerDraftId, {
+        mode: "new",
+        from: existingEmail.emailAddress,
+        to: to || existingEmail.to.map((t) => t.email),
+        cc: cc || existingEmail.cc?.map((c) => c.email),
+        bcc: bcc || existingEmail.bcc?.map((b) => b.email),
+        subject: subject || existingEmail.subject,
+        html: html || existingEmail.bodyHtml,
+        text: text || existingEmail.bodyText,
+      });
     }
 
     // Update in Elasticsearch
@@ -1551,29 +1557,32 @@ export const deleteEmail = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    // If it's a draft, delete from provider
-    if (existingEmail.isDraft) {
-      const providerDraftId = existingEmail.draftData?.providerDraftId;
-      if (providerDraftId) {
-        // Delete from provider
-        if (existingEmail.provider === "gmail") {
-          const gmailService = new GmailApiService({
-            email: existingEmail.emailAddress,
-          });
-          await gmailService.deleteDraft(providerDraftId);
-        } else {
-          const outlookService = new OutlookApiService({
-            email: existingEmail.emailAddress,
-          });
-          await outlookService.deleteDraft(providerDraftId);
-        }
-      }
-      // Delete from Elasticsearch
-      await elasticService.deleteEmail(id);
-    } else {
-      // Regular email: just mark as deleted
-      await elasticService.updateEmail(id, { isDeleted: true });
+    // Only drafts can be permanently deleted
+    if (!existingEmail.isDraft) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete sent/received emails. Only drafts can be deleted. Use email actions to move to trash.",
+      });
     }
+
+    // Delete draft from provider
+    const providerDraftId = existingEmail.draftData?.providerDraftId;
+    if (providerDraftId) {
+      // Delete from provider
+      if (existingEmail.provider === "gmail") {
+        const gmailService = new GmailApiService({
+          email: existingEmail.emailAddress,
+        });
+        await gmailService.deleteDraft(providerDraftId);
+      } else {
+        const outlookService = new OutlookApiService({
+          email: existingEmail.emailAddress,
+        });
+        await outlookService.deleteDraft(providerDraftId);
+      }
+    }
+    // Delete from Elasticsearch
+    await elasticService.deleteEmail(id);
 
     res.json({
       success: true,

@@ -136,15 +136,15 @@ router.post("/drafts/:id/send", verifyAccessToken(), mailController.sendDraft);
 // GENERIC EMAIL ROUTES (Handles drafts too)
 // --------------------
 
-router.get("/emails/:id", verifyAccessToken(), mailController.getEmailById);
+router.get("/drafts/:id", verifyAccessToken(), mailController.getEmailById);
 
 router.patch(
-  "/emails/:id",
+  "/drafts/:id",
   verifyAccessToken(),
   mailValidator.validateUpdateDraft, // Reuse same validation
   mailController.updateEmail,
 );
 
-router.delete("/emails/:id", verifyAccessToken(), mailController.deleteEmail);
+router.delete("/drafts/:id", verifyAccessToken(), mailController.deleteEmail);
 
 export default router;
