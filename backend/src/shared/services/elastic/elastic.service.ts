@@ -1234,4 +1234,140 @@ export class ElasticsearchService {
     }
     return count > 0 ? Math.round(total / count) : 0;
   }
+
+  /**
+   * Get all emails from a specific sender
+   * Sorted by receivedAt ascending (earliest first)
+   */
+  async getEmailsFromSender(params: {
+    emailAddresses: string[];
+    senderEmail: string;
+    size?: number;
+    cursor?: { receivedAt: string; id: string };
+  }) {
+    const { emailAddresses, senderEmail, size = 20, cursor } = params;
+
+    const result = await this.client.search({
+      index: this.EMAILS_INDEX,
+      size,
+      _source: [
+        "id",
+        "providerMessageId",
+        "providerThreadId",
+        "threadId",
+        "from",
+        "subject",
+        "snippet",
+        "receivedAt",
+        "sentAt",
+      ],
+      query: {
+        bool: {
+          filter: [
+            { terms: { emailAddress: emailAddresses } },
+            { term: { "from.email": senderEmail.toLowerCase() } },
+            { term: { isDeleted: false } },
+          ],
+        },
+      },
+      sort: [
+        { receivedAt: "asc" }, // Earliest first
+      ],
+      ...(cursor && {
+        search_after: [cursor.receivedAt, cursor.id],
+      }),
+    });
+
+    const hits = result.hits.hits;
+
+    return {
+      emails: hits.map((hit) => ({
+        ...(hit._source as UnifiedEmailDocument),
+        id: hit._id as string,
+      })),
+      total: (result.hits.total as any).value,
+      nextCursor:
+        hits.length === size
+          ? {
+              receivedAt: (hits[hits.length - 1]._source as any).receivedAt,
+              id: (hits[hits.length - 1]._source as any).id,
+            }
+          : null,
+    };
+  }
+
+  /**
+   * Get email suggestions (recipients from sent emails)
+   * Can filter by query string (matches name or email)
+   */
+  async getEmailSuggestions(params: {
+    emailAddresses: string[];
+    query?: string;
+    limit?: number;
+  }) {
+    const { emailAddresses, query, limit = 10 } = params;
+
+    const mustConditions: any[] = [];
+
+    if (query) {
+      mustConditions.push({
+        nested: {
+          path: "to",
+          query: {
+            bool: {
+              should: [
+                { wildcard: { "to.email": `*${query.toLowerCase()}*` } },
+                { match_phrase_prefix: { "to.name": query } },
+              ],
+            },
+          },
+        },
+      });
+    }
+
+    const res = await this.client.search({
+      index: this.EMAILS_INDEX,
+      size: 1000, // Get more results to aggregate unique recipients
+      query: {
+        bool: {
+          filter: [
+            { terms: { emailAddress: emailAddresses } },
+            { term: { isDraft: false } },
+            { term: { isDeleted: false } },
+          ],
+          must: mustConditions.length > 0 ? mustConditions : undefined,
+        },
+      },
+      sort: [{ sentAt: "desc" }],
+      _source: ["to", "sentAt"],
+    });
+
+    // Manually aggregate unique recipients by email
+    const recipientMap = new Map<
+      string,
+      { email: string; name: string; lastUsed: string }
+    >();
+
+    res.hits.hits.forEach((hit: any) => {
+      const doc = hit._source;
+      const recipients = Array.isArray(doc.to) ? doc.to : [doc.to];
+
+      recipients.forEach((recipient: any) => {
+        if (recipient?.email && !recipientMap.has(recipient.email)) {
+          recipientMap.set(recipient.email, {
+            email: recipient.email,
+            name: recipient.name || "",
+            lastUsed: doc.sentAt,
+          });
+        }
+      });
+    });
+
+    const suggestions = Array.from(recipientMap.values()).slice(0, limit);
+
+    return {
+      suggestions,
+      total: suggestions.length,
+    };
+  }
 }

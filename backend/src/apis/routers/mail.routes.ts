@@ -179,4 +179,22 @@ router.get(
   mailController.listThreadNotes,
 );
 
+// --------------------
+// EMAIL SUGGESTIONS & FROM USER ROUTES
+// --------------------
+
+router.get(
+  "/suggestions",
+  verifyAccessToken(),
+  mailValidator.validateGetEmailSuggestions,
+  mailController.getEmailSuggestions,
+);
+
+router.get(
+  "/from/:senderEmail",
+  verifyAccessToken(),
+  mailValidator.validateGetEmailsFromUser,
+  mailController.getEmailsFromUser,
+);
+
 export default router;

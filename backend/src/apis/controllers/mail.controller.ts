@@ -1775,3 +1775,130 @@ export const listThreadNotes = asyncHandler(
   },
   "listThreadNotes",
 );
+/**
+ * Get all emails from a specific sender
+ * GET /api/v1/mail/from/:senderEmail?size=20&cursor=...
+ */
+export const getEmailsFromUser = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { senderEmail } = req.params;
+    const { size, cursor } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    // Get user's email accounts
+    const { emails: emailAddresses, error } = await getUserEmails(userId);
+
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
+    }
+
+    try {
+      // Parse cursor if provided
+      let parsedCursor: { receivedAt: string; id: string } | undefined;
+      if (cursor && typeof cursor === "string") {
+        try {
+          parsedCursor = JSON.parse(cursor as string);
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor format",
+          });
+        }
+      }
+
+      const elasticService = new ElasticsearchService(elasticClient);
+
+      const result = await elasticService.getEmailsFromSender({
+        emailAddresses,
+        senderEmail: senderEmail as string,
+        size: size ? parseInt(size as string, 10) : 20,
+        cursor: parsedCursor,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          sender: {
+            email: senderEmail,
+            totalCount: result.total,
+          },
+          emails: result.emails,
+          nextCursor: result.nextCursor,
+        },
+      });
+    } catch (error: any) {
+      console.error("Failed to get emails from user:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get emails from user",
+      });
+    }
+  },
+  "getEmailsFromUser",
+);
+
+/**
+ * Get email suggestions for 'to' field
+ * GET /api/v1/mail/suggestions?query=john&limit=10
+ * query is optional - without it returns top contacts
+ */
+export const getEmailSuggestions = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { query, limit } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    // Get user's email accounts
+    const { emails: emailAddresses, error } = await getUserEmails(userId);
+
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
+    }
+
+    try {
+      const elasticService = new ElasticsearchService(elasticClient);
+
+      const result = await elasticService.getEmailSuggestions({
+        emailAddresses,
+        query: query as string | undefined,
+        limit: limit ? parseInt(limit as string, 10) : 10,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          suggestions: result.suggestions,
+          total: result.total,
+        },
+      });
+    } catch (error: any) {
+      console.error("Failed to get email suggestions:", error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get email suggestions",
+      });
+    }
+  },
+  "getEmailSuggestions",
+);

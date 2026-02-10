@@ -662,3 +662,31 @@ export const validateListThreadNotes = [
 
   handleValidationErrors,
 ];
+export const validateGetEmailsFromUser = [
+  param("senderEmail")
+    .exists()
+    .withMessage("senderEmail is required")
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+
+  query("size")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("Size must be between 1 and 100"),
+
+  query("cursor").optional().isString().withMessage("Cursor must be a string"),
+
+  handleValidationErrors,
+];
+
+export const validateGetEmailSuggestions = [
+  query("query").optional().isString().withMessage("Query must be a string"),
+
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage("Limit must be between 1 and 50"),
+
+  handleValidationErrors,
+];

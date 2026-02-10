@@ -10,8 +10,8 @@ export function transformOutlookToUnified(
   isWebhook: boolean = false,
 ): UnifiedEmailDocument {
   const parseAddress = (addr: any) => ({
-    name: addr?.emailAddress?.name,
     email: addr?.emailAddress?.address || "",
+    name: addr?.emailAddress?.name || undefined,
   });
 
   const isDraft = msg.isDraft === true;
