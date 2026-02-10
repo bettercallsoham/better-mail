@@ -1561,7 +1561,8 @@ export const deleteEmail = asyncHandler(async (req: Request, res: Response) => {
     if (!existingEmail.isDraft) {
       return res.status(400).json({
         success: false,
-        message: "Cannot delete sent/received emails. Only drafts can be deleted. Use email actions to move to trash.",
+        message:
+          "Cannot delete sent/received emails. Only drafts can be deleted. Use email actions to move to trash.",
       });
     }
 

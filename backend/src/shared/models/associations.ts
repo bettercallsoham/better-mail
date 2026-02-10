@@ -3,6 +3,7 @@ import { Subscription } from "./subscription-model";
 import { Plan } from "./plan-model";
 import { EmailAccount } from "./emailAccount.model";
 import { EmailEngineInstance } from "./emailengine-model";
+import { EmailTemplate } from "./email-template.model";
 
 User.hasMany(Subscription, {
   foreignKey: "user_id",
@@ -38,4 +39,13 @@ EmailEngineInstance.hasMany(EmailAccount, {
 EmailAccount.belongsTo(EmailEngineInstance, {
   foreignKey: "email_engine_instance_id",
   as: "emailEngineInstance",
+});
+
+User.hasMany(EmailTemplate, {
+  foreignKey: "user_id",
+  as: "emailTemplates",
+});
+EmailTemplate.belongsTo(User, {
+  foreignKey: "user_id",
+  as: "user",
 });
