@@ -602,3 +602,63 @@ export const validateUpdateDraft = [
 
   handleValidationErrors,
 ];
+
+export const validateUpsertThreadNote = [
+  param("threadId")
+    .exists()
+    .withMessage("threadId is required")
+    .isString()
+    .withMessage("threadId must be a string")
+    .notEmpty()
+    .withMessage("threadId cannot be empty"),
+
+  body("content")
+    .exists()
+    .withMessage("Note content is required")
+    .isString()
+    .withMessage("Content must be a string")
+    .notEmpty()
+    .withMessage("Content cannot be empty")
+    .isLength({ max: 10000 })
+    .withMessage("Content must not exceed 10,000 characters"),
+
+  handleValidationErrors,
+];
+
+export const validateGetThreadNote = [
+  param("threadId")
+    .exists()
+    .withMessage("threadId is required")
+    .isString()
+    .withMessage("threadId must be a string")
+    .notEmpty()
+    .withMessage("threadId cannot be empty"),
+
+  handleValidationErrors,
+];
+
+export const validateDeleteThreadNote = [
+  param("threadId")
+    .exists()
+    .withMessage("threadId is required")
+    .isString()
+    .withMessage("threadId must be a string")
+    .notEmpty()
+    .withMessage("threadId cannot be empty"),
+
+  handleValidationErrors,
+];
+
+export const validateListThreadNotes = [
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("Limit must be between 1 and 100"),
+
+  query("offset")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("Offset must be a non-negative integer"),
+
+  handleValidationErrors,
+];

@@ -147,4 +147,36 @@ router.patch(
 
 router.delete("/drafts/:id", verifyAccessToken(), mailController.deleteEmail);
 
+// --------------------
+// THREAD NOTES ROUTES
+// --------------------
+
+router.put(
+  "/threads/:threadId/note",
+  verifyAccessToken(),
+  mailValidator.validateUpsertThreadNote,
+  mailController.upsertThreadNote,
+);
+
+router.get(
+  "/threads/:threadId/note",
+  verifyAccessToken(),
+  mailValidator.validateGetThreadNote,
+  mailController.getThreadNote,
+);
+
+router.delete(
+  "/threads/:threadId/note",
+  verifyAccessToken(),
+  mailValidator.validateDeleteThreadNote,
+  mailController.deleteThreadNote,
+);
+
+router.get(
+  "/notes",
+  verifyAccessToken(),
+  mailValidator.validateListThreadNotes,
+  mailController.listThreadNotes,
+);
+
 export default router;

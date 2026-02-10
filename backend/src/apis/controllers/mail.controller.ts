@@ -8,6 +8,7 @@ import { EmailAccount } from "../../shared/models";
 import { OutlookApiService } from "../../shared/services/outlook/outlook-api.service";
 import { GmailApiService } from "../../shared/services/gmail/gmail-api.service";
 import { searchHistoryQueue } from "../../shared/queues";
+import { threadNoteService } from "../../shared/services/thread-notes/thread-note.service";
 
 export const getConnectedMailboxes = asyncHandler(
   async (req: Request, res: Response) => {
@@ -1598,3 +1599,179 @@ export const deleteEmail = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 }, "deleteEmail");
+
+/**
+ * Upsert a note for a thread
+ * PUT /api/v1/mail/threads/:threadId/note
+ */
+export const upsertThreadNote = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    const emailAddresses = await getUserEmails(userId);
+    if (emailAddresses.emails.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No connected email accounts found",
+      });
+    }
+
+    const { threadId } = req.params;
+    const { content } = req.body;
+
+    // Use first email address for note storage
+    const note = await threadNoteService.upsertNote(
+      emailAddresses.emails[0],
+      threadId as string,
+      content,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Note saved successfully",
+      data: note,
+    });
+  },
+  "upsertThreadNote",
+);
+
+/**
+ * Get a note for a thread
+ * GET /api/v1/mail/threads/:threadId/note
+ */
+export const getThreadNote = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    const emailAddresses = await getUserEmails(userId);
+    if (emailAddresses.emails.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No connected email accounts found",
+      });
+    }
+
+    const { threadId } = req.params;
+
+    const note = await threadNoteService.getNote(
+      emailAddresses.emails[0],
+      threadId as string,
+    );
+
+    if (!note) {
+      return res.status(404).json({
+        success: false,
+        message: "Note not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: note,
+    });
+  },
+  "getThreadNote",
+);
+
+/**
+ * Delete a note for a thread
+ * DELETE /api/v1/mail/threads/:threadId/note
+ */
+export const deleteThreadNote = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    const emailAddresses = await getUserEmails(userId);
+    if (emailAddresses.emails.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No connected email accounts found",
+      });
+    }
+
+    const { threadId } = req.params;
+
+    const deleted = await threadNoteService.deleteNote(
+      emailAddresses.emails[0],
+      threadId as string,
+    );
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: "Note not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Note deleted successfully",
+    });
+  },
+  "deleteThreadNote",
+);
+
+/**
+ * List all notes for current user
+ * GET /api/v1/mail/notes
+ */
+export const listThreadNotes = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    const emailAddresses = await getUserEmails(userId);
+    if (emailAddresses.emails.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No connected email accounts found",
+      });
+    }
+
+    const { limit, offset } = req.query;
+
+    const result = await threadNoteService.listNotes(
+      emailAddresses.emails,
+      limit ? parseInt(limit as string) : undefined,
+      offset ? parseInt(offset as string) : undefined,
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        notes: result.notes,
+        total: result.total,
+        limit: limit ? parseInt(limit as string) : 50,
+        offset: offset ? parseInt(offset as string) : 0,
+      },
+    });
+  },
+  "listThreadNotes",
+);
