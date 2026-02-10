@@ -4,6 +4,7 @@ import redis from "../../config/redis";
 import { EmailAccount } from "../../models";
 import { GmailMessage, SendEmailInput } from "./interfaces";
 import { Rfc822Builder } from "../RFC.service";
+import { logger } from "@sentry/node";
 
 export class GmailApiService {
   private client?: AxiosInstance;
@@ -507,11 +508,7 @@ export class GmailApiService {
       },
     });
 
-    console.log("Gmail createDraft response:", {
-      draftId: res.data.id,
-      messageId: res.data.message?.id,
-      fullResponse: JSON.stringify(res.data, null, 2),
-    });
+  
 
     return res.data.id; // Returns draft ID
   }
@@ -546,11 +543,15 @@ export class GmailApiService {
 
   async sendDraft(draftId: string): Promise<string> {
     const client = await this.getClient();
+
     try {
-      const res = await client.post(`/users/me/drafts/${draftId}/send`, {});
-      return res.data.id; // Returns sent message ID
+      const res = await client.post(`/users/me/drafts/send`, {
+        id: draftId,
+      });
+
+      return res.data.id; // sent message ID
     } catch (error: any) {
-      console.error("Gmail sendDraft error:", {
+      logger.error("Gmail sendDraft error:", {
         draftId,
         status: error.response?.status,
         statusText: error.response?.statusText,
