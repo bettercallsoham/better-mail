@@ -37,7 +37,7 @@ async function processOutlookSync(job: Job<OutlookSyncData>) {
       logger.info(
         `Synced batch: ${batch.length} emails (total: ${totalSynced})`,
       );
-      
+
       // Queue emails for embedding generation
       await Promise.all(
         batch.map((email) =>
@@ -48,7 +48,7 @@ async function processOutlookSync(job: Job<OutlookSyncData>) {
           }),
         ),
       );
-      
+
       batch = [];
     }
   };

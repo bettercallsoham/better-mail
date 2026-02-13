@@ -38,7 +38,7 @@ async function processGmailSync(job: Job<GmailSyncData>) {
       logger.info(
         `Synced batch: ${batch.length} emails (total: ${totalSynced})`,
       );
-      
+
       // Queue emails for embedding generation
       await Promise.all(
         batch.map((email) =>
@@ -49,7 +49,7 @@ async function processGmailSync(job: Job<GmailSyncData>) {
           }),
         ),
       );
-      
+
       batch = [];
     }
   };

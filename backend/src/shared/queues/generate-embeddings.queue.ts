@@ -7,20 +7,23 @@ export interface EmbeddingJobData {
   providerMessageId: string;
 }
 
-export const embeddingsQueue = new Queue<EmbeddingJobData>("generate-embeddings", {
-  connection: redis as any,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: "exponential",
-      delay: 2000,
-    },
-    removeOnComplete: {
-      age: 3600,
-      count: 100,
-    },
-    removeOnFail: {
-      age: 24 * 3600,
+export const embeddingsQueue = new Queue<EmbeddingJobData>(
+  "generate-embeddings",
+  {
+    connection: redis as any,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: "exponential",
+        delay: 2000,
+      },
+      removeOnComplete: {
+        age: 3600,
+        count: 100,
+      },
+      removeOnFail: {
+        age: 24 * 3600,
+      },
     },
   },
-});
+);
