@@ -184,6 +184,25 @@ export class ElasticsearchService {
           },
 
           lastActivityAt: { type: "date" },
+
+          // AI-generated summary
+          summary: {
+            properties: {
+              text: { type: "text" },
+              keyPoints: { type: "text" },
+              actionItems: { type: "text" },
+              sentiment: { type: "keyword" },
+              priority: { type: "keyword" },
+            },
+          },
+
+          // Metadata for incremental summarization
+          summaryMetadata: {
+            properties: {
+              summarizedUpToDate: { type: "date" }, // Latest email date included in summary
+              lastSummarizedAt: { type: "date" }, // When summary was last generated
+            },
+          },
         },
       },
     });
