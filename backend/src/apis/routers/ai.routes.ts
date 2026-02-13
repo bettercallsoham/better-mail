@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { verifyAccessToken } from "../middleware/auth";
-import { validateThreadSummarization } from "../validators/ai.validator";
-import { summarizeThread } from "../controllers/ai.controller";
+import {
+  validateThreadSummarization,
+  validateRagChat,
+} from "../validators/ai.validator";
+import { summarizeThread, ragChat } from "../controllers/ai.controller";
 
 const router = Router();
 
@@ -12,6 +15,6 @@ router.post(
   summarizeThread,
 );
 
-
+router.post("/chat", verifyAccessToken(), validateRagChat, ragChat);
 
 export default router;

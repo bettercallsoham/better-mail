@@ -38,3 +38,52 @@ export const validateThreadSummarization = [
 
   handleValidationErrors,
 ];
+export const validateRagChat = [
+  body("query")
+    .exists()
+    .withMessage("query is required")
+    .isString()
+    .withMessage("query must be a string")
+    .notEmpty()
+    .withMessage("query cannot be empty")
+    .isLength({ min: 3, max: 500 })
+    .withMessage("query must be between 3 and 500 characters"),
+
+  body("emailAddress")
+    .exists()
+    .withMessage("emailAddress is required")
+    .isEmail()
+    .withMessage("emailAddress must be a valid email"),
+
+  body("conversationHistory")
+    .optional()
+    .isArray()
+    .withMessage("conversationHistory must be an array"),
+
+  body("filters")
+    .optional()
+    .isObject()
+    .withMessage("filters must be an object"),
+
+  body("filters.dateFrom")
+    .optional()
+    .isISO8601()
+    .withMessage("dateFrom must be a valid ISO 8601 date"),
+
+  body("filters.dateTo")
+    .optional()
+    .isISO8601()
+    .withMessage("dateTo must be a valid ISO 8601 date"),
+
+  body("filters.from")
+    .optional()
+    .isString()
+    .withMessage("from must be a string"),
+
+  body("filters.labels")
+    .optional()
+    .isArray()
+    .withMessage("labels must be an array"),
+
+  handleValidationErrors,
+];

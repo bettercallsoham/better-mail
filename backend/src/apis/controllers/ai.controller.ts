@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AISummaryService } from "../../shared/services/ai/ai.service";
+import { EmbeddingsService } from "../../shared/services/ai/embeddings.service";
+import { VectorSearchService } from "../../shared/services/elastic/vector-search.service";
 import { elasticClient } from "../../shared/config/elastic";
 import { ElasticsearchService } from "../../shared/services/elastic/elastic.service";
 import {
@@ -12,7 +14,9 @@ import sanitizeHtml from "sanitize-html";
 
 const elasticService = new ElasticsearchService(elasticClient);
 const threadService = new ThreadService(elasticService);
-const aiService = new AISummaryService();
+const vectorSearchService = new VectorSearchService(elasticClient);
+const embeddingsService = new EmbeddingsService(vectorSearchService);
+const aiService = new AISummaryService(embeddingsService);
 
 /**
  * Strip markdown code blocks from JSON response
@@ -172,3 +176,47 @@ ${truncatedBody}
   },
   "summarizeThread",
 );
+
+/**
+ * RAG-based chat for email queries
+ * POST /api/ai/chat
+ * Body: {
+ *   query: string,
+ *   emailAddress: string,
+ *   conversationHistory?: Array<{role, content}>,
+ *   filters?: { dateFrom?, dateTo?, from?, labels? }
+ * }
+ */
+export const ragChat = asyncHandler(async (req: Request, res: Response) => {
+  const {
+    query,
+    emailAddress,
+    conversationHistory = [],
+    filters = {},
+  } = req.body;
+  const userId = (req as any).user.id;
+
+  try {
+    logger.info(
+      `RAG chat query from user ${userId}: "${query.slice(0, 50)}..."`,
+    );
+
+    const answer = await aiService.ragChat({
+      query,
+      emailAddresses: [emailAddress],
+      conversationHistory,
+      filters,
+    });
+
+    res.json({
+      success: true,
+      answer,
+      query,
+    });
+
+    logger.info(`RAG chat completed for user ${userId}`);
+  } catch (error: any) {
+    logger.error("RAG chat error:", { error: error.message });
+    throw error;
+  }
+}, "ragChat");
