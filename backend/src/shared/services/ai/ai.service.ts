@@ -20,13 +20,15 @@ export class AISummaryService {
     const { emailsText, previousSummary } = input;
 
     try {
-      const systemPrompt = `You are an AI assistant that summarizes email threads.
+      const systemPrompt = `You're an  assistant that summarizes email threads.
 Provide a comprehensive summary in pure JSON format (no markdown, no code blocks) with these fields:
 - summary: A concise overview of the thread
 - keyPoints: Array of main discussion points
 - actionItems: Array of tasks or follow-ups needed
 - sentiment: "positive", "neutral", or "negative"
 - priority: "low", "medium", or "high"
+
+DON'T MISS OUT ON ANY IMPORTANT INFORMATION.
 
 Return ONLY the JSON object, nothing else.`;
 
@@ -41,8 +43,8 @@ Return ONLY the JSON object, nothing else.`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.3,
-        max_tokens: 1000,
+        temperature: 0.2,
+        max_tokens: 2000,
         response_format: { type: "json_object" },
       });
 

@@ -46,11 +46,14 @@ export const summarizeThread = asyncHandler(
     try {
       logger.info(`Summarizing thread ${threadId} for user ${userId}`);
 
-      // 1. Fetch thread emails from Elasticsearch
-      const { emails } = await elasticService.getEmailsByThreadId({
-        threadId,
-        emailAddresses: [emailAddress],
-      });
+      // 1. Fetch emails and existing summary in parallel
+      const [{ emails }, existingSummary] = await Promise.all([
+        elasticService.getEmailsByThreadId({
+          threadId,
+          emailAddresses: [emailAddress],
+        }),
+        threadService.getThreadSummary(threadId, emailAddress),
+      ]);
 
       if (emails.length === 0) {
         return res.status(404).json({
@@ -58,12 +61,6 @@ export const summarizeThread = asyncHandler(
           message: "Thread not found or empty",
         });
       }
-
-      // 2. Check for existing summary
-      const existingSummary = await threadService.getThreadSummary(
-        threadId,
-        emailAddress,
-      );
 
       const latestEmailDate = emails[emails.length - 1].receivedAt;
       const needsUpdate = threadService.needsSummaryUpdate(
@@ -83,10 +80,14 @@ export const summarizeThread = asyncHandler(
       // 3. Format emails for AI
       const emailsText = emails
         .map((email, i) => {
-          const body = sanitizeHtml(email.bodyHtml || email.bodyText || "", {
-            allowedTags: [],
-            allowedAttributes: {},
-          });
+          // Skip sanitization for plain text, only sanitize HTML
+          const body = email.bodyHtml
+            ? sanitizeHtml(email.bodyHtml, {
+                allowedTags: [],
+                allowedAttributes: {},
+              })
+            : email.bodyText || "";
+
           const truncatedBody =
             body.length > 1000
               ? body.substring(0, 800) + "\n[...truncated...]"

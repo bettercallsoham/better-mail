@@ -62,10 +62,12 @@ export const getThreadEmails = asyncHandler(
     }
 
     // Get emails with caching
+    console.time("getUserEmails");
     const { emails: emailAddresses, error } = await getUserEmails(
       userId,
       email as string | undefined,
     );
+    console.timeEnd("getUserEmails");
 
     if (error) {
       return res.status(403).json({
@@ -82,6 +84,8 @@ export const getThreadEmails = asyncHandler(
       });
     }
 
+    console.time("elastiSearch-query-time");
+
     const elasticService = new ElasticsearchService(elasticClient);
 
     const threads = await elasticService.getInboxThreads({
@@ -89,6 +93,8 @@ export const getThreadEmails = asyncHandler(
       size: size ? parseInt(size as string, 10) : 20,
       cursor: parsedCursor,
     });
+
+    console.timeEnd("elastiSearch-query-time");
 
     res.json({
       success: true,
