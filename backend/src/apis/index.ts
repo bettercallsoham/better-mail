@@ -5,6 +5,7 @@ import webhookRouter from "./routers/webhook.routes";
 import mailRouter from "./routers/mail.routes";
 import analyticsRouter from "./routers/analytics.routes";
 import templateRouter from "./routers/template.routes";
+import aiRouter from "./routers/ai.routes";
 
 const router = Router();
 router.use("/auth", authRouter);
@@ -13,4 +14,5 @@ router.use("/webhook", webhookRouter);
 router.use("/mail", mailRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/templates", templateRouter);
+router.use("/ai", aiRouter);
 export default router;

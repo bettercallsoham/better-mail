@@ -25,5 +25,16 @@ export const validateThreadSummarization = [
     .notEmpty()
     .withMessage("threadId cannot be empty"),
 
+  body("emailAddress")
+    .exists()
+    .withMessage("emailAddress is required")
+    .isEmail()
+    .withMessage("emailAddress must be a valid email"),
+
+  body("forceRefresh")
+    .optional()
+    .isBoolean()
+    .withMessage("forceRefresh must be a boolean"),
+
   handleValidationErrors,
 ];

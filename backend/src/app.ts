@@ -5,6 +5,11 @@ Sentry.init({
   environment: process.env.NODE_ENV || "development",
   tracesSampleRate: 1.0,
 });
+
+Sentry.metrics.count("button_click", 1);
+Sentry.metrics.gauge("page_load_time", 150);
+Sentry.metrics.distribution("response_time", 200);
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
