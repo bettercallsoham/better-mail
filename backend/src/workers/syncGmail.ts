@@ -8,6 +8,7 @@ import { logger } from "../shared/utils/logger";
 import { UnifiedEmailDocument } from "../shared/services/elastic/interface";
 import { GmailSyncData } from "../shared/queues/sync-gmail.queue";
 import { transformGmailToUnified } from "../shared/utils/helpers/gmail-helper";
+import { embeddingsQueue } from "../shared/queues/generate-embeddings.queue";
 
 const elasticService = new ElasticsearchService(elasticClient);
 const BATCH_SIZE = 100;
@@ -37,6 +38,18 @@ async function processGmailSync(job: Job<GmailSyncData>) {
       logger.info(
         `Synced batch: ${batch.length} emails (total: ${totalSynced})`,
       );
+      
+      // Queue emails for embedding generation
+      await Promise.all(
+        batch.map((email) =>
+          embeddingsQueue.add("generate-embedding", {
+            emailAddress: email.emailAddress,
+            provider: email.provider,
+            providerMessageId: email.providerMessageId,
+          }),
+        ),
+      );
+      
       batch = [];
     }
   };

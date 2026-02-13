@@ -978,7 +978,7 @@ export class ElasticsearchService {
 
   async getEmailById(
     id: string,
-    emailAddresses: string[],
+    emailAddresses?: string[],
   ): Promise<UnifiedEmailDocument | null> {
     try {
       const result = await this.client.get({
@@ -988,8 +988,8 @@ export class ElasticsearchService {
 
       const email = result._source as UnifiedEmailDocument;
 
-      // Verify ownership
-      if (!emailAddresses.includes(email.emailAddress)) {
+      // Verify ownership if emailAddresses provided
+      if (emailAddresses && !emailAddresses.includes(email.emailAddress)) {
         return null;
       }
 
@@ -997,6 +997,20 @@ export class ElasticsearchService {
     } catch (error) {
       return null;
     }
+  }
+
+  async upsertEmailWithEmbedding(
+    id: string,
+    embedding: number[],
+  ): Promise<void> {
+    await this.client.update({
+      index: this.EMAILS_INDEX,
+      id,
+      doc: {
+        embedding,
+      },
+      doc_as_upsert: true,
+    });
   }
 
   async updateEmail(

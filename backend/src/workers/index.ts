@@ -1,4 +1,5 @@
 import "dotenv/config";
+export { embeddingsWorker } from "./generateEmbeddings";
 export { outlookSyncWorker } from "./syncOutlook";
 export { gmailSyncWorker } from "./syncGmail";
 export { handleMailboxConnectionWorker } from "./handleMailboxConnection";

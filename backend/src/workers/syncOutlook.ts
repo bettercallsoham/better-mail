@@ -9,6 +9,7 @@ import { UnifiedEmailDocument } from "../shared/services/elastic/interface";
 import { OutlookSyncData } from "../shared/queues/sync-outlook.queue";
 import { transformOutlookToUnified } from "../shared/utils/helpers/outlook-helper";
 import { OutlookMessage } from "../shared/services/outlook/interfaces";
+import { embeddingsQueue } from "../shared/queues/generate-embeddings.queue";
 
 const elasticService = new ElasticsearchService(elasticClient);
 
@@ -36,6 +37,18 @@ async function processOutlookSync(job: Job<OutlookSyncData>) {
       logger.info(
         `Synced batch: ${batch.length} emails (total: ${totalSynced})`,
       );
+      
+      // Queue emails for embedding generation
+      await Promise.all(
+        batch.map((email) =>
+          embeddingsQueue.add("generate-embedding", {
+            emailAddress: email.emailAddress,
+            provider: email.provider,
+            providerMessageId: email.providerMessageId,
+          }),
+        ),
+      );
+      
       batch = [];
     }
   };
