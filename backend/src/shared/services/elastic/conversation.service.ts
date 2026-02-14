@@ -1,5 +1,4 @@
 import { Client } from "@elastic/elasticsearch";
-import { logger } from "../../utils/logger";
 import { redis } from "../../config/redis";
 
 // ============================================
@@ -12,7 +11,6 @@ export interface ConversationMessage {
   userId: string;
   role: "user" | "assistant" | "system";
   content: string;
-  sequence: number;
   status: "queued" | "processing" | "completed" | "failed" | "cancelled";
   createdAt: Date;
   updatedAt: Date;
@@ -50,7 +48,7 @@ export class ConversationService {
   private readonly client: Client;
   private readonly CONVERSATIONS_INDEX = "conversations_v1";
   private readonly SUMMARIES_INDEX = "conversation_summaries_v1";
-  private readonly CACHE_TTL = 300; // 5 minutes
+  private readonly CACHE_TTL = 300;
 
   constructor(client: Client) {
     this.client = client;
@@ -60,9 +58,6 @@ export class ConversationService {
   // CREATE
   // ============================================
 
-  /**
-   * Create a new message in the conversation
-   */
   async createMessage(message: ConversationMessage): Promise<void> {
     await this.client.index({
       index: this.CONVERSATIONS_INDEX,
@@ -73,16 +68,12 @@ export class ConversationService {
         updatedAt: message.updatedAt.toISOString(),
         completedAt: message.completedAt?.toISOString(),
       },
-      refresh: false, // Don't wait for refresh
+      refresh: false,
     });
 
-    // Invalidate cached conversation
     await redis.del(this.getCacheKey(message.conversationId));
   }
 
-  /**
-   * Store or update conversation summary
-   */
   async createOrUpdateSummary(summary: ConversationSummary): Promise<void> {
     await this.client.index({
       index: this.SUMMARIES_INDEX,
@@ -96,73 +87,70 @@ export class ConversationService {
       refresh: false,
     });
 
-    // Cache the summary
-    const cacheKey = `summary:${summary.conversationId}`;
-    await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(summary));
+    await redis.setex(
+      `summary:${summary.conversationId}`,
+      this.CACHE_TTL,
+      JSON.stringify(summary)
+    );
   }
 
   // ============================================
   // READ
   // ============================================
 
-  /**
-   * Get recent messages from conversation (cached)
-   * Returns last N messages in chronological order
-   */
   async getRecentMessages(
     conversationId: string,
     limit: number = 20,
+    includeIncomplete: boolean = false
   ): Promise<ConversationMessage[]> {
-    // Check cache first
     const cacheKey = this.getCacheKey(conversationId);
     const cached = await redis.get(cacheKey);
+
     if (cached) {
       const messages: ConversationMessage[] = JSON.parse(cached);
-      return messages.slice(-limit); // Return last N
+      return messages.slice(-limit);
     }
 
-    // Fetch from Elasticsearch
+    const mustConditions: any[] = [
+      { term: { conversationId } }
+    ];
+
+    if (!includeIncomplete) {
+      mustConditions.push({ term: { status: "completed" } });
+    }
+
     const result = await this.client.search({
       index: this.CONVERSATIONS_INDEX,
-      _source_excludes: ["embeddings"], // Don't return embeddings by default
+      _source_excludes: ["embeddings"],
       body: {
         query: {
-          bool: {
-            must: [
-              { term: { conversationId } },
-              { term: { status: "completed" } }, // Only completed messages for context
-            ],
-          },
+          bool: { must: mustConditions },
         },
-        sort: [{ sequence: "desc" }],
-        size: limit,
+        sort: [
+          { createdAt: "asc" },
+          { messageId: "asc" } // tie-breaker
+        ],
+        size: 1000, // fetch reasonably sized batch for cache
       },
     });
 
-    const messages = result.hits.hits
-      .map((hit: any) => this.parseMessage(hit._source))
-      .reverse(); // Chronological order
+    const messages = result.hits.hits.map((hit: any) =>
+      this.parseMessage(hit._source)
+    );
 
-    // Cache it
     await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(messages));
 
-    return messages;
+    return messages.slice(-limit);
   }
 
-  /**
-   * Get conversation summary (cached)
-   */
   async getSummary(
-    conversationId: string,
+    conversationId: string
   ): Promise<ConversationSummary | null> {
-    // Check cache
     const cacheKey = `summary:${conversationId}`;
     const cached = await redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
 
-    // Fetch from Elasticsearch
+    if (cached) return JSON.parse(cached);
+
     try {
       const result = await this.client.get({
         index: this.SUMMARIES_INDEX,
@@ -171,7 +159,6 @@ export class ConversationService {
 
       const summary = this.parseSummary(result._source);
 
-      // Cache it
       await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(summary));
 
       return summary;
@@ -181,38 +168,41 @@ export class ConversationService {
     }
   }
 
-  /**
-   * Get next sequence number for conversation
-   */
-  async getNextSequence(conversationId: string): Promise<number> {
-    const result = await this.client.search({
-      index: this.CONVERSATIONS_INDEX,
-      body: {
-        query: { term: { conversationId } },
-        sort: [{ sequence: "desc" }],
-        size: 1,
-        _source: ["sequence"],
-      },
-    });
+  async getMessageById(messageId: string): Promise<ConversationMessage | null> {
+    try {
+      const result = await this.client.get({
+        index: this.CONVERSATIONS_INDEX,
+        id: messageId,
+      });
 
-    if (result.hits.hits.length === 0) return 1;
-    return (result.hits.hits[0]._source as any).sequence + 1;
+      return this.parseMessage(result._source);
+    } catch (error: any) {
+      if (error.meta?.statusCode === 404) return null;
+      throw error;
+    }
+  }
+
+  async getConversationContext(conversationId: string) {
+    const [summary, messages] = await Promise.all([
+      this.getSummary(conversationId),
+      this.getRecentMessages(conversationId, 10, false),
+    ]);
+
+    return { summary, messages };
   }
 
   // ============================================
   // UPDATE
   // ============================================
 
-  /**
-   * Update message status and metadata
-   */
   async updateMessage(
+    conversationId: string,
     messageId: string,
     updates: {
       status?: ConversationMessage["status"];
       metadata?: ConversationMessage["metadata"];
       embeddings?: number[];
-    },
+    }
   ): Promise<void> {
     const doc: any = {
       updatedAt: new Date().toISOString(),
@@ -220,18 +210,14 @@ export class ConversationService {
 
     if (updates.status) {
       doc.status = updates.status;
+
       if (["completed", "failed", "cancelled"].includes(updates.status)) {
         doc.completedAt = new Date().toISOString();
       }
     }
 
-    if (updates.metadata) {
-      doc.metadata = updates.metadata;
-    }
-
-    if (updates.embeddings) {
-      doc.embeddings = updates.embeddings;
-    }
+    if (updates.metadata) doc.metadata = updates.metadata;
+    if (updates.embeddings) doc.embeddings = updates.embeddings;
 
     await this.client.update({
       index: this.CONVERSATIONS_INDEX,
@@ -239,6 +225,8 @@ export class ConversationService {
       doc,
       refresh: false,
     });
+
+    await redis.del(this.getCacheKey(conversationId));
   }
 
   // ============================================
@@ -251,33 +239,21 @@ export class ConversationService {
 
   private parseMessage(source: any): ConversationMessage {
     return {
-      messageId: source.messageId,
-      conversationId: source.conversationId,
-      userId: source.userId,
-      role: source.role,
-      content: source.content,
-      sequence: source.sequence,
-      status: source.status,
+      ...source,
       createdAt: new Date(source.createdAt),
       updatedAt: new Date(source.updatedAt),
       completedAt: source.completedAt
         ? new Date(source.completedAt)
         : undefined,
-      embeddings: source.embeddings,
-      metadata: source.metadata,
     };
   }
 
   private parseSummary(source: any): ConversationSummary {
     return {
-      conversationId: source.conversationId,
-      userId: source.userId,
-      summary: source.summary,
-      title: source.title,
-      messageCount: source.messageCount,
-      lastMessageAt: new Date(source.lastMessageAt),
+      ...source,
       createdAt: new Date(source.createdAt),
       updatedAt: new Date(source.updatedAt),
+      lastMessageAt: new Date(source.lastMessageAt),
     };
   }
 }
