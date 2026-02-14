@@ -1,5 +1,6 @@
 import "dotenv/config";
 import OpenAI from "openai";
+import { AzureChatOpenAI } from "@langchain/openai";
 
 export const {
   AZURE_OPEN_AI_KEY,
@@ -45,4 +46,27 @@ export const embeddingsClient = new OpenAI({
   defaultHeaders: {
     "api-key": AZURE_OPEN_AI_KEY!,
   },
+});
+
+export const gpt41LLM = new AzureChatOpenAI({
+  azureOpenAIApiKey: AZURE_OPEN_AI_KEY!,
+  azureOpenAIApiInstanceName: GPT_41_ENDPOINT!
+    .split("https://")[1]
+    .split(".openai.azure.com")[0],
+  azureOpenAIApiDeploymentName: GPT_41_MODEL!,
+  azureOpenAIApiVersion: GPT_41_API_VERSION!,
+  temperature: 0.3,
+  streaming: true,
+});
+
+export const gpt4oMiniLLM = new AzureChatOpenAI({
+  // Same changes
+  azureOpenAIApiKey: AZURE_OPEN_AI_KEY!,
+  azureOpenAIApiInstanceName: GPT_4O_MINI_ENDPOINT!
+    .split("https://")[1]
+    .split(".openai.azure.com")[0],
+  azureOpenAIApiDeploymentName: GPT_4O_MINI_MODEL!,
+  azureOpenAIApiVersion: GPT_4O_MINI_VERSION!,
+  temperature: 0.3,
+  streaming: true,
 });

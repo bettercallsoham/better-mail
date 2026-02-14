@@ -4,13 +4,12 @@ import {
 } from "../../elastic/conversation.service";
 import { AgentFactory } from "./AgentsFactory";
 import { AIEmitter } from "./AIEmitter";
-import { buildContext } from "./helper";
-import { run } from "@openai/agents";
+import { buildContext } from "./helper"; 
 
 interface ProcessMessageInput {
   conversationId: string;
   userId: string;
-  messageId: string; // user message
+  messageId: string;
 }
 
 export class AIOrchestratorService {
@@ -24,42 +23,40 @@ export class AIOrchestratorService {
     const { conversationId, userId, messageId } = input;
 
     try {
-      // 1. Mark user message as processing
       await this.conversationService.updateMessage(conversationId, messageId, {
         status: "processing",
       });
 
-      // 2. Load context
-      const { summary, messages } =
+      const { summary, messages: history } =
         await this.conversationService.getConversationContext(conversationId);
 
-      const context = buildContext({ summary, messages });
+      
+      const formattedMessages = buildContext({ summary, messages: history });
 
-      // 3. Create agent
-      const agent = this.agentFactory.createChatAgent({
-        userId,
-        conversationId,
-      });
+      const agent = this.agentFactory.createChatAgent();
 
-      // 4. Start streaming run
-      const stream = await run(agent, context, {
-        stream: true,
-      });
+      const stream = await agent.stream(
+        { messages: formattedMessages },
+        { 
+          streamMode: "messages",
+          context: { userId, conversationId } 
+        }
+      );
 
       let finalText = "";
 
-      // 5. Stream tokens
-      const textStream = stream.toTextStream({
-        compatibleWithNodeStreams: false,
-      });
+      // 5. Iterate through the stream
+      for await (const [chunk, metadata] of stream) {
+      
+        if (metadata.langgraph_node === "model" && chunk.content) {
+          const content = Array.isArray(chunk.content) 
+            ? chunk.content.map(c => ("text" in c ? c.text : "")).join("")
+            : chunk.content;
 
-      for await (const chunk of textStream) {
-        finalText += chunk;
-        this.emitter.emitToken(conversationId, chunk);
+          finalText += content;
+          this.emitter.emitToken(conversationId, content);
+        }
       }
-
-      // 6. Wait until fully completed
-      await stream.completed;
 
       // 7. Persist assistant message
       const assistantMessage: ConversationMessage = {
@@ -74,15 +71,13 @@ export class AIOrchestratorService {
       };
 
       await this.conversationService.createMessage(assistantMessage);
-
-      // 8. Emit completion event
       this.emitter.emitComplete(conversationId, assistantMessage.messageId);
+
     } catch (error: any) {
       await this.conversationService.updateMessage(conversationId, messageId, {
         status: "failed",
         metadata: { errorMessage: error.message },
       });
-
       this.emitter.emitError(conversationId, error.message);
     }
   }

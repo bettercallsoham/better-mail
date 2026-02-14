@@ -1,22 +1,24 @@
-import { Agent } from "@openai/agents";
-import { azureClient4o_mini, GPT_4O_MINI_MODEL } from "../../../config/llm";
+import { createAgent } from "langchain";
+import { searchEmailsTool } from "../tools/searchEmailsTools";
+import { z } from "zod";
+import { gpt41LLM } from "../../../config/llm";
 
-interface CreateAgentInput {
-  userId: string;
-  conversationId: string;
-}
+const contextSchema = z.object({
+  userId: z.string(),
+  conversationId: z.string(),
+});
 
 export class AgentFactory {
-  createChatAgent(_: CreateAgentInput): Agent {
-    return new Agent({
-      name: "Better Agent",
-      model: GPT_4O_MINI_MODEL!,
-      instructions: `
-        You are BetterMail AI assistant.
+  createChatAgent() {
+    return createAgent({
+      model: gpt41LLM,
+      tools: [searchEmailsTool],
+      contextSchema,
+      systemPrompt: `
+        You are BetterMail AI assistant. 
         Help users manage emails efficiently.
-        Be concise, structured and actionable.
+        Be concise and actionable.
       `,
-      tools: [], // we add later
     });
   }
 }
