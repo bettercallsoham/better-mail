@@ -11,6 +11,7 @@ import { gmailSyncQueue } from "../queues/sync-gmail.queue";
 import { outlookSyncQueue } from "../queues/sync-outlook.queue";
 import { searchHistoryQueue } from "../queues";
 import { embeddingsQueue } from "../queues/generate-embeddings.queue";
+import { conversationQueue } from "../queues/conversation.queue";
 
 // Create Express adapter with custom UI config
 export const serverAdapter = new ExpressAdapter();
@@ -25,6 +26,7 @@ export const bullBoard = createBullBoard({
     new BullMQAdapter(outlookSyncQueue),
     new BullMQAdapter(searchHistoryQueue),
     new BullMQAdapter(embeddingsQueue),
+    new BullMQAdapter(conversationQueue),
   ],
   serverAdapter: serverAdapter,
   options: {

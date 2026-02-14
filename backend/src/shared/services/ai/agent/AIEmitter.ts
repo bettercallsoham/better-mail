@@ -11,6 +11,8 @@ export class AIEmitter {
   }
 
   emitComplete(conversationId: string, messageId: string) {
+    console.log("conversation id : ", conversationId, "messageid", messageId);
+
     pusher.trigger(`private-${conversationId}`, "ai.complete", { messageId });
   }
 

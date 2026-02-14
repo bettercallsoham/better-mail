@@ -68,7 +68,7 @@ export class ConversationService {
         updatedAt: message.updatedAt.toISOString(),
         completedAt: message.completedAt?.toISOString(),
       },
-      refresh: false,
+      refresh: "wait_for", // Wait for refresh so message is immediately searchable
     });
 
     await redis.del(this.getCacheKey(message.conversationId));
@@ -128,7 +128,7 @@ export class ConversationService {
         },
         sort: [
           { createdAt: "asc" },
-          { messageId: "asc" } // tie-breaker
+          { messageId: "asc" } // Use messageId (keyword field) as tie-breaker
         ],
         size: 1000, // fetch reasonably sized batch for cache
       },
@@ -185,7 +185,7 @@ export class ConversationService {
   async getConversationContext(conversationId: string) {
     const [summary, messages] = await Promise.all([
       this.getSummary(conversationId),
-      this.getRecentMessages(conversationId, 10, false),
+      this.getRecentMessages(conversationId, 10, true), // Include incomplete messages
     ]);
 
     return { summary, messages };

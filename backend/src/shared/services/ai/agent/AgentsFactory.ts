@@ -2,6 +2,7 @@ import { createAgent } from "langchain";
 import { searchEmailsTool } from "../tools/searchEmailsTools";
 import { z } from "zod";
 import { gpt41LLM } from "../../../config/llm";
+import { AGENT_SYSTEM_PROMPT } from "../prompts/system-prompt";
 
 const contextSchema = z.object({
   userId: z.string(),
@@ -14,11 +15,8 @@ export class AgentFactory {
       model: gpt41LLM,
       tools: [searchEmailsTool],
       contextSchema,
-      systemPrompt: `
-        You are BetterMail AI assistant. 
-        Help users manage emails efficiently.
-        Be concise and actionable.
-      `,
+      systemPrompt: AGENT_SYSTEM_PROMPT,
+      
     });
   }
 }

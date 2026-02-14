@@ -314,9 +314,9 @@ export class ElasticsearchService {
       settings: {
         number_of_shards: 2,
         number_of_replicas: 1,
-        // Sort by conversationId then sequence for efficient retrieval
-        "index.sort.field": ["conversationId", "sequence"],
-        "index.sort.order": ["asc", "asc"],
+        // Sort by conversationId, createdAt, then messageId for efficient retrieval
+        "index.sort.field": ["conversationId", "createdAt", "messageId"],
+        "index.sort.order": ["asc", "asc", "asc"],
       },
       mappings: {
         dynamic: "strict",

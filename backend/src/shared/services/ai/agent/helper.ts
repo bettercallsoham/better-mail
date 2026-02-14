@@ -1,35 +1,32 @@
 import {
+  HumanMessage,
+  AIMessage,
+  SystemMessage,
+} from "@langchain/core/messages";
+import {
   ConversationMessage,
   ConversationSummary,
 } from "../../elastic/conversation.service";
 
-export function buildContext({
-  summary,
-  messages,
-}: {
+export function buildContext(input: {
   summary: ConversationSummary | null;
   messages: ConversationMessage[];
 }) {
-  const context: any[] = [];
+  const langchainMessages: any[] = [];
 
-  context.push({
-    role: "system",
-    content: "You are BetterMail AI assistant. Help user manage emails.",
+  if (input.summary) {
+    langchainMessages.push(
+      new SystemMessage(
+        `Previous Conversation Summary: ${input.summary.summary}`,
+      ),
+    );
+  }
+
+  const history = input.messages.map((m) => {
+    if (m.role === "user") return new HumanMessage(m.content);
+    if (m.role === "assistant") return new AIMessage(m.content);
+    return new SystemMessage(m.content);
   });
 
-  if (summary) {
-    context.push({
-      role: "system",
-      content: `Conversation summary: ${summary.summary}`,
-    });
-  }
-
-  for (const msg of messages) {
-    context.push({
-      role: msg.role,
-      content: msg.content,
-    });
-  }
-
-  return context;
+  return [...langchainMessages, ...history];
 }
