@@ -5,7 +5,7 @@ import {
   GPT_41_MODEL,
 } from "../../config/llm";
 import { logger } from "../../utils/logger";
-import { EmbeddingsService } from "./embeddings.service";
+import { RAGService } from "./rag.service";
 
 interface SummaryInput {
   emailsText: string;
@@ -25,11 +25,11 @@ interface RAGChatInput {
 }
 
 /**
- * Simple LLM wrapper for AI operations
- * No business logic - just makes API calls
+ * AI Service - LLM orchestration layer
+ * Handles LLM API calls and response formatting
  */
 export class AISummaryService {
-  constructor(private embeddingsService?: EmbeddingsService) {}
+  constructor(private ragService?: RAGService) {}
   /**
    * Summarize thread emails
    * @param input - Formatted emails text and optional previous summary
@@ -55,7 +55,6 @@ Return ONLY the JSON object, nothing else.`;
         ? `Previous Summary:\n${previousSummary}\n\nNew Emails:\n${emailsText}\n\nUpdate the summary with the new information.`
         : `Emails:\n${emailsText}\n\nSummarize this email thread.`;
 
-      logger.info("Calling Azure OpenAI for thread summary");
       const response = await azureClient4o_mini.chat.completions.create({
         model: GPT_4O_MINI_MODEL!,
         messages: [
@@ -90,20 +89,19 @@ Return ONLY the JSON object, nothing else.`;
       filters = {},
     } = input;
 
-    if (!this.embeddingsService) {
-      throw new Error("EmbeddingsService not initialized");
+    if (!this.ragService) {
+      throw new Error("RAGService not initialized");
     }
 
     try {
       logger.info(`RAG Chat query: "${query.slice(0, 50)}..."`);
 
-      // Search for relevant emails using vector search
-      const { context, results } =
-        await this.embeddingsService.searchAndFormatContext(
-          query,
-          { emailAddresses, ...filters },
-          5, // Top 5 most relevant emails
-        );
+      // Search for relevant emails using RAG service
+      const { context, results } = await this.ragService.searchAndFormatContext(
+        query,
+        { emailAddresses, ...filters },
+        5, // Top 5 most relevant emails
+      );
 
       if (results.length === 0) {
         return "I couldn't find any relevant emails to answer your question. Try rephrasing or adjusting your filters.";

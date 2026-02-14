@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { AISummaryService } from "../../shared/services/ai/ai.service";
 import { EmbeddingsService } from "../../shared/services/ai/embeddings.service";
+import { RAGService } from "../../shared/services/ai/rag.service";
 import { VectorSearchService } from "../../shared/services/elastic/vector-search.service";
 import { elasticClient } from "../../shared/config/elastic";
 import { ElasticsearchService } from "../../shared/services/elastic/elastic.service";
@@ -12,11 +13,13 @@ import {
 import { logger } from "../../shared/utils/logger";
 import sanitizeHtml from "sanitize-html";
 
+// Initialize services with proper dependency injection
 const elasticService = new ElasticsearchService(elasticClient);
 const threadService = new ThreadService(elasticService);
 const vectorSearchService = new VectorSearchService(elasticClient);
-const embeddingsService = new EmbeddingsService(vectorSearchService);
-const aiService = new AISummaryService(embeddingsService);
+const embeddingsService = new EmbeddingsService();
+const ragService = new RAGService(embeddingsService, vectorSearchService);
+const aiService = new AISummaryService(ragService);
 
 /**
  * Strip markdown code blocks from JSON response
@@ -196,7 +199,6 @@ export const ragChat = asyncHandler(async (req: Request, res: Response) => {
   } = req.body;
   const userId = (req as any).user.id;
 
-  
   try {
     const answer = await aiService.ragChat({
       query,
