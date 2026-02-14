@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { verifyAccessToken } from "../middleware/auth";
+import { verifyEmailOwnership } from "../middleware/email-ownership";
 import {
   validateThreadSummarization,
   validateRagChat,
@@ -12,9 +13,16 @@ router.post(
   "/threads/:threadId/summarize",
   verifyAccessToken(),
   validateThreadSummarization,
+  verifyEmailOwnership,
   summarizeThread,
 );
 
-router.post("/chat", verifyAccessToken(), validateRagChat, ragChat);
+router.post(
+  "/chat",
+  verifyAccessToken(),
+  validateRagChat,
+  verifyEmailOwnership,
+  ragChat,
+);
 
 export default router;

@@ -9,6 +9,8 @@ export class ElasticsearchService {
   private readonly THREADS_INDEX = "threads_v1";
   private readonly SAVED_SEARCHES_INDEX = "saved_searches_v1";
   private readonly SEARCH_HISTORY_INDEX = "search_history_v1";
+  private readonly CONVERSATIONS_INDEX = "conversations_v1";
+  private readonly CONVERSATION_SUMMARIES_INDEX = "conversation_summaries_v1";
 
   constructor(client: Client) {
     this.client = client;
@@ -23,6 +25,8 @@ export class ElasticsearchService {
     await this.ensureThreadsIndex();
     await this.ensureSavedSearchesIndex();
     await this.ensureSearchHistoryIndex();
+    await this.ensureConversationsIndex();
+    await this.ensureConversationSummariesIndex();
   }
 
   // --------------------
@@ -289,6 +293,175 @@ export class ElasticsearchService {
           executionTimeMs: { type: "integer" },
           emailAddresses: { type: "keyword" },
           searchedAt: { type: "date" },
+        },
+      },
+    });
+  }
+
+  // --------------------
+  // Conversations index
+  // --------------------
+
+  private async ensureConversationsIndex(): Promise<void> {
+    const exists = await this.client.indices.exists({
+      index: this.CONVERSATIONS_INDEX,
+    });
+
+    if (exists) return;
+
+    await this.client.indices.create({
+      index: this.CONVERSATIONS_INDEX,
+      settings: {
+        number_of_shards: 2,
+        number_of_replicas: 1,
+        // Sort by conversationId then sequence for efficient retrieval
+        "index.sort.field": ["conversationId", "sequence"],
+        "index.sort.order": ["asc", "asc"],
+      },
+      mappings: {
+        dynamic: "strict",
+        properties: {
+          // Identifiers
+          messageId: { type: "keyword" },
+          conversationId: { type: "keyword" },
+          userId: { type: "keyword" },
+
+          // Content & Role
+          role: { type: "keyword" }, // "user" | "assistant" | "system"
+          content: {
+            type: "text",
+            fields: {
+              keyword: { type: "keyword", ignore_above: 512 },
+            },
+          },
+
+          // Ordering & Status
+          sequence: { type: "integer" }, // Message order within conversation
+          status: { type: "keyword" }, // "queued" | "processing" | "completed" | "failed" | "cancelled"
+
+          // Timestamps
+          createdAt: { type: "date" },
+          updatedAt: { type: "date" },
+          completedAt: { type: "date" },
+
+          // Vector embeddings for RAG search
+          embeddings: {
+            type: "dense_vector",
+            dims: 1536, // OpenAI embeddings dimension
+            index: true,
+            similarity: "cosine",
+          },
+
+          // Tool execution tracking
+          toolCalls: {
+            type: "nested",
+            properties: {
+              toolName: { type: "keyword" },
+              arguments: {
+                type: "object",
+                enabled: false, // Store but don't index
+              },
+              result: {
+                type: "object",
+                enabled: false,
+              },
+              status: { type: "keyword" }, // "running" | "completed" | "failed"
+              executionTimeMs: { type: "integer" },
+              timestamp: { type: "date" },
+            },
+          },
+
+          // Metadata
+          metadata: {
+            type: "object",
+            properties: {
+              model: { type: "keyword" },
+              tokensUsed: { type: "integer" },
+              promptTokens: { type: "integer" },
+              completionTokens: { type: "integer" },
+              processingTimeMs: { type: "integer" },
+              temperature: { type: "float" },
+              errorMessage: { type: "text" },
+            },
+          },
+
+          // Context & Threading
+          parentMessageId: { type: "keyword" }, // For branching conversations
+
+          // Sources (email references, search results)
+          sources: {
+            type: "nested",
+            properties: {
+              type: { type: "keyword" }, // "email" | "search" | "tool_result"
+              emailId: { type: "keyword" },
+              threadId: { type: "keyword" },
+              relevanceScore: { type: "float" },
+              snippet: { type: "text" },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // --------------------
+  // Conversation Summaries index
+  // --------------------
+
+  private async ensureConversationSummariesIndex(): Promise<void> {
+    const exists = await this.client.indices.exists({
+      index: this.CONVERSATION_SUMMARIES_INDEX,
+    });
+
+    if (exists) return;
+
+    await this.client.indices.create({
+      index: this.CONVERSATION_SUMMARIES_INDEX,
+      settings: {
+        number_of_shards: 1,
+        number_of_replicas: 1,
+      },
+      mappings: {
+        dynamic: "strict",
+        properties: {
+          conversationId: { type: "keyword" },
+          userId: { type: "keyword" },
+
+          // Summary content
+          summary: {
+            type: "text",
+            fields: {
+              keyword: { type: "keyword", ignore_above: 512 },
+            },
+          },
+          title: { type: "text" }, // Auto-generated conversation title
+
+          // Summary embeddings for semantic search
+          embeddings: {
+            type: "dense_vector",
+            dims: 1536,
+            index: true,
+            similarity: "cosine",
+          },
+
+          // Stats
+          messageCount: { type: "integer" },
+          lastMessageAt: { type: "date" },
+
+          // Key topics/entities extracted
+          topics: { type: "keyword" },
+          entities: {
+            type: "nested",
+            properties: {
+              type: { type: "keyword" }, // "person" | "email" | "date" | "action"
+              value: { type: "keyword" },
+              mentions: { type: "integer" },
+            },
+          },
+
+          // Timestamps
+          createdAt: { type: "date" },
+          updatedAt: { type: "date" },
         },
       },
     });

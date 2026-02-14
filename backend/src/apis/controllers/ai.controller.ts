@@ -196,11 +196,8 @@ export const ragChat = asyncHandler(async (req: Request, res: Response) => {
   } = req.body;
   const userId = (req as any).user.id;
 
+  
   try {
-    logger.info(
-      `RAG chat query from user ${userId}: "${query.slice(0, 50)}..."`,
-    );
-
     const answer = await aiService.ragChat({
       query,
       emailAddresses: [emailAddress],
@@ -213,8 +210,6 @@ export const ragChat = asyncHandler(async (req: Request, res: Response) => {
       answer,
       query,
     });
-
-    logger.info(`RAG chat completed for user ${userId}`);
   } catch (error: any) {
     logger.error("RAG chat error:", { error: error.message });
     throw error;
