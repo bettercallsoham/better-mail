@@ -90,7 +90,7 @@ export class ConversationService {
     await redis.setex(
       `summary:${summary.conversationId}`,
       this.CACHE_TTL,
-      JSON.stringify(summary)
+      JSON.stringify(summary),
     );
   }
 
@@ -101,7 +101,7 @@ export class ConversationService {
   async getRecentMessages(
     conversationId: string,
     limit: number = 20,
-    includeIncomplete: boolean = false
+    includeIncomplete: boolean = false,
   ): Promise<ConversationMessage[]> {
     const cacheKey = this.getCacheKey(conversationId);
     const cached = await redis.get(cacheKey);
@@ -111,9 +111,7 @@ export class ConversationService {
       return messages.slice(-limit);
     }
 
-    const mustConditions: any[] = [
-      { term: { conversationId } }
-    ];
+    const mustConditions: any[] = [{ term: { conversationId } }];
 
     if (!includeIncomplete) {
       mustConditions.push({ term: { status: "completed" } });
@@ -128,14 +126,14 @@ export class ConversationService {
         },
         sort: [
           { createdAt: "asc" },
-          { messageId: "asc" } // Use messageId (keyword field) as tie-breaker
+          { messageId: "asc" }, // Use messageId (keyword field) as tie-breaker
         ],
         size: 1000, // fetch reasonably sized batch for cache
       },
     });
 
     const messages = result.hits.hits.map((hit: any) =>
-      this.parseMessage(hit._source)
+      this.parseMessage(hit._source),
     );
 
     await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(messages));
@@ -144,7 +142,7 @@ export class ConversationService {
   }
 
   async getSummary(
-    conversationId: string
+    conversationId: string,
   ): Promise<ConversationSummary | null> {
     const cacheKey = `summary:${conversationId}`;
     const cached = await redis.get(cacheKey);
@@ -202,7 +200,7 @@ export class ConversationService {
       status?: ConversationMessage["status"];
       metadata?: ConversationMessage["metadata"];
       embeddings?: number[];
-    }
+    },
   ): Promise<void> {
     const doc: any = {
       updatedAt: new Date().toISOString(),

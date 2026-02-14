@@ -63,30 +63,37 @@ export class AIOrchestratorService {
           node: metadata.langgraph_node,
           hasContent: !!chunk.content,
           contentType: typeof chunk.content,
-          contentPreview: typeof chunk.content === 'string' 
-            ? chunk.content.substring(0, 50) 
-            : Array.isArray(chunk.content) 
-              ? `Array[${chunk.content.length}]` 
-              : chunk.content,
+          contentPreview:
+            typeof chunk.content === "string"
+              ? chunk.content.substring(0, 50)
+              : Array.isArray(chunk.content)
+                ? `Array[${chunk.content.length}]`
+                : chunk.content,
         });
 
         // Accept both "model" and "model_request" nodes
-        if ((metadata.langgraph_node === "model" || metadata.langgraph_node === "model_request") && chunk.content) {
+        if (
+          (metadata.langgraph_node === "model" ||
+            metadata.langgraph_node === "model_request") &&
+          chunk.content
+        ) {
           const content = Array.isArray(chunk.content)
             ? chunk.content.map((c) => ("text" in c ? c.text : "")).join("")
             : chunk.content;
 
           finalText += content;
-          
+
           // Store in Redis as we accumulate (with 1 hour TTL)
           await redis.setex(streamKey, 3600, finalText);
-          
+
           this.emitter.emitToken(conversationId, content);
           console.log("✅ Accumulated text length:", finalText.length);
         }
       }
 
-      console.log(`\n📊 Stream completed: ${chunkCount} chunks processed, finalText length: ${finalText.length}`);
+      console.log(
+        `\n📊 Stream completed: ${chunkCount} chunks processed, finalText length: ${finalText.length}`,
+      );
 
       // Retrieve from Redis as fallback if finalText is empty
       if (!finalText || finalText.trim() === "") {
@@ -99,7 +106,7 @@ export class AIOrchestratorService {
       }
 
       console.log("finalText: ", finalText);
-      
+
       // Clean up Redis after retrieval
       await redis.del(streamKey);
       // 7. Persist assistant message
