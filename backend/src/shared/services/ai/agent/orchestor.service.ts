@@ -37,6 +37,10 @@ export class AIOrchestratorService {
 
       const agent = this.agentFactory.createChatAgent();
 
+      /**
+       * Note: We use streamMode: "values" or "updates" to easily catch tool outputs.
+       * If staying with "messages", we check the node names in metadata.
+       */
       const stream = await agent.stream(
         { messages: formattedMessages },
         {
@@ -49,39 +53,57 @@ export class AIOrchestratorService {
       await redis.del(streamKey);
 
       let finalText = "";
-      let chunkCount = 0;
+      let sources: any[] = []; // Collector for UI-interactive data
 
       for await (const [chunk, metadata] of stream) {
-        chunkCount++;
+        // 1. CAPTURE TOOL OUTPUTS (Sources)
+        // In LangGraph, tool results usually come from a node named 'tools'
+        if (metadata.langgraph_node === "tools" && chunk.content) {
+          try {
+            const contentStr = Array.isArray(chunk.content)
+              ? chunk.content
+                  .map((c: any) => ("text" in c ? c.text : ""))
+                  .join("")
+              : chunk.content;
+            const toolData = JSON.parse(contentStr);
+            this.emitter.emitToken(conversationId, toolData);
 
-        // Accept both "model" and "model_request" nodes
+            if (toolData.emails && Array.isArray(toolData.emails)) {
+              sources.push(...toolData.emails);
+            }
+          } catch (e) {
+            console.warn(
+              "Tool output was not JSON, skipping source extraction",
+            );
+          }
+        }
+
+        // 2. CAPTURE ASSISTANT TEXT (Streaming)
         if (
           (metadata.langgraph_node === "model" ||
             metadata.langgraph_node === "model_request") &&
           chunk.content
         ) {
           const content = Array.isArray(chunk.content)
-            ? chunk.content.map((c) => ("text" in c ? c.text : "")).join("")
+            ? chunk.content
+                .map((c: any) => ("text" in c ? c.text : ""))
+                .join("")
             : chunk.content;
 
           finalText += content;
-
-          // Store in Redis as we accumulate (with 1 hour TTL)
           await redis.setex(streamKey, 3600, finalText);
-
           this.emitter.emitToken(conversationId, content);
         }
       }
 
       if (!finalText || finalText.trim() === "") {
         const cachedText = await redis.get(streamKey);
-        if (cachedText) {
-          finalText = cachedText;
-        }
+        if (cachedText) finalText = cachedText;
       }
 
-      // Clean up Redis after retrieval
       await redis.del(streamKey);
+
+      // 3. CREATE MESSAGE WITH METADATA
       const assistantMessage: ConversationMessage = {
         messageId: crypto.randomUUID(),
         conversationId,
@@ -91,18 +113,21 @@ export class AIOrchestratorService {
         status: "completed",
         createdAt: new Date(),
         updatedAt: new Date(),
+        metadata: {
+          toolCalls: sources.length > 0 ? sources : undefined,
+        },
       };
 
       await this.conversationService.createMessage(assistantMessage);
       this.emitter.emitComplete(conversationId, assistantMessage.messageId);
 
-      // Queue embedding generation for both user and assistant messages
       await addConversationEmbeddingsJob({
         conversationId,
         userId,
-        messageIds: [messageId, assistantMessage.messageId], // Both messages need embeddings
+        messageIds: [messageId, assistantMessage.messageId],
       });
     } catch (error: any) {
+      console.error("Orchestrator Error:", error);
       await this.conversationService.updateMessage(conversationId, messageId, {
         status: "failed",
         metadata: { errorMessage: error.message },
