@@ -17,12 +17,12 @@ router.post(
   summarizeThread,
 );
 
-router.post(
-  "/chat",
-  verifyAccessToken(),
-  validateRagChat,
-  verifyEmailOwnership,
-  ragChat,
-);
+// router.post(
+//   "/chat",
+//   verifyAccessToken(),
+//   validateRagChat,
+//   verifyEmailOwnership,
+//   ragChat,
+// );
 
 export default router;

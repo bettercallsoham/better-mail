@@ -62,27 +62,31 @@ export class ElasticsearchService {
       mappings: {
         dynamic: "strict",
         properties: {
+          // --- Identifiers ---
           id: { type: "keyword" },
           emailAddress: { type: "keyword" },
-          provider: { type: "keyword" },
 
+          // UPGRADE 1: Authorization list (handles shared emails/webhooks natively)
+          authorizedEmails: { type: "keyword" },
+
+          provider: { type: "keyword" },
           providerMessageId: { type: "keyword" },
           providerThreadId: { type: "keyword" },
-
           threadId: { type: "keyword" },
           isThreadRoot: { type: "boolean" },
 
+          // --- Dates ---
           receivedAt: { type: "date" },
           sentAt: { type: "date" },
           indexedAt: { type: "date" },
 
+          // --- Contacts ---
           from: {
             properties: {
               name: { type: "text" },
               email: { type: "keyword" },
             },
           },
-
           to: {
             type: "nested",
             properties: {
@@ -105,12 +109,28 @@ export class ElasticsearchService {
             },
           },
 
-          subject: { type: "text", analyzer: "email_search" },
-          bodyText: { type: "text", analyzer: "email_search" },
+          // --- Content (Optimized with copy_to) ---
+          subject: {
+            type: "text",
+            analyzer: "email_search",
+            copy_to: "searchText",
+          },
+          bodyText: {
+            type: "text",
+            analyzer: "email_search",
+            copy_to: "searchText",
+          },
           bodyHtml: { type: "text", index: false },
-          snippet: { type: "text", analyzer: "email_search" },
+          snippet: {
+            type: "text",
+            analyzer: "email_search",
+            copy_to: "searchText",
+          },
+
+          // UPGRADE 2: Centralized BM25 search field
           searchText: { type: "text", analyzer: "email_search" },
 
+          // --- Attachments ---
           hasAttachments: { type: "boolean" },
           attachments: {
             type: "nested",
@@ -123,15 +143,15 @@ export class ElasticsearchService {
             },
           },
 
+          // --- Metadata & State ---
           isRead: { type: "boolean" },
           isStarred: { type: "boolean" },
           isArchived: { type: "boolean" },
           isDeleted: { type: "boolean" },
-
           labels: { type: "keyword" },
           providerLabels: { type: "keyword" },
 
-          // ---- Drafts ----
+          // --- Drafts & Snooze ---
           isDraft: { type: "boolean" },
           draftData: {
             properties: {
@@ -139,15 +159,18 @@ export class ElasticsearchService {
               lastEditedAt: { type: "date" },
             },
           },
-
           inboxState: { type: "keyword" },
           snoozeUntil: { type: "date" },
 
+          // UPGRADE 3: High-speed quantized vectors (int8)
           embedding: {
             type: "dense_vector",
             dims: 1536,
             index: true,
             similarity: "cosine",
+            index_options: {
+              type: "int8_hnsw", // Use int8 for massive memory savings in 2026
+            },
           },
         },
       },
@@ -298,36 +321,32 @@ export class ElasticsearchService {
     });
   }
 
-  // --------------------
-  // Conversations index
-  // --------------------
-
+  /**
+   * Ensures the Conversations Index exists with 2026 Semantic Text capabilities.
+   */
   private async ensureConversationsIndex(): Promise<void> {
-    const exists = await this.client.indices.exists({
-      index: this.CONVERSATIONS_INDEX,
-    });
+    const indexName = this.CONVERSATIONS_INDEX;
+    const exists = await this.client.indices.exists({ index: indexName });
 
     if (exists) return;
 
     await this.client.indices.create({
-      index: this.CONVERSATIONS_INDEX,
+      index: indexName,
       settings: {
         number_of_shards: 2,
         number_of_replicas: 1,
-        // Sort by conversationId, createdAt, then messageId for efficient retrieval
-        "index.sort.field": ["conversationId", "createdAt", "messageId"],
-        "index.sort.order": ["asc", "asc", "asc"],
+        "index.sort.field": ["conversationId", "createdAt"],
+        "index.sort.order": ["asc", "asc"],
       },
       mappings: {
         dynamic: "strict",
         properties: {
-          // Identifiers
           messageId: { type: "keyword" },
           conversationId: { type: "keyword" },
           userId: { type: "keyword" },
+          role: { type: "keyword" },
 
-          // Content & Role
-          role: { type: "keyword" }, // "user" | "assistant" | "system"
+          // Optimized for instant indexing without waiting for Azure
           content: {
             type: "text",
             fields: {
@@ -335,64 +354,39 @@ export class ElasticsearchService {
             },
           },
 
+          embeddings: {
+            type: "dense_vector",
+            dims: 1536,
+            index: true,
+            similarity: "cosine",
+            index_options: {
+              type: "int8_hnsw",
+            },
+          },
+
           // Ordering & Status
-          sequence: { type: "integer" }, // Message order within conversation
-          status: { type: "keyword" }, // "queued" | "processing" | "completed" | "failed" | "cancelled"
+          sequence: { type: "integer" },
+          status: { type: "keyword" },
 
           // Timestamps
           createdAt: { type: "date" },
           updatedAt: { type: "date" },
           completedAt: { type: "date" },
 
-          // Vector embeddings for RAG search
-          embeddings: {
-            type: "dense_vector",
-            dims: 1536, // OpenAI embeddings dimension
-            index: true,
-            similarity: "cosine",
-          },
-
-          // Tool execution tracking
-          toolCalls: {
-            type: "nested",
-            properties: {
-              toolName: { type: "keyword" },
-              arguments: {
-                type: "object",
-                enabled: false, // Store but don't index
-              },
-              result: {
-                type: "object",
-                enabled: false,
-              },
-              status: { type: "keyword" }, // "running" | "completed" | "failed"
-              executionTimeMs: { type: "integer" },
-              timestamp: { type: "date" },
-            },
-          },
+          // Context & Threading
+          parentMessageId: { type: "keyword" },
 
           // Metadata
-          metadata: {
-            type: "object",
-            properties: {
-              model: { type: "keyword" },
-              tokensUsed: { type: "integer" },
-              promptTokens: { type: "integer" },
-              completionTokens: { type: "integer" },
-              processingTimeMs: { type: "integer" },
-              temperature: { type: "float" },
-              errorMessage: { type: "text" },
-            },
-          },
+          metadata: { type: "object", enabled: false },
 
-          // Context & Threading
-          parentMessageId: { type: "keyword" }, // For branching conversations
+          // Tool execution tracking
+          toolCalls: { type: "nested" },
 
           // Sources (email references, search results)
           sources: {
             type: "nested",
             properties: {
-              type: { type: "keyword" }, // "email" | "search" | "tool_result"
+              type: { type: "keyword" },
               emailId: { type: "keyword" },
               threadId: { type: "keyword" },
               relevanceScore: { type: "float" },
@@ -404,64 +398,39 @@ export class ElasticsearchService {
     });
   }
 
-  // --------------------
-  // Conversation Summaries index
-  // --------------------
-
+  /**
+   * Ensures the Conversation Summaries Index exists for high-level semantic retrieval.
+   */
   private async ensureConversationSummariesIndex(): Promise<void> {
-    const exists = await this.client.indices.exists({
-      index: this.CONVERSATION_SUMMARIES_INDEX,
-    });
+    const indexName = this.CONVERSATION_SUMMARIES_INDEX;
+    const exists = await this.client.indices.exists({ index: indexName });
 
     if (exists) return;
 
     await this.client.indices.create({
-      index: this.CONVERSATION_SUMMARIES_INDEX,
-      settings: {
-        number_of_shards: 1,
-        number_of_replicas: 1,
-      },
+      index: indexName,
       mappings: {
-        dynamic: "strict",
         properties: {
           conversationId: { type: "keyword" },
           userId: { type: "keyword" },
 
-          // Summary content
-          summary: {
+          title: {
             type: "text",
-            fields: {
-              keyword: { type: "keyword", ignore_above: 512 },
-            },
+            fields: { keyword: { type: "keyword" } },
           },
-          title: { type: "text" }, // Auto-generated conversation title
+          summary: { type: "text" },
 
-          // Summary embeddings for semantic search
+          // Optimized vector storage for summary search
           embeddings: {
             type: "dense_vector",
             dims: 1536,
             index: true,
             similarity: "cosine",
+            index_options: { type: "int8_hnsw" },
           },
 
-          // Stats
-          messageCount: { type: "integer" },
-          lastMessageAt: { type: "date" },
-
-          // Key topics/entities extracted
           topics: { type: "keyword" },
-          entities: {
-            type: "nested",
-            properties: {
-              type: { type: "keyword" }, // "person" | "email" | "date" | "action"
-              value: { type: "keyword" },
-              mentions: { type: "integer" },
-            },
-          },
-
-          // Timestamps
-          createdAt: { type: "date" },
-          updatedAt: { type: "date" },
+          lastMessageAt: { type: "date" },
         },
       },
     });

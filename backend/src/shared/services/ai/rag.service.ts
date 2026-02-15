@@ -1,137 +1,109 @@
-import { VectorSearchService } from "../elastic/vector-search.service";
-import { UnifiedEmailDocument } from "../elastic/interface";
 import { EmbeddingsService } from "./embeddings.service";
-import { logger } from "../../utils/logger";
+import {
+  SearchHit,
+  VectorSearchService,
+} from "../elastic/vector-search.service";
+import { UnifiedEmailDocument } from "../elastic/interface";
+import { getUserEmails } from "../../../apis/utils/email-helper";
 
-// ============================================
-// Types
-// ============================================
-
-export interface SearchFilters {
-  emailAddresses: string[];
-  dateFrom?: string;
-  dateTo?: string;
-  from?: string;
-  labels?: string[];
+export interface RAGResponse {
+  context: string;
+  raw: {
+    emails: any[];
+    conversations: any[];
+  };
 }
 
-export interface SearchResult {
-  email: UnifiedEmailDocument;
-  score: number;
-}
-
-// ============================================
-// RAG Service - Business Logic Layer
-// ============================================
-
-/**
- * RAG Service - Handles RAG search logic
- * Orchestrates embeddings generation + vector search + formatting
- */
 export class RAGService {
   constructor(
     private embeddingsService: EmbeddingsService,
     private vectorSearchService: VectorSearchService,
   ) {}
 
-  /**
-   * Search for similar emails using vector similarity
-   */
-  async searchSimilarEmails(
-    queryVector: number[],
-    filters: SearchFilters,
-    k: number = 10,
-  ): Promise<SearchResult[]> {
-    const { emailAddresses, dateFrom, dateTo, from, labels } = filters;
-
-    const must: any[] = [
-      { terms: { emailAddress: emailAddresses } },
-      { term: { isDeleted: false } },
-    ];
-
-    if (dateFrom || dateTo) {
-      const dateRange: any = {};
-      if (dateFrom) dateRange.gte = dateFrom;
-      if (dateTo) dateRange.lte = dateTo;
-      must.push({ range: { receivedAt: dateRange } });
-    }
-
-    if (from) {
-      must.push({ term: { "from.email": from } });
-    }
-
-    if (labels && labels.length > 0) {
-      must.push({ terms: { labels } });
-    }
-
-    try {
-      const result = await this.vectorSearchService.vectorSearch({
-        queryVector,
-        filters: { must },
-        k,
-        numCandidates: k * 10, // For better accuracy
-      });
-
-      return result.map((hit: any) => ({
-        email: hit._source as UnifiedEmailDocument,
-        score: hit._score || 0,
-      }));
-    } catch (error) {
-      logger.error("Vector search failed:", {
-        error: (error as Error).message,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Format emails into context for RAG
-   */
-  formatEmailContext(results: SearchResult[]): string {
-    if (results.length === 0) {
-      return "No relevant emails found.";
-    }
-
-    const formattedEmails = results.map((result, idx) => {
-      const email = result.email;
-      const date = new Date(email.receivedAt).toLocaleDateString();
-
-      return `
-Email ${idx + 1} (Relevance: ${(result.score * 100).toFixed(1)}%):
-From: ${email.from.name || email.from.email}
-To: ${email.to.map((t) => t.name || t.email).join(", ")}
-Date: ${date}
-Subject: ${email.subject}
-Content: ${email.bodyText?.slice(0, 500) || email.snippet || "No content"}
-${email.bodyText && email.bodyText.length > 500 ? "..." : ""}
----`.trim();
-    });
-
-    return formattedEmails.join("\n\n");
-  }
-
-  /**
-   * Complete RAG search: query → embedding → search → format
-   * This is the main method used by AI service
-   */
-  async searchAndFormatContext(
+  async getUnifiedContext(
     query: string,
-    filters: SearchFilters,
-    k: number = 5,
-  ): Promise<{ context: string; results: SearchResult[] }> {
-    logger.info(`RAG search for query: "${query.slice(0, 50)}..."`);
-
-    // Generate embedding
+    userId: string,
+    currentConvId: string,
+  ): Promise<RAGResponse> {
     const queryVector = await this.embeddingsService.generate(query);
 
-    // Search similar emails
-    const results = await this.searchSimilarEmails(queryVector, filters, k);
+    const { emails: verifiedEmails } = await getUserEmails(userId);
 
-    // Format for LLM context
-    const context = this.formatEmailContext(results);
+    const [emailHits, chatHits] = await Promise.all([
+      this.searchEmails(query, queryVector, verifiedEmails),
+      this.searchConversations(query, queryVector, userId, currentConvId),
+    ]);
 
-    logger.info(`Found ${results.length} relevant emails`);
+    // 4. Construct Context
+    const context = [
+      "RELEVANT EMAIL DATA: ",
+      emailHits.length > 0
+        ? this.formatEmails(emailHits)
+        : "No relevant emails found.",
+      "\nRELEVANT PAST CHAT HISTORY : ",
+      chatHits.length > 0
+        ? this.formatChats(chatHits)
+        : "No relevant past conversations found.",
+    ].join("\n");
 
-    return { context, results };
+    return {
+      context,
+      raw: { emails: emailHits, conversations: chatHits },
+    };
+  }
+
+  private async searchEmails(
+    query: string,
+    vector: number[],
+    verifiedEmails: string[],
+  ) {
+    return this.vectorSearchService.hybridSearch<UnifiedEmailDocument>({
+      index: "emails_v1",
+      queryText: query,
+      queryVector: vector,
+      filterMust: [
+        { terms: { emailAddress: verifiedEmails } },
+        { term: { isDeleted: false } },
+      ],
+      k: 5,
+    });
+  }
+
+  private async searchConversations(
+    query: string,
+    vector: number[],
+    userId: string,
+    excludeId: string,
+  ) {
+    return this.vectorSearchService.hybridSearch<any>({
+      index: "conversations",
+      queryText: query,
+      queryVector: vector,
+      filterMust: [
+        { term: { userId: userId } },
+        { bool: { must_not: { term: { conversationId: excludeId } } } },
+      ],
+      k: 3,
+    });
+  }
+
+  private formatEmails(hits: SearchHit<UnifiedEmailDocument>[]): string {
+    return hits
+      .map(
+        (h, i) =>
+          `Email ${i + 1} [Score: ${h._score.toFixed(2)}]:\n` +
+          `From: ${h._source.from.email} | Subject: ${h._source.subject}\n` +
+          `Snippet: ${h._source.snippet}\n---`,
+      )
+      .join("\n");
+  }
+
+  private formatChats(hits: SearchHit<any>[]): string {
+    return hits
+      .map(
+        (h) =>
+          `[Past Chat ${h._source.conversationId.slice(0, 6)}] ${h._source.role}: ${h._source.content}`,
+      )
+      .join("\n");
   }
 }

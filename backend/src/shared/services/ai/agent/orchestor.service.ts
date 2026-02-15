@@ -32,12 +32,7 @@ export class AIOrchestratorService {
       const { summary, messages: history } =
         await this.conversationService.getConversationContext(conversationId);
 
-      console.log("summary :", summary);
-      console.log("messages :", history);
-
       const formattedMessages = buildContext({ summary, messages: history });
-
-      console.log("formatted Messages :", formattedMessages);
 
       const agent = this.agentFactory.createChatAgent();
 
@@ -49,28 +44,15 @@ export class AIOrchestratorService {
         },
       );
 
-      // Redis key to store streaming text
       const streamKey = `stream:${conversationId}:${userId}:${messageId}`;
-      await redis.del(streamKey); // Clear any previous data
+      await redis.del(streamKey);
 
       let finalText = "";
       let chunkCount = 0;
 
-      // Iterate through the stream
       for await (const [chunk, metadata] of stream) {
         chunkCount++;
-        console.log(`\n🔍 Chunk #${chunkCount}:`, {
-          node: metadata.langgraph_node,
-          hasContent: !!chunk.content,
-          contentType: typeof chunk.content,
-          contentPreview:
-            typeof chunk.content === "string"
-              ? chunk.content.substring(0, 50)
-              : Array.isArray(chunk.content)
-                ? `Array[${chunk.content.length}]`
-                : chunk.content,
-        });
-
+      
         // Accept both "model" and "model_request" nodes
         if (
           (metadata.langgraph_node === "model" ||
@@ -87,29 +69,22 @@ export class AIOrchestratorService {
           await redis.setex(streamKey, 3600, finalText);
 
           this.emitter.emitToken(conversationId, content);
-          console.log("✅ Accumulated text length:", finalText.length);
         }
       }
 
-      console.log(
-        `\n📊 Stream completed: ${chunkCount} chunks processed, finalText length: ${finalText.length}`,
-      );
+    
 
-      // Retrieve from Redis as fallback if finalText is empty
       if (!finalText || finalText.trim() === "") {
-        console.log("⚠️ finalText is empty, retrieving from Redis...");
         const cachedText = await redis.get(streamKey);
         if (cachedText) {
           finalText = cachedText;
-          console.log("✅ Retrieved from Redis, length:", finalText.length);
+
         }
       }
 
-      console.log("finalText: ", finalText);
 
       // Clean up Redis after retrieval
       await redis.del(streamKey);
-      // 7. Persist assistant message
       const assistantMessage: ConversationMessage = {
         messageId: crypto.randomUUID(),
         conversationId,
