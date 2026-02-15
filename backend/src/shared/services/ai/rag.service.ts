@@ -76,7 +76,7 @@ export class RAGService {
     excludeId: string,
   ) {
     return this.vectorSearchService.hybridSearch<any>({
-      index: "conversations",
+      index: "conversations_v1",
       queryText: query,
       queryVector: vector,
       filterMust: [
