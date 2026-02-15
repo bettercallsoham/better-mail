@@ -6,6 +6,8 @@ export { outlookSyncQueue } from "./sync-outlook.queue";
 
 export { searchHistoryQueue } from "./search-history.queue";
 
+export { conversationEmbeddingsQueue } from "./generate-conversation-embeddings.queue";
+
 export const QUEUE_NAMES = {
   MAILBOX_CONNECTION: "mailbox-connection",
   GMAIL_WEBHOOK: "gmail-webhook",
@@ -13,4 +15,5 @@ export const QUEUE_NAMES = {
   GMAIL_SYNC: "gmail-sync",
   OUTLOOK_SYNC: "outlook-sync",
   SEARCH_HISTORY: "search-history",
+  CONVERSATION_EMBEDDINGS: "conversation-embeddings-queue",
 } as const;

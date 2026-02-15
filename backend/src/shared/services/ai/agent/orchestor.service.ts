@@ -6,6 +6,7 @@ import { AgentFactory } from "./AgentsFactory";
 import { AIEmitter } from "./AIEmitter";
 import { buildContext } from "./helper";
 import { redis } from "../../../config/redis";
+import { addConversationEmbeddingsJob } from "../../../queues/generate-conversation-embeddings.queue";
 
 interface ProcessMessageInput {
   conversationId: string;
@@ -26,7 +27,7 @@ export class AIOrchestratorService {
 
     try {
       await this.conversationService.updateMessage(conversationId, messageId, {
-        status: "processing",
+        status: "completed",
       });
 
       const { summary, messages: history } =
@@ -52,7 +53,7 @@ export class AIOrchestratorService {
 
       for await (const [chunk, metadata] of stream) {
         chunkCount++;
-      
+
         // Accept both "model" and "model_request" nodes
         if (
           (metadata.langgraph_node === "model" ||
@@ -72,16 +73,12 @@ export class AIOrchestratorService {
         }
       }
 
-    
-
       if (!finalText || finalText.trim() === "") {
         const cachedText = await redis.get(streamKey);
         if (cachedText) {
           finalText = cachedText;
-
         }
       }
-
 
       // Clean up Redis after retrieval
       await redis.del(streamKey);
@@ -98,6 +95,13 @@ export class AIOrchestratorService {
 
       await this.conversationService.createMessage(assistantMessage);
       this.emitter.emitComplete(conversationId, assistantMessage.messageId);
+
+      // Queue embedding generation for both user and assistant messages
+      await addConversationEmbeddingsJob({
+        conversationId,
+        userId,
+        messageIds: [messageId, assistantMessage.messageId], // Both messages need embeddings
+      });
     } catch (error: any) {
       await this.conversationService.updateMessage(conversationId, messageId, {
         status: "failed",

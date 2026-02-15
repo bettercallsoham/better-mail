@@ -40,6 +40,11 @@ export interface ConversationSummary {
   updatedAt: Date;
 }
 
+export interface PaginatedMessages {
+  messages: ConversationMessage[];
+  nextCursor: any[] | null;
+}
+
 // ============================================
 // Service
 // ============================================
@@ -48,7 +53,7 @@ export class ConversationService {
   private readonly client: Client;
   private readonly CONVERSATIONS_INDEX = "conversations_v1";
   private readonly SUMMARIES_INDEX = "conversation_summaries_v1";
-  private readonly CACHE_TTL = 300;
+  private readonly CACHE_TTL = 300; // 5 minutes
 
   constructor(client: Client) {
     this.client = client;
@@ -68,9 +73,10 @@ export class ConversationService {
         updatedAt: message.updatedAt.toISOString(),
         completedAt: message.completedAt?.toISOString(),
       },
-      refresh: "wait_for", // Wait for refresh so message is immediately searchable
+      refresh: "wait_for", // Crucial for conversational consistency
     });
 
+    // Invalidate list cache
     await redis.del(this.getCacheKey(message.conversationId));
   }
 
@@ -84,7 +90,6 @@ export class ConversationService {
         updatedAt: summary.updatedAt.toISOString(),
         lastMessageAt: summary.lastMessageAt.toISOString(),
       },
-      refresh: false,
     });
 
     await redis.setex(
@@ -95,24 +100,24 @@ export class ConversationService {
   }
 
   // ============================================
-  // READ
+  // READ (Paginated & Optimized)
   // ============================================
 
+  /**
+   * Fetches latest messages using search_after for infinite scroll support.
+   */
   async getRecentMessages(
     conversationId: string,
-    limit: number = 20,
-    includeIncomplete: boolean = false,
-  ): Promise<ConversationMessage[]> {
-    const cacheKey = this.getCacheKey(conversationId);
-    const cached = await redis.get(cacheKey);
+    params: {
+      limit?: number;
+      cursor?: any[];
+      includeIncomplete?: boolean;
+    } = {},
+  ): Promise<PaginatedMessages> {
+    const { limit = 10, cursor, includeIncomplete = true } = params;
 
-    if (cached) {
-      const messages: ConversationMessage[] = JSON.parse(cached);
-      return messages.slice(-limit);
-    }
-
+    
     const mustConditions: any[] = [{ term: { conversationId } }];
-
     if (!includeIncomplete) {
       mustConditions.push({ term: { status: "completed" } });
     }
@@ -121,24 +126,44 @@ export class ConversationService {
       index: this.CONVERSATIONS_INDEX,
       _source_excludes: ["embeddings"],
       body: {
+        size: limit,
         query: {
           bool: { must: mustConditions },
         },
+        // Sort DESC to get the latest messages first
         sort: [
-          { createdAt: "asc" },
-          { messageId: "asc" }, // Use messageId (keyword field) as tie-breaker
+          { createdAt: "desc" },
+          { messageId: "asc" }, // Tie-breaker for millisecond collisions
         ],
-        size: 1000, // fetch reasonably sized batch for cache
+        ...(cursor && { search_after: cursor }),
       },
     });
 
-    const messages = result.hits.hits.map((hit: any) =>
-      this.parseMessage(hit._source),
-    );
+    const hits = result.hits.hits;
 
-    await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(messages));
+    // Reverse hits to return them in chronological order (Old -> New)
+    const messages = hits
+      .map((hit: any) => this.parseMessage(hit._source))
+      .reverse();
 
-    return messages.slice(-limit);
+    // The 'sort' array of the last hit is the cursor for the next page
+    const nextCursor =
+      hits.length === limit && hits.length > 0 ? (hits[hits.length - 1].sort as any[]) : null;
+
+    return { messages, nextCursor };
+  }
+
+  async getConversationContext(conversationId: string) {
+    const [summary, paginated] = await Promise.all([
+      this.getSummary(conversationId),
+      this.getRecentMessages(conversationId, { limit: 15 }),
+    ]);
+
+    return {
+      summary,
+      messages: paginated.messages,
+      nextCursor: paginated.nextCursor,
+    };
   }
 
   async getSummary(
@@ -146,7 +171,6 @@ export class ConversationService {
   ): Promise<ConversationSummary | null> {
     const cacheKey = `summary:${conversationId}`;
     const cached = await redis.get(cacheKey);
-
     if (cached) return JSON.parse(cached);
 
     try {
@@ -154,11 +178,8 @@ export class ConversationService {
         index: this.SUMMARIES_INDEX,
         id: conversationId,
       });
-
       const summary = this.parseSummary(result._source);
-
       await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(summary));
-
       return summary;
     } catch (error: any) {
       if (error.meta?.statusCode === 404) return null;
@@ -172,21 +193,11 @@ export class ConversationService {
         index: this.CONVERSATIONS_INDEX,
         id: messageId,
       });
-
       return this.parseMessage(result._source);
     } catch (error: any) {
       if (error.meta?.statusCode === 404) return null;
       throw error;
     }
-  }
-
-  async getConversationContext(conversationId: string) {
-    const [summary, messages] = await Promise.all([
-      this.getSummary(conversationId),
-      this.getRecentMessages(conversationId, 10, true), // Include incomplete messages
-    ]);
-
-    return { summary, messages };
   }
 
   // ============================================
@@ -208,7 +219,6 @@ export class ConversationService {
 
     if (updates.status) {
       doc.status = updates.status;
-
       if (["completed", "failed", "cancelled"].includes(updates.status)) {
         doc.completedAt = new Date().toISOString();
       }
@@ -221,7 +231,6 @@ export class ConversationService {
       index: this.CONVERSATIONS_INDEX,
       id: messageId,
       doc,
-      refresh: false,
     });
 
     await redis.del(this.getCacheKey(conversationId));

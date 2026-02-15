@@ -8,28 +8,49 @@ const searchEmailsSchema = z.object({
   query: z
     .string()
     .describe(
-      "Search query text. Can be natural language like 'emails from John'",
+      "Search query with keywords. Use this for general searches like 'google', 'apollo', 'project update', etc. Do NOT use filter syntax here.",
     ),
   filters: z
     .object({
-      isRead: z.boolean().optional(),
-      isStarred: z.boolean().optional(),
-      isArchived: z.boolean().optional(),
-      hasAttachments: z.boolean().optional(),
-      from: z.string().optional(),
-      to: z.string().optional(),
-      labels: z.array(z.string()).optional(),
-      dateFrom: z.string().optional(),
-      dateTo: z.string().optional(),
+      isRead: z.boolean().optional().describe("Filter by read/unread status"),
+      isStarred: z.boolean().optional().describe("Filter by starred status"),
+      isArchived: z.boolean().optional().describe("Filter by archived status"),
+      hasAttachments: z
+        .boolean()
+        .optional()
+        .describe("Filter emails with attachments"),
+      from: z
+        .string()
+        .optional()
+        .describe(
+          "Filter by COMPLETE sender email address only (e.g., 'john@company.com'). Do NOT use partial matches or domains.",
+        ),
+      to: z.string().optional().describe("Filter by recipient email address"),
+      labels: z
+        .array(z.string())
+        .optional()
+        .describe("Filter by email labels/tags"),
+      dateFrom: z
+        .string()
+        .optional()
+        .describe("Filter emails from this date (ISO format)"),
+      dateTo: z
+        .string()
+        .optional()
+        .describe("Filter emails until this date (ISO format)"),
     })
-    .optional(),
+    .optional()
+    .describe(
+      "Optional filters - use ONLY when you have complete, specific information. For general searches, use keywords in the query field instead.",
+    ),
   limit: z.number().default(5).describe("Number of results (max 10)"),
 });
 
 // Define the tool
 export const searchEmailsTool = tool(
   async (input, runtime: ToolRuntime) => {
-    const { userId } = runtime.context as { userId: string }; 
+    console.log("inside searchEmailTool with ", input);
+    const { userId } = runtime.context as { userId: string }; // Type assertion for context
     const elasticService = new ElasticsearchService(elasticClient);
 
     try {
@@ -66,7 +87,7 @@ export const searchEmailsTool = tool(
   {
     name: "search_emails",
     description:
-      "Search through user's emails using filters like 'from', 'date', or 'unread'.",
+      "Search through user's emails. Use the 'query' field for keyword searches like 'google', 'apollo', 'project update'. Use 'filters' ONLY for complete, specific information like exact email addresses or date ranges.",
     schema: searchEmailsSchema,
   },
 );

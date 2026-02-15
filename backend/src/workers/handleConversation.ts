@@ -6,12 +6,13 @@ import { elasticClient } from "../shared/config/elastic";
 import { AgentFactory } from "../shared/services/ai/agent/AgentsFactory";
 import { AIEmitter } from "../shared/services/ai/agent/AIEmitter";
 import { logger } from "../shared/utils/logger";
+import { conversationQueue } from "../shared/queues/conversation.queue";
 
 interface ProcessConversationMessageJob {
   conversationId: string;
   userId: string;
   messageId: string;
-  messageContent:string;
+  messageContent: string;
 }
 
 // Initialize services
@@ -25,9 +26,9 @@ const orchestrator = new AIOrchestratorService(
 );
 
 export const conversationWorker = new Worker<ProcessConversationMessageJob>(
-  "conversation-queue",
+  conversationQueue.name,
   async (job: Job<ProcessConversationMessageJob>) => {
-    const { conversationId, userId, messageId , messageContent} = job.data;
+    const { conversationId, userId, messageId, messageContent } = job.data;
 
     logger.info(`Processing conversation message`, {
       conversationId,
@@ -42,7 +43,7 @@ export const conversationWorker = new Worker<ProcessConversationMessageJob>(
         conversationId,
         userId,
         messageId,
-        messageContent
+        messageContent,
       });
 
       logger.info(`Successfully processed conversation message`, {

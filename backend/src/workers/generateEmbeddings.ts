@@ -30,9 +30,6 @@ async function processEmbedding(job: Job<EmbeddingJobData>) {
   const { emailAddress, provider, providerMessageId } = job.data;
   const compositeId = `${provider}_${providerMessageId}`;
 
-  logger.info(`Generating embedding for: ${compositeId}`);
-
-  // Fetch email from Elasticsearch
   const email = await elasticService.getEmailById(compositeId);
 
   if (!email) {

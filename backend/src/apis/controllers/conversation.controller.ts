@@ -2,24 +2,19 @@ import { Request, Response } from "express";
 import { validationResult } from "express-validator";
 import createHttpError from "http-errors";
 import { asyncHandler } from "../utils/asyncHandler";
-import { ConversationService } from "../../shared/services/elastic/conversation.service";
+import { ConversationService, ConversationMessage } from "../../shared/services/elastic/conversation.service";
 import { elasticClient } from "../../shared/config/elastic";
 import { addConversationMessageJob } from "../../shared/queues/conversation.queue";
-import { ConversationMessage } from "../../shared/services/elastic/conversation.service";
 
 const conversationService = new ConversationService(elasticClient);
 
 /**
  * POST /conversations
- * Create a new conversation
  */
 export const createConversation = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
-
-    if (!userId) {
-      throw createHttpError(401, "User not authenticated");
-    }
+    if (!userId) throw createHttpError(401, "User not authenticated");
 
     const conversationId = crypto.randomUUID();
 
@@ -34,28 +29,20 @@ export const createConversation = asyncHandler(
 
 /**
  * POST /conversations/:conversationId/messages
- * Create a new message and queue for AI processing
  */
 export const createMessage = asyncHandler(
   async (req: Request, res: Response) => {
-    // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      throw createHttpError(400, "Validation failed", {
-        errors: errors.array(),
-      });
+      throw createHttpError(400, "Validation failed", { errors: errors.array() });
     }
 
-    const conversationId = req.params.conversationId as string;
+    const { conversationId } = req.params;
     const { content } = req.body;
     const userId = req.user?.id;
 
-    console.log("content :", content);
-    if (!userId) {
-      throw createHttpError(401, "User not authenticated");
-    }
+    if (!userId || !conversationId || Array.isArray(conversationId)) throw createHttpError(401, "User not authenticated");
 
-    // Create user message in Elasticsearch (status: queued)
     const messageId = crypto.randomUUID();
     const userMessage: ConversationMessage = {
       messageId,
@@ -68,9 +55,10 @@ export const createMessage = asyncHandler(
       updatedAt: new Date(),
     };
 
+    // Index the user's message immediately so it appears in the UI
     await conversationService.createMessage(userMessage);
 
-    // Add job to BullMQ for async processing
+    // Queue for AI Orchestration
     await addConversationMessageJob({
       conversationId,
       userId,
@@ -78,35 +66,39 @@ export const createMessage = asyncHandler(
       messageContent: content,
     });
 
-    // Return immediately with 202 Accepted
     return res.status(202).json({
       messageId,
       conversationId,
       status: "queued",
-      message: "Message queued for processing",
     });
   },
-  "createMesage",
+  "createMessage",
 );
 
 /**
  * GET /conversations/:conversationId/messages
- * Get all messages in a conversation
+ * Support for cursor-based infinite scroll
  */
 export const getMessages = asyncHandler(async (req: Request, res: Response) => {
-  const conversationId = req.params.conversationId as string;
+  const { conversationId } = req.params;
   const userId = req.user?.id;
 
-  if (!userId) {
-    throw createHttpError(401, "User not authenticated");
-  }
+  if (!userId || !conversationId || Array.isArray(conversationId)) throw createHttpError(401, "User not authenticated");
 
-  const { messages } =
-    await conversationService.getConversationContext(conversationId);
+  // PRINCIPAL UPGRADE: Parse cursor and limit from query params
+  const limit = parseInt(req.query.limit as string) || 15;
+  const cursor = req.query.cursor ? JSON.parse(req.query.cursor as string) : undefined;
+
+  // We use getRecentMessages directly for paginated historical lookups
+  const { messages, nextCursor } = await conversationService.getRecentMessages(
+    conversationId,
+    { limit, cursor, includeIncomplete: true }
+  );
 
   return res.status(200).json({
     conversationId,
     messages,
+    nextCursor: nextCursor ? JSON.stringify(nextCursor) : null,
     total: messages.length,
   });
-}, "getMessage");
+}, "getMessages");

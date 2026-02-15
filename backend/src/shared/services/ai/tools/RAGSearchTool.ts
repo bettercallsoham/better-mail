@@ -5,17 +5,13 @@ import { VectorSearchService } from "../../elastic/vector-search.service";
 import { EmbeddingsService } from "../embeddings.service";
 import { RAGService } from "../rag.service";
 
-// Define the schema for the LLM
 const ragSearchSchema = z.object({
   query: z
     .string()
     .describe(
-      "The natural language query to search for context, e.g., 'What did John say about the project budget?'",
+      "Natural language query for semantic reasoning (e.g. 'Summarize Google security alerts')",
     ),
-  limit: z
-    .number()
-    .default(5)
-    .describe("Number of context pieces to retrieve."),
+  limit: z.number().default(5),
 });
 
 /**
@@ -51,8 +47,7 @@ export const unifiedRAGTool = tool(
   {
     name: "search_knowledge_and_history",
     description:
-      "Use this tool when the user asks a question that requires information from their emails or past conversations. " +
-      "It performs a semantic search to find the most relevant historical facts.",
+      "Best for: Summarizing topics, 'What'/'How' questions, and finding info across chats when user query isn't complete and emails.",
     schema: ragSearchSchema,
   },
 );

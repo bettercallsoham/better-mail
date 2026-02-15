@@ -4,11 +4,6 @@ import {
 } from "../../config/llm";
 import { logger } from "../../utils/logger";
 
-/**
- * Embeddings Service - Pure ML transformation layer
- * Single Responsibility: Text → Vector
- * No business logic, no search logic, just OpenAI API calls
- */
 export class EmbeddingsService {
   /**
    * Generate embedding vector for a single text
