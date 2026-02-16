@@ -1,10 +1,6 @@
 import { Client } from "@elastic/elasticsearch";
 import { redis } from "../../config/redis";
 
-// ============================================
-// Types
-// ============================================
-
 export interface ConversationMessage {
   messageId: string;
   conversationId: string;
@@ -17,21 +13,18 @@ export interface ConversationMessage {
   completedAt?: Date;
   embeddings?: number[];
 
-  // ✅ FIX: Change 'metadata' and add 'toolCalls' as a top-level field
   metadata?: {
     model?: string;
     tokensUsed?: number;
     processingTimeMs?: number;
   };
 
-  // ✅ Matches your ES Mapping: toolCalls { toolName, output }
   toolCalls?: Array<{
     toolName: string;
     input?: any;
     output?: any;
   }>;
 
-  // ✅ Matches your ES Mapping: sources { emailId, snippet... }
   sources?: Array<{
     type: string;
     emailId?: string;
@@ -56,10 +49,6 @@ export interface PaginatedMessages {
   nextCursor: any[] | null;
 }
 
-// ============================================
-// Service
-// ============================================
-
 export class ConversationService {
   private readonly client: Client;
   private readonly CONVERSATIONS_INDEX = "conversations_v1";
@@ -69,10 +58,6 @@ export class ConversationService {
   constructor(client: Client) {
     this.client = client;
   }
-
-  // ============================================
-  // CREATE
-  // ============================================
 
   async createMessage(message: ConversationMessage): Promise<void> {
     await this.client.index({
@@ -84,10 +69,9 @@ export class ConversationService {
         updatedAt: message.updatedAt.toISOString(),
         completedAt: message.completedAt?.toISOString(),
       },
-      refresh: "wait_for", // Crucial for conversational consistency
+      refresh: "wait_for",
     });
 
-    // Invalidate list cache
     await redis.del(this.getCacheKey(message.conversationId));
   }
 
@@ -110,13 +94,6 @@ export class ConversationService {
     );
   }
 
-  // ============================================
-  // READ (Paginated & Optimized)
-  // ============================================
-
-  /**
-   * Fetches latest messages using search_after for infinite scroll support.
-   */
   async getRecentMessages(
     conversationId: string,
     params: {
@@ -141,22 +118,17 @@ export class ConversationService {
           bool: { must: mustConditions },
         },
         // Sort DESC to get the latest messages first
-        sort: [
-          { createdAt: "desc" },
-          { messageId: "asc" }, // Tie-breaker for millisecond collisions
-        ],
+        sort: [{ createdAt: "desc" }, { messageId: "asc" }],
         ...(cursor && { search_after: cursor }),
       },
     });
 
     const hits = result.hits.hits;
 
-    // Reverse hits to return them in chronological order (Old -> New)
     const messages = hits
       .map((hit: any) => this.parseMessage(hit._source))
       .reverse();
 
-    // The 'sort' array of the last hit is the cursor for the next page
     const nextCursor =
       hits.length === limit && hits.length > 0
         ? (hits[hits.length - 1].sort as any[])
@@ -172,7 +144,8 @@ export class ConversationService {
     ]);
 
     return {
-      summary,
+      title: summary?.title || "New Conversation",
+      summary: summary?.summary,
       messages: paginated.messages,
       nextCursor: paginated.nextCursor,
     };
@@ -212,10 +185,6 @@ export class ConversationService {
     }
   }
 
-  // ============================================
-  // UPDATE
-  // ============================================
-
   async updateMessage(
     conversationId: string,
     messageId: string,
@@ -248,10 +217,6 @@ export class ConversationService {
     await redis.del(this.getCacheKey(conversationId));
   }
 
-  // ============================================
-  // UTILITIES
-  // ============================================
-
   private getCacheKey(conversationId: string): string {
     return `conversation:${conversationId}:messages`;
   }
@@ -274,5 +239,32 @@ export class ConversationService {
       updatedAt: new Date(source.updatedAt),
       lastMessageAt: new Date(source.lastMessageAt),
     };
+  }
+
+  async getUserConversations(
+    userId: string,
+    params: { limit?: number; cursor?: any[] } = {},
+  ): Promise<{ summaries: ConversationSummary[]; nextCursor: any[] | null }> {
+    const { limit = 20, cursor } = params;
+
+    const result = await this.client.search({
+      index: this.SUMMARIES_INDEX,
+      body: {
+        size: limit,
+        query: {
+          bool: { must: [{ term: { userId } }] },
+        },
+        sort: [{ lastMessageAt: "desc" }, { conversationId: "asc" }],
+        ...(cursor && { search_after: cursor }),
+      },
+    });
+
+    const hits = result.hits.hits;
+    const summaries = hits.map((hit: any) => this.parseSummary(hit._source));
+
+    const nextCursor =
+      hits.length === limit ? (hits[hits.length - 1].sort as any[]) : null;
+
+    return { summaries, nextCursor };
   }
 }

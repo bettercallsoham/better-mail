@@ -38,7 +38,6 @@ export const conversationWorker = new Worker<ProcessConversationMessageJob>(
     });
 
     try {
-      // Call the AI orchestrator to process the message
       await orchestrator.processMessage({
         conversationId,
         userId,

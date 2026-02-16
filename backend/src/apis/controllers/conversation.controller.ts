@@ -2,7 +2,10 @@ import { Request, Response } from "express";
 import { validationResult } from "express-validator";
 import createHttpError from "http-errors";
 import { asyncHandler } from "../utils/asyncHandler";
-import { ConversationService, ConversationMessage } from "../../shared/services/elastic/conversation.service";
+import {
+  ConversationService,
+  ConversationMessage,
+} from "../../shared/services/elastic/conversation.service";
 import { elasticClient } from "../../shared/config/elastic";
 import { addConversationMessageJob } from "../../shared/queues/conversation.queue";
 
@@ -34,14 +37,17 @@ export const createMessage = asyncHandler(
   async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      throw createHttpError(400, "Validation failed", { errors: errors.array() });
+      throw createHttpError(400, "Validation failed", {
+        errors: errors.array(),
+      });
     }
 
     const { conversationId } = req.params;
     const { content } = req.body;
     const userId = req.user?.id;
 
-    if (!userId || !conversationId || Array.isArray(conversationId)) throw createHttpError(401, "User not authenticated");
+    if (!userId || !conversationId || Array.isArray(conversationId))
+      throw createHttpError(401, "User not authenticated");
 
     const messageId = crypto.randomUUID();
     const userMessage: ConversationMessage = {
@@ -55,10 +61,8 @@ export const createMessage = asyncHandler(
       updatedAt: new Date(),
     };
 
-    // Index the user's message immediately so it appears in the UI
     await conversationService.createMessage(userMessage);
 
-    // Queue for AI Orchestration
     await addConversationMessageJob({
       conversationId,
       userId,
@@ -76,6 +80,32 @@ export const createMessage = asyncHandler(
 );
 
 /**
+ * GET /conversations
+ * Retrieve all conversation summaries for the authenticated user
+ */
+export const getConversations = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) throw createHttpError(401, "User not authenticated");
+
+    const limit = parseInt(req.query.limit as string) || 20;
+    const cursor = req.query.cursor
+      ? JSON.parse(req.query.cursor as string)
+      : undefined;
+
+    const { summaries, nextCursor } =
+      await conversationService.getUserConversations(userId, { limit, cursor });
+
+    return res.status(200).json({
+      summaries,
+      nextCursor: nextCursor ? JSON.stringify(nextCursor) : null,
+      total: summaries.length,
+    });
+  },
+  "getConversations",
+);
+
+/**
  * GET /conversations/:conversationId/messages
  * Support for cursor-based infinite scroll
  */
@@ -83,16 +113,17 @@ export const getMessages = asyncHandler(async (req: Request, res: Response) => {
   const { conversationId } = req.params;
   const userId = req.user?.id;
 
-  if (!userId || !conversationId || Array.isArray(conversationId)) throw createHttpError(401, "User not authenticated");
+  if (!userId || !conversationId || Array.isArray(conversationId))
+    throw createHttpError(401, "User not authenticated");
 
-  // PRINCIPAL UPGRADE: Parse cursor and limit from query params
   const limit = parseInt(req.query.limit as string) || 15;
-  const cursor = req.query.cursor ? JSON.parse(req.query.cursor as string) : undefined;
+  const cursor = req.query.cursor
+    ? JSON.parse(req.query.cursor as string)
+    : undefined;
 
-  // We use getRecentMessages directly for paginated historical lookups
   const { messages, nextCursor } = await conversationService.getRecentMessages(
     conversationId,
-    { limit, cursor, includeIncomplete: true }
+    { limit, cursor, includeIncomplete: true },
   );
 
   return res.status(200).json({
