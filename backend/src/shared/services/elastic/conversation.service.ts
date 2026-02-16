@@ -17,12 +17,14 @@ export interface ConversationMessage {
     model?: string;
     tokensUsed?: number;
     processingTimeMs?: number;
+    userDecision?: string;
   };
 
   toolCalls?: Array<{
     toolName: string;
     input?: any;
     output?: any;
+    status?: string;
   }>;
 
   sources?: Array<{
@@ -53,8 +55,8 @@ export class ConversationService {
   private readonly client: Client;
   private readonly CONVERSATIONS_INDEX = "conversations_v1";
   private readonly SUMMARIES_INDEX = "conversation_summaries_v1";
-  private readonly CACHE_TTL = 300; // 5 minutes
-
+  private readonly CACHE_TTL = 300;
+  
   constructor(client: Client) {
     this.client = client;
   }

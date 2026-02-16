@@ -1,4 +1,5 @@
 import { Command } from "@langchain/langgraph";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import {
   ConversationMessage,
   ConversationService,
@@ -8,7 +9,6 @@ import { AIEmitter } from "./AIEmitter";
 import { buildContext } from "./helper";
 import { gpt41LLM } from "../../../config/llm";
 import crypto from "crypto";
-import { HumanMessage, SystemMessage } from "langchain";
 
 export class AIOrchestratorService {
   constructor(
@@ -28,28 +28,48 @@ export class AIOrchestratorService {
 
     try {
       const agent = await this.agentFactory.createChatAgent();
-      const state = (await Promise.resolve(agent.getState(config))) as any;
-
-      // Determine if this is the first message to trigger title generation
-      const isFirstMessage =
-        !state.values?.messages || state.values.messages.length === 0;
+      const state = (await agent.getState(config)) as any;
       const isInterrupted = state.next && state.next.length > 0;
 
       let stream;
       if (isInterrupted) {
-        // Conversational resume: LLM interprets user intent (approve/reject/edit)
-        stream = await agent.stream(new Command({ resume: messageContent }), {
-          ...config,
-          streamMode: ["messages", "updates"],
-        });
+        // 1. CHECK FOR PENDING TOOL CALLS
+        const lastMessage =
+          state.values?.messages?.[state.values.messages.length - 1];
+        const hasToolCalls = lastMessage?.tool_calls?.length > 0;
+
+        // 2. TRANSLATE NATURAL LANGUAGE TO DECISION
+        // If there are pending tool calls, LangGraph middleware REQUIRES the 'decisions' format.
+        if (hasToolCalls) {
+          const isPositive = /yes|approve|do it|proceed|go ahead|delete/i.test(
+            messageContent,
+          );
+
+          stream = await agent.stream(
+            new Command({
+              resume: {
+                decisions: lastMessage.tool_calls.map(() => ({
+                  type: isPositive ? "approve" : "reject",
+                })),
+              },
+            }),
+            { ...config, streamMode: ["messages", "updates"] },
+          );
+        } else {
+          // Fallback for non-tool interrupts
+          stream = await agent.stream(new Command({ resume: messageContent }), {
+            ...config,
+            streamMode: ["messages", "updates"],
+          });
+        }
       } else {
+        // Standard flow (New Turn)
         const { summary, messages: history } =
           await this.conversationService.getConversationContext(conversationId);
         const messages = [
           ...buildContext({ summary, messages: history }),
           new HumanMessage(messageContent),
         ];
-
         stream = await agent.stream(
           { messages },
           { ...config, streamMode: ["messages", "updates"] },
@@ -62,7 +82,7 @@ export class AIOrchestratorService {
         userId,
         messageId,
         config,
-        isFirstMessage,
+        isFirstMessage: !state.values?.messages?.length,
         messageContent,
       });
     } catch (error: any) {
@@ -76,19 +96,23 @@ export class AIOrchestratorService {
     messageId: string;
     approved: boolean;
   }) {
-    const config = this.getAgentConfig(input.conversationId, input.userId);
+    const { conversationId, userId, approved } = input;
+    const config = this.getAgentConfig(conversationId, userId);
+    const decisionStatus = approved ? "approved" : "rejected";
+
     try {
       const agent = await this.agentFactory.createChatAgent();
-      const state = (await Promise.resolve(agent.getState(config))) as any;
-      const pendingCalls =
-        state.values?.messages?.[state.values.messages.length - 1]
-          ?.tool_calls || [];
+      const state = (await agent.getState(config)) as any;
+      const lastMsg =
+        state.values?.messages?.[state.values.messages.length - 1];
+      const pendingCalls = lastMsg?.tool_calls || [];
 
+      // Resume graph with structured decision
       const stream = await agent.stream(
         new Command({
           resume: {
             decisions: pendingCalls.map(() => ({
-              type: input.approved ? "approve" : "reject",
+              type: approved ? "approve" : "reject",
             })),
           },
         }),
@@ -97,21 +121,23 @@ export class AIOrchestratorService {
 
       await this.handleStream(stream, {
         agent,
-        ...input,
+        conversationId,
+        userId,
         config,
-        isFirstMessage: false,
+        decisionStatus,
       });
     } catch (error: any) {
-      this.handleError(input.conversationId, error);
+      this.handleError(conversationId, error);
     }
   }
 
   private async handleStream(stream: any, ctx: any) {
     let finalText = "";
-    let toolResults: any[] = [];
+    let capturedToolCalls: any[] = [];
 
     for await (const [mode, data] of stream) {
       if (mode === "updates") {
+        // Handle Interrupts
         if ("__interrupt__" in data) {
           const interrupt = data.__interrupt__[0].value;
           return this.emitter.emitActionRequired(ctx.conversationId, {
@@ -122,80 +148,98 @@ export class AIOrchestratorService {
               "Approval required.",
           });
         }
-        if (data.tools?.emails) toolResults.push(...data.tools.emails);
+
+        // Capture Tool Outputs
+        if (data.tools) {
+          Object.entries(data.tools).forEach(([toolName, output]) => {
+            capturedToolCalls.push({
+              toolName,
+              output,
+              status: ctx.decisionStatus || "auto_executed",
+            });
+          });
+        }
       }
 
       if (mode === "messages" && data[0]?.content) {
         const token = data[0].content;
         finalText += token;
-        process.stdout.write(token); // Real-time typewriter logging
         this.emitter.emitToken(ctx.conversationId, token);
       }
     }
 
-    await this.persistCompletion(ctx, finalText, toolResults);
+    await this.persistCompletion(ctx, finalText, capturedToolCalls);
   }
 
-  private async persistCompletion(ctx: any, content: string, sources: any[]) {
-    if (!content && sources.length === 0) return;
+  private async persistCompletion(ctx: any, content: string, toolCalls: any[]) {
+    if (!content && toolCalls.length === 0) return;
 
-    const message: ConversationMessage = {
+    const assistantMessage: ConversationMessage = {
       messageId: crypto.randomUUID(),
       conversationId: ctx.conversationId,
       userId: ctx.userId,
       role: "assistant",
-      content: content || "Action processed.",
+      content: content || (toolCalls.length > 0 ? "Action processed." : ""),
       status: "completed",
       createdAt: new Date(),
       updatedAt: new Date(),
-      toolCalls: sources.map((s) => ({ toolName: "search_emails", output: s })),
-      sources: sources.map((s) => ({
-        type: "email",
-        emailId: s.emailId,
-        snippet: s.snippet,
-      })),
+      toolCalls: toolCalls,
+      metadata: {
+        model: "gpt-4.1",
+        userDecision: ctx.decisionStatus || "auto_executed",
+      },
+      sources: this.extractSources(toolCalls),
     };
 
-    await this.conversationService.createMessage(message);
+    await this.conversationService.createMessage(assistantMessage);
 
     if (ctx.isFirstMessage) {
-      this.generateAndSaveTitle(
+      await this.generateAndSaveTitle(
         ctx.conversationId,
         ctx.userId,
         ctx.messageContent,
       );
     }
 
-    this.emitter.emitComplete(ctx.conversationId, message.messageId);
+    this.emitter.emitComplete(ctx.conversationId, assistantMessage.messageId);
+  }
+
+  private extractSources(toolCalls: any[]) {
+    return toolCalls
+      .filter((tc) => tc.toolName === "search_emails" && tc.output?.emails)
+      .flatMap((tc) =>
+        tc.output.emails.map((e: any) => ({
+          type: "email",
+          emailId: e.emailId,
+          snippet: e.snippet,
+        })),
+      );
   }
 
   private async generateAndSaveTitle(
     conversationId: string,
     userId: string,
-    firstMessage: string,
+    firstMsg: string,
   ) {
     try {
       const response = await gpt41LLM.invoke([
         new SystemMessage(
           "Create a 3-5 word concise title for this conversation. Return ONLY the title.",
         ),
-        new HumanMessage(firstMessage),
+        new HumanMessage(firstMsg),
       ]);
-
       const title = response.content.toString().replace(/"/g, "");
-
       await this.conversationService.createOrUpdateSummary({
         conversationId,
         userId,
         title,
-        summary: firstMessage.slice(0, 100),
+        summary: firstMsg.slice(0, 100),
         messageCount: 2,
         lastMessageAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-
-      this.emitter.emitTitleGenerated(conversationId, title); // Notify frontend
+      this.emitter.emitTitleGenerated(conversationId, title);
     } catch (err) {
       console.error("[Title Gen Error]:", err);
     }

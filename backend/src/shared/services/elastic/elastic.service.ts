@@ -325,13 +325,14 @@ export class ElasticsearchService {
    * Ensures the Conversations Index exists with 2026 Semantic Text capabilities.
    */
   private async ensureConversationsIndex(): Promise<void> {
-    const indexName = this.CONVERSATIONS_INDEX;
-    const exists = await this.client.indices.exists({ index: indexName });
+    const exists = await this.client.indices.exists({
+      index: this.CONVERSATIONS_INDEX,
+    });
 
     if (exists) return;
 
     await this.client.indices.create({
-      index: indexName,
+      index: this.CONVERSATIONS_INDEX,
       settings: {
         number_of_shards: 2,
         number_of_replicas: 1,
@@ -345,56 +346,25 @@ export class ElasticsearchService {
           conversationId: { type: "keyword" },
           userId: { type: "keyword" },
           role: { type: "keyword" },
-
-          content: {
-            type: "text",
-            fields: {
-              keyword: { type: "keyword", ignore_above: 512 },
-            },
-          },
-
-          embeddings: {
-            type: "dense_vector",
-            dims: 1536,
-            index: true,
-            similarity: "cosine",
-            index_options: { type: "int8_hnsw" },
-          },
-
-          status: { type: "keyword" }, // e.g., "pending_confirmation", "completed", "cancelled"
-
-          // Timestamps
+          content: { type: "text" },
+          status: { type: "keyword" },
           createdAt: { type: "date" },
           updatedAt: { type: "date" },
           completedAt: { type: "date" },
 
-          // --- CRITICAL CHANGES BELOW ---
-
-          // 1. Enable metadata so we can store and query the "Pending Action"
+          // FLEXIBLE METADATA: Solves the strict_dynamic_mapping_exception
           metadata: {
             type: "object",
-            enabled: true,
+            dynamic: true,
           },
 
-          // 2. Define the Action Schema for HITL
-          // This allows you to store the specific IDs and the method (star/archive)
-          pendingAction: {
-            properties: {
-              actionId: { type: "keyword" },
-              type: { type: "keyword" }, // e.g., "email_star"
-              description: { type: "text" },
-              messageIds: { type: "keyword" }, // Array of IDs to be acted upon
-              status: { type: "keyword" }, // "pending", "approved", "rejected"
-            },
-          },
-
-          // 3. Keep Tool Calls for the chain history
           toolCalls: {
             type: "nested",
             properties: {
               toolName: { type: "keyword" },
-              input: { type: "object", enabled: false }, // we don't need to search input
+              input: { type: "object", enabled: false },
               output: { type: "object", enabled: false },
+              status: { type: "keyword" },
             },
           },
 
@@ -403,49 +373,38 @@ export class ElasticsearchService {
             properties: {
               type: { type: "keyword" },
               emailId: { type: "keyword" },
-              threadId: { type: "keyword" },
-              relevanceScore: { type: "float" },
               snippet: { type: "text" },
             },
+          },
+
+          embeddings: {
+            type: "dense_vector",
+            dims: 1536,
+            index: true,
+            similarity: "cosine",
           },
         },
       },
     });
   }
 
-  /**
-   * Ensures the Conversation Summaries Index exists for high-level semantic retrieval.
-   */
   private async ensureConversationSummariesIndex(): Promise<void> {
-    const indexName = this.CONVERSATION_SUMMARIES_INDEX;
-    const exists = await this.client.indices.exists({ index: indexName });
-
+    const exists = await this.client.indices.exists({
+      index: this.CONVERSATION_SUMMARIES_INDEX,
+    });
     if (exists) return;
 
     await this.client.indices.create({
-      index: indexName,
+      index: this.CONVERSATION_SUMMARIES_INDEX,
       mappings: {
         properties: {
           conversationId: { type: "keyword" },
           userId: { type: "keyword" },
-
-          title: {
-            type: "text",
-            fields: { keyword: { type: "keyword" } },
-          },
+          title: { type: "text", fields: { keyword: { type: "keyword" } } },
           summary: { type: "text" },
-
-          // Optimized vector storage for summary search
-          embeddings: {
-            type: "dense_vector",
-            dims: 1536,
-            index: true,
-            similarity: "cosine",
-            index_options: { type: "int8_hnsw" },
-          },
-
-          topics: { type: "keyword" },
           lastMessageAt: { type: "date" },
+          createdAt: { type: "date" },
+          updatedAt: { type: "date" },
         },
       },
     });
