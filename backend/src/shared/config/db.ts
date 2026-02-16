@@ -1,12 +1,20 @@
 import "dotenv/config";
 import { Sequelize } from "sequelize";
 import { logger } from "../utils/logger";
-
+import pg from "pg";
 const { PG_CONNECTION_STRING } = process.env;
 
 if (!PG_CONNECTION_STRING) {
   throw new Error("No postgres Connection string found");
 }
+
+export const pool = new pg.Pool({
+  connectionString: process.env.PG_CONNECTION_STRING,
+  max: 20,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
 
 const sequelize = new Sequelize(PG_CONNECTION_STRING!, {
   dialect: "postgres",

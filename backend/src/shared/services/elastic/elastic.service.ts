@@ -346,7 +346,6 @@ export class ElasticsearchService {
           userId: { type: "keyword" },
           role: { type: "keyword" },
 
-          // Optimized for instant indexing without waiting for Azure
           content: {
             type: "text",
             fields: {
@@ -359,30 +358,46 @@ export class ElasticsearchService {
             dims: 1536,
             index: true,
             similarity: "cosine",
-            index_options: {
-              type: "int8_hnsw",
-            },
+            index_options: { type: "int8_hnsw" },
           },
 
-          // Ordering & Status
-          sequence: { type: "integer" },
-          status: { type: "keyword" },
+          status: { type: "keyword" }, // e.g., "pending_confirmation", "completed", "cancelled"
 
           // Timestamps
           createdAt: { type: "date" },
           updatedAt: { type: "date" },
           completedAt: { type: "date" },
 
-          // Context & Threading
-          parentMessageId: { type: "keyword" },
+          // --- CRITICAL CHANGES BELOW ---
 
-          // Metadata
-          metadata: { type: "object", enabled: false },
+          // 1. Enable metadata so we can store and query the "Pending Action"
+          metadata: {
+            type: "object",
+            enabled: true,
+          },
 
-          // Tool execution tracking
-          toolCalls: { type: "nested" },
+          // 2. Define the Action Schema for HITL
+          // This allows you to store the specific IDs and the method (star/archive)
+          pendingAction: {
+            properties: {
+              actionId: { type: "keyword" },
+              type: { type: "keyword" }, // e.g., "email_star"
+              description: { type: "text" },
+              messageIds: { type: "keyword" }, // Array of IDs to be acted upon
+              status: { type: "keyword" }, // "pending", "approved", "rejected"
+            },
+          },
 
-          // Sources (email references, search results)
+          // 3. Keep Tool Calls for the chain history
+          toolCalls: {
+            type: "nested",
+            properties: {
+              toolName: { type: "keyword" },
+              input: { type: "object", enabled: false }, // we don't need to search input
+              output: { type: "object", enabled: false },
+            },
+          },
+
           sources: {
             type: "nested",
             properties: {

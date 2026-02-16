@@ -1,4 +1,4 @@
-import { tool, type ToolRuntime } from "langchain";
+import { tool } from "langchain";
 import { z } from "zod";
 import { elasticClient } from "../../../config/elastic";
 import { ElasticsearchService } from "../../elastic/elastic.service";
@@ -46,11 +46,17 @@ const searchEmailsSchema = z.object({
   limit: z.number().default(5).describe("Number of results (max 10)"),
 });
 
-// Define the tool
 export const searchEmailsTool = tool(
-  async (input, runtime: ToolRuntime) => {
+  async (input, config) => {
     console.log("inside searchEmailTool with ", input);
-    const { userId } = runtime.context as { userId: string }; // Type assertion for context
+
+    const userId = config.configurable?.userId;
+
+    if (!userId) {
+      console.error("❌ No userId found in tool config!");
+      return "Error: User identity could not be verified. Please try again.";
+    }
+
     const elasticService = new ElasticsearchService(elasticClient);
 
     try {
@@ -66,11 +72,11 @@ export const searchEmailsTool = tool(
         filters: input.filters || {},
       });
 
-      // Transform for LLM consumption
       const simplified = result.emails.map((email: any) => ({
         emailId: email._id,
         subject: email.subject || "(No subject)",
         from: email.from?.email,
+        to: email.to?.email,
         snippet: email.snippet,
         receivedAt: email.receivedAt,
       }));
@@ -87,7 +93,7 @@ export const searchEmailsTool = tool(
   {
     name: "search_emails",
     description:
-      "Search through user's emails. Use the 'query' field for keyword searches like 'google', 'apollo', 'project update'. Use 'filters' ONLY for complete, specific information like exact email addresses or date ranges.",
+      "Search through user's emails. Use query for keywords, filters for specific metadata.",
     schema: searchEmailsSchema,
   },
 );

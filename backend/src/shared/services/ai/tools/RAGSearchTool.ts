@@ -14,40 +14,36 @@ const ragSearchSchema = z.object({
   limit: z.number().default(5),
 });
 
-/**
- * Unified RAG Tool
- * Purpose: Provides the LLM with 'Memory' (Past Chats) and 'Knowledge' (Emails).
- */
 export const unifiedRAGTool = tool(
-  async (input, runtime: ToolRuntime) => {
-    console.log("Got unifiedRAG tool ");
-    const { userId, conversationId } = runtime.context as {
-      userId: string;
-      conversationId: string;
-    };
+  async (input, config) => {
+    const userId = config.configurable?.userId;
+    const conversationId = config.configurable?.conversationId;
+
+    if (!userId || !conversationId) {
+      return "Error: Missing required context (userId or conversationId).";
+    }
+
     const vectorSearch = new VectorSearchService(elasticClient);
     const embeddings = new EmbeddingsService();
     const ragService = new RAGService(embeddings, vectorSearch);
 
     try {
-      // 3. Perform the Dual-Index Hybrid Search
-      const { context, raw } = await ragService.getUnifiedContext(
+      const { context } = await ragService.getUnifiedContext(
         input.query,
         userId,
-        conversationId, // Pass this to avoid searching the active chat
+        conversationId,
       );
 
-      console.log("context from ragSearch", context);
+      console.log("Context retrieved for query:", input.query);
       return context;
     } catch (error: any) {
       console.error("RAG Tool Failure:", error);
-      return `Error retrieving context: ${error.message}. Proceed with existing conversation history.`;
+      return `Error retrieving context: ${error.message}.`;
     }
   },
   {
     name: "search_knowledge_and_history",
-    description:
-      "Best for: Summarizing topics, 'What'/'How' questions, and finding info across chats when user query isn't complete and emails.",
+    description: "Search across past chats and existing email knowledge base.",
     schema: ragSearchSchema,
   },
 );

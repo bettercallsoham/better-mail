@@ -16,17 +16,28 @@ export interface ConversationMessage {
   updatedAt: Date;
   completedAt?: Date;
   embeddings?: number[];
+
+  // ✅ FIX: Change 'metadata' and add 'toolCalls' as a top-level field
   metadata?: {
     model?: string;
     tokensUsed?: number;
     processingTimeMs?: number;
-    errorMessage?: string;
-    toolCalls?: Array<{
-      toolName: string;
-      result?: any;
-      executionTimeMs?: number;
-    }>;
   };
+
+  // ✅ Matches your ES Mapping: toolCalls { toolName, output }
+  toolCalls?: Array<{
+    toolName: string;
+    input?: any;
+    output?: any;
+  }>;
+
+  // ✅ Matches your ES Mapping: sources { emailId, snippet... }
+  sources?: Array<{
+    type: string;
+    emailId?: string;
+    snippet?: string;
+    [key: string]: any;
+  }>;
 }
 
 export interface ConversationSummary {
@@ -116,7 +127,6 @@ export class ConversationService {
   ): Promise<PaginatedMessages> {
     const { limit = 10, cursor, includeIncomplete = true } = params;
 
-    
     const mustConditions: any[] = [{ term: { conversationId } }];
     if (!includeIncomplete) {
       mustConditions.push({ term: { status: "completed" } });
@@ -148,7 +158,9 @@ export class ConversationService {
 
     // The 'sort' array of the last hit is the cursor for the next page
     const nextCursor =
-      hits.length === limit && hits.length > 0 ? (hits[hits.length - 1].sort as any[]) : null;
+      hits.length === limit && hits.length > 0
+        ? (hits[hits.length - 1].sort as any[])
+        : null;
 
     return { messages, nextCursor };
   }
