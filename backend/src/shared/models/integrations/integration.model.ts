@@ -6,6 +6,10 @@ import {
   CreationOptional,
 } from "sequelize";
 import { sequelize } from "../../config/db";
+import { NonAttribute } from "sequelize";
+import { TelegramIntegration } from "./telegram-integration.model";
+import { SlackIntegration } from "./slack-integration.model";
+import { NotionIntegration } from "./notion-integration.model";
 
 export enum IntegrationProvider {
   TELEGRAM = "telegram",
@@ -37,6 +41,9 @@ class Integration extends Model<
 
   declare created_at: CreationOptional<Date>;
   declare updated_at: CreationOptional<Date>;
+  declare telegram?: NonAttribute<TelegramIntegration>;
+  declare slack?: NonAttribute<SlackIntegration>;
+  declare notion?: NonAttribute<NotionIntegration>;
 }
 
 Integration.init(
