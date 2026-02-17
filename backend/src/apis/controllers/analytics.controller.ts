@@ -4,6 +4,7 @@ import { ElasticsearchService } from "../../shared/services/elastic/elastic.serv
 import { asyncHandler } from "../utils/asyncHandler";
 import { getUserEmails } from "../utils/email-helper";
 import redis from "../../shared/config/redis";
+import { logger } from "@sentry/node";
 
 export const getAnalyticsOverview = asyncHandler(
   async (req: Request, res: Response) => {
@@ -57,7 +58,7 @@ export const getAnalyticsOverview = asyncHandler(
         cached: false,
       });
     } catch (error: any) {
-      console.error("Failed to get analytics overview:", error);
+      logger.error("Failed to get analytics overview:", error);
 
       res.status(500).json({
         success: false,
@@ -120,7 +121,7 @@ export const getTimePatterns = asyncHandler(
         cached: false,
       });
     } catch (error: any) {
-      console.error("Failed to get time patterns:", error);
+      logger.error("Failed to get time patterns:", error);
 
       res.status(500).json({
         success: false,

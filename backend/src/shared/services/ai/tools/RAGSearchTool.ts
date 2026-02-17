@@ -34,7 +34,6 @@ export const unifiedRAGTool = tool(
         conversationId,
       );
 
-      console.log("Context retrieved for query:", input.query);
       return context;
     } catch (error: any) {
       console.error("RAG Tool Failure:", error);

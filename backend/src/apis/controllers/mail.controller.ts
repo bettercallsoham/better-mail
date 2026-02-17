@@ -9,6 +9,7 @@ import { OutlookApiService } from "../../shared/services/outlook/outlook-api.ser
 import { GmailApiService } from "../../shared/services/gmail/gmail-api.service";
 import { searchHistoryQueue } from "../../shared/queues";
 import { threadNoteService } from "../../shared/services/thread-notes/thread-note.service";
+import { logger } from "@sentry/node";
 
 export const getConnectedMailboxes = asyncHandler(
   async (req: Request, res: Response) => {
@@ -61,13 +62,11 @@ export const getThreadEmails = asyncHandler(
       }
     }
 
-    // Get emails with caching
-    console.time("getUserEmails");
+    
     const { emails: emailAddresses, error } = await getUserEmails(
       userId,
       email as string | undefined,
     );
-    console.timeEnd("getUserEmails");
 
     if (error) {
       return res.status(403).json({
@@ -84,7 +83,6 @@ export const getThreadEmails = asyncHandler(
       });
     }
 
-    console.time("elastiSearch-query-time");
 
     const elasticService = new ElasticsearchService(elasticClient);
 
@@ -94,7 +92,6 @@ export const getThreadEmails = asyncHandler(
       cursor: parsedCursor,
     });
 
-    console.timeEnd("elastiSearch-query-time");
 
     res.json({
       success: true,
@@ -280,9 +277,8 @@ export const replyEmail = asyncHandler(async (req: Request, res: Response) => {
       message: "Email sent successfully",
     });
   } catch (error: any) {
-    console.error("Failed to send reply:", error);
+    logger.error("Failed to send reply:", error);
 
-    // Handle specific error cases
     if (error.response?.status === 401 || error.message?.includes("token")) {
       return res.status(401).json({
         success: false,
@@ -367,7 +363,7 @@ export const sendEmail = asyncHandler(async (req: Request, res: Response) => {
       message: "Email sent successfully",
     });
   } catch (error: any) {
-    console.error("Failed to send email:", error);
+    logger.error("Failed to send email:", error);
 
     // Handle specific error cases
     if (error.response?.status === 401 || error.message?.includes("token")) {
@@ -488,7 +484,7 @@ export const emailAction = asyncHandler(async (req: Request, res: Response) => {
       messageIds,
     });
   } catch (error: any) {
-    console.error("Failed to perform email action:", error);
+    logger.error("Failed to perform email action:", error);
 
     // Handle specific error cases
     if (error.response?.status === 401 || error.message?.includes("token")) {
@@ -648,7 +644,7 @@ export const searchEmails = asyncHandler(
           executionTimeMs,
           emailAddresses,
         })
-        .catch((err) => console.error("Failed to queue search history:", err));
+        .catch((err) => logger.error("Failed to queue search history:", err));
 
       res.json({
         success: true,
@@ -658,7 +654,7 @@ export const searchEmails = asyncHandler(
         nextCursor: result.nextCursor,
       });
     } catch (error: any) {
-      console.error("Search failed:", error);
+      logger.error("Search failed:", error);
 
       res.status(500).json({
         success: false,
@@ -723,7 +719,7 @@ export const getInboxZero = asyncHandler(
         nextCursor: result.nextCursor,
       });
     } catch (error: any) {
-      console.error("Failed to fetch inbox zero emails:", error);
+      logger.error("Failed to fetch inbox zero emails:", error);
 
       res.status(500).json({
         success: false,
@@ -778,7 +774,7 @@ export const updateInboxState = asyncHandler(
         messageIds,
       });
     } catch (error: any) {
-      console.error("Failed to update inbox state:", error);
+      logger.error("Failed to update inbox state:", error);
 
       res.status(500).json({
         success: false,
@@ -825,7 +821,7 @@ export const createSavedSearch = asyncHandler(
         data: doc,
       });
     } catch (error: any) {
-      console.error("Failed to create saved search:", error);
+      logger.error("Failed to create saved search:", error);
 
       res.status(500).json({
         success: false,
@@ -856,7 +852,7 @@ export const getSavedSearches = asyncHandler(
         data: searches,
       });
     } catch (error: any) {
-      console.error("Failed to get saved searches:", error);
+      logger.error("Failed to get saved searches:", error);
 
       res.status(500).json({
         success: false,
@@ -907,7 +903,7 @@ export const updateSavedSearch = asyncHandler(
         message: "Saved search updated",
       });
     } catch (error: any) {
-      console.error("Failed to update saved search:", error);
+      logger.error("Failed to update saved search:", error);
 
       res.status(500).json({
         success: false,
@@ -953,7 +949,7 @@ export const deleteSavedSearch = asyncHandler(
         message: "Saved search deleted",
       });
     } catch (error: any) {
-      console.error("Failed to delete saved search:", error);
+      logger.error("Failed to delete saved search:", error);
 
       res.status(500).json({
         success: false,
@@ -1046,7 +1042,7 @@ export const executeSavedSearch = asyncHandler(
         nextCursor: result.nextCursor,
       });
     } catch (error: any) {
-      console.error("Failed to execute saved search:", error);
+      logger.error("Failed to execute saved search:", error);
 
       res.status(500).json({
         success: false,
@@ -1081,7 +1077,7 @@ export const getRecentSearches = asyncHandler(
         data: searches,
       });
     } catch (error: any) {
-      console.error("Failed to get recent searches:", error);
+      logger.error("Failed to get recent searches:", error);
 
       res.status(500).json({
         success: false,
@@ -1198,7 +1194,7 @@ export const createDraft = asyncHandler(async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error("Failed to create draft:", error);
+    logger.error("Failed to create draft:", error);
 
     res.status(500).json({
       success: false,
@@ -1247,14 +1243,7 @@ export const sendDraft = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    console.log("Sending draft:", {
-      elasticsearchId: id,
-      providerDraftId,
-      provider: existingDraft.provider,
-      emailAddress: existingDraft.emailAddress,
-      draftData: existingDraft.draftData,
-    });
-
+   
     // Send via provider
     let sentMessageId: string;
     if (existingDraft.provider === "gmail") {
@@ -1286,7 +1275,7 @@ export const sendDraft = asyncHandler(async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error("Failed to send draft:", error);
+    logger.error("Failed to send draft:", error);
 
     res.status(500).json({
       success: false,
@@ -1335,7 +1324,7 @@ export const getEmailById = asyncHandler(
         data: email,
       });
     } catch (error: any) {
-      console.error("Failed to get email:", error);
+      logger.error("Failed to get email:", error);
 
       res.status(500).json({
         success: false,
@@ -1407,7 +1396,7 @@ export const getEmailsByFolder = asyncHandler(
         nextCursor: result.nextCursor,
       });
     } catch (error: any) {
-      console.error("Failed to get emails by folder:", error);
+      logger.error("Failed to get emails by folder:", error);
 
       res.status(500).json({
         success: false,
@@ -1523,7 +1512,7 @@ export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
       message: "Email updated successfully",
     });
   } catch (error: any) {
-    console.error("Failed to update email:", error);
+    logger.error("Failed to update email:", error);
 
     res.status(500).json({
       success: false,
@@ -1597,7 +1586,7 @@ export const deleteEmail = asyncHandler(async (req: Request, res: Response) => {
       message: "Email deleted successfully",
     });
   } catch (error: any) {
-    console.error("Failed to delete email:", error);
+    logger.error("Failed to delete email:", error);
 
     res.status(500).json({
       success: false,
@@ -1843,7 +1832,7 @@ export const getEmailsFromUser = asyncHandler(
         },
       });
     } catch (error: any) {
-      console.error("Failed to get emails from user:", error);
+      logger.error("Failed to get emails from user:", error);
 
       res.status(500).json({
         success: false,
@@ -1898,7 +1887,7 @@ export const getEmailSuggestions = asyncHandler(
         },
       });
     } catch (error: any) {
-      console.error("Failed to get email suggestions:", error);
+      logger.error("Failed to get email suggestions:", error);
 
       res.status(500).json({
         success: false,

@@ -5,6 +5,7 @@ import {
   gmailWebhookQueue,
   outlookWebhookQueue,
 } from "../../shared/queues/handle-webhook.queue";
+import { logger } from "@sentry/node";
 
 const router = Router();
 
@@ -22,24 +23,16 @@ router.post("/", async (req, res) => {
 
     const lastHistoryId = await redis.get(`gmail:history:${emailAddress}`);
 
-    // Initialize on first webhook
     if (!lastHistoryId) {
       await redis.set(`gmail:history:${emailAddress}`, historyId);
-      console.log(
-        `Initialized Gmail history for ${emailAddress}: ${historyId}`,
-      );
+
       return res.sendStatus(200);
     }
 
-    // Skip if we've already processed this or a newer historyId
     if (parseInt(historyId) <= parseInt(lastHistoryId)) {
-      console.log(
-        `Skipping old historyId ${historyId} (current: ${lastHistoryId}) for ${emailAddress}`,
-      );
       return res.sendStatus(200);
     }
 
-    // Enqueue webhook job
     await gmailWebhookQueue.add("process-gmail-webhook", {
       email: emailAddress,
       historyId,
@@ -48,18 +41,14 @@ router.post("/", async (req, res) => {
 
     return res.sendStatus(200);
   } catch (err) {
-    console.error("Gmail webhook error:", err);
+    logger.error("Gmail webhook error:", { err });
     return res.sendStatus(200);
   }
 });
 
 router.post("/outlook", async (req, res) => {
   try {
-    console.log("Webhook recieved outlook");
-    // Validation handshake
     if (req.query.validationToken) {
-      console.log(" validation outlook");
-
       return res.status(200).send(req.query.validationToken);
     }
 
@@ -70,9 +59,8 @@ router.post("/outlook", async (req, res) => {
     }
 
     for (const n of notifications) {
-      // Security check
       if (n.clientState !== process.env.OUTLOOK_CLIENT_STATE) {
-        console.warn("Invalid clientState, ignoring");
+        logger.warn("Invalid clientState, ignoring");
         continue;
       }
 
@@ -83,7 +71,6 @@ router.post("/outlook", async (req, res) => {
         continue;
       }
 
-      // Get email and mailboxId from cache or DB
       const cacheKey = `subscription:${subscriptionId}`;
       let cached = await redis.get(cacheKey);
 
@@ -98,15 +85,13 @@ router.post("/outlook", async (req, res) => {
         });
 
         if (!account) {
-          console.error(
+          logger.error(
             `Outlook account not found for subscription: ${subscriptionId}`,
           );
           continue;
         }
 
         email = account.email;
-
-        // Cache for 1 hour
         await redis.setex(cacheKey, 3600, JSON.stringify({ email }));
       }
 
@@ -118,8 +103,8 @@ router.post("/outlook", async (req, res) => {
     }
 
     return res.sendStatus(202);
-  } catch (err) {
-    console.error("Outlook webhook error:", err);
+  } catch (err: unknown) {
+    logger.error("Outlook webhook error:", { err });
     return res.sendStatus(202);
   }
 });

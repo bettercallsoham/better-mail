@@ -48,7 +48,6 @@ const searchEmailsSchema = z.object({
 
 export const searchEmailsTool = tool(
   async (input, config) => {
-    console.log("inside searchEmailTool with ", input);
 
     const userId = config.configurable?.userId;
 

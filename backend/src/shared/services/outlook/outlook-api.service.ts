@@ -7,6 +7,7 @@ import {
   OutlookAttachment,
   SendEmailInput,
 } from "./interfaces";
+import { logger } from "@sentry/node";
 
 export class OutlookApiService {
   private client?: AxiosInstance;
@@ -100,9 +101,9 @@ export class OutlookApiService {
       try {
         await this.deleteSubscription(account.subscription_id);
       } catch (error) {
-        console.warn(
-          `Failed to delete expired subscription ${account.subscription_id}:`,
-          error,
+        logger.warn(
+          `Failed to delete expired subscription ${account.subscription_id}:` +
+            error,
         );
       }
     }
@@ -132,7 +133,7 @@ export class OutlookApiService {
         },
       );
     } catch (error: any) {
-      console.error("Outlook subscription creation error:", {
+      logger.error("Outlook subscription creation error:", {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
@@ -220,9 +221,8 @@ export class OutlookApiService {
       const res = await client.get(`/me/messages/${messageId}/attachments`);
       return res.data.value || [];
     } catch (error) {
-      console.error(
-        `Failed to fetch attachments for message ${messageId}:`,
-        error,
+      logger.error(
+        `Failed to fetch attachments for message ${messageId}:` + error,
       );
       return [];
     }
@@ -243,7 +243,7 @@ export class OutlookApiService {
       return res.data as OutlookMessage;
     } catch (error: any) {
       if (error.response?.status === 404) {
-        console.warn(`Message not found: ${messageId}`);
+        logger.warn(`Message not found: ${messageId}`);
         return null;
       }
       throw error;

@@ -1,3 +1,4 @@
+import { logger } from "@sentry/node";
 import redis from "../../shared/config/redis";
 import { EmailAccount } from "../../shared/models";
 
@@ -16,12 +17,10 @@ export async function getUserEmails(
   const cacheKey = `user:${userId}:emails`;
 
   try {
-    // Try cache first
     const cached = await redis.get(cacheKey);
     if (cached) {
       const emails: string[] = JSON.parse(cached);
 
-      // If specific email requested, verify ownership
       if (specificEmail) {
         const normalized = specificEmail.toLowerCase();
         if (!emails.includes(normalized)) {
@@ -36,11 +35,9 @@ export async function getUserEmails(
       return { emails };
     }
   } catch (cacheError) {
-    // Cache error - continue to DB (non-blocking)
-    console.warn("Redis cache error:", cacheError);
+    logger.warn("Redis cache error:" + cacheError);
   }
 
-  // Cache miss or error - query database
   const whereClause: any = { user_id: userId };
   if (specificEmail) {
     whereClause.email = specificEmail.toLowerCase();
@@ -63,13 +60,11 @@ export async function getUserEmails(
 
   const emails = userAccounts.map((acc) => acc.email.toLowerCase());
 
-  // Update cache (fire and forget - non-blocking)
   if (!specificEmail) {
-    // Only cache full list, not single email checks
     redis
       .setex(cacheKey, USER_EMAILS_CACHE_TTL, JSON.stringify(emails))
       .catch((err) => {
-        console.warn("Failed to cache user emails:", err);
+        logger.warn("Failed to cache user emails:", err);
       });
   }
 
@@ -80,14 +75,11 @@ export async function getUserEmails(
   return { emails };
 }
 
-/**
- * Invalidate user's email cache
- * Call this when emails are connected/disconnected
- */
+
 export async function invalidateUserEmailsCache(userId: string): Promise<void> {
   try {
     await redis.del(`user:${userId}:emails`);
   } catch (err) {
-    console.warn("Failed to invalidate email cache:", err);
+    logger.warn("Failed to invalidate email cache:"+ err);
   }
 }

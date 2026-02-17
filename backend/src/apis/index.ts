@@ -7,7 +7,7 @@ import analyticsRouter from "./routers/analytics.routes";
 import templateRouter from "./routers/template.routes";
 import aiRouter from "./routers/ai.routes";
 import conversationRouter from "./routers/conversation.routes";
-
+import integrationRouter from "./routers/integrations.routes";
 const router = Router();
 router.use("/auth", authRouter);
 router.use("/connect", connectEmailRouter);
@@ -17,4 +17,5 @@ router.use("/analytics", analyticsRouter);
 router.use("/templates", templateRouter);
 router.use("/ai", aiRouter);
 router.use("/conversations", conversationRouter);
+router.use("/integrations", integrationRouter);
 export default router;

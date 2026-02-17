@@ -15,6 +15,8 @@ class TelegramIntegration extends Model<
   declare chat_id: string;
   declare username: string | null;
   declare first_name: string | null;
+  declare last_name: string | null;
+  declare photo_url: string | null;
 }
 
 TelegramIntegration.init(
@@ -36,6 +38,15 @@ TelegramIntegration.init(
     },
 
     first_name: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
+    last_name: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    photo_url: {
       type: DataTypes.TEXT,
       allowNull: true,
     },

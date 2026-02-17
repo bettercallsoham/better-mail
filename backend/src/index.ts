@@ -18,7 +18,7 @@ async function startServer() {
   if (!isElasticConnected) {
     throw new Error("Elastic Service Not connected.");
   } else {
-    console.log("Elastic Server connected successfully");
+    logger.info("Elastic Server connected successfully");
   }
 
   const elasticService = new ElasticsearchService(elasticClient);
@@ -28,7 +28,7 @@ async function startServer() {
 
   telegramBot.start({
     onStart: (telegramBotInfo) => {
-      console.log("telegramBot started as", telegramBotInfo.username);
+      logger.info("telegramBot started as" + telegramBotInfo.username);
     },
   });
 

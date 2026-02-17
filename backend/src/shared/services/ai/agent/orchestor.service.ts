@@ -9,6 +9,7 @@ import { AIEmitter } from "./AIEmitter";
 import { buildContext } from "./helper";
 import { gpt41LLM } from "../../../config/llm";
 import crypto from "crypto";
+import { logger } from "@sentry/node";
 
 export class AIOrchestratorService {
   constructor(
@@ -241,7 +242,7 @@ export class AIOrchestratorService {
       });
       this.emitter.emitTitleGenerated(conversationId, title);
     } catch (err) {
-      console.error("[Title Gen Error]:", err);
+      logger.error("[Title Gen Error]:" + err);
     }
   }
 
@@ -250,7 +251,7 @@ export class AIOrchestratorService {
   }
 
   private handleError(conversationId: string, error: any) {
-    console.error(`[Orchestrator Fatal]:`, error);
+    logger.error(`[Orchestrator Fatal]:`, error);
     this.emitter.emitError(conversationId, error.message);
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from "@sentry/node";
 import { pusher } from "../../../config/pusher";
 
 export class AIEmitter {
@@ -62,7 +63,7 @@ export class AIEmitter {
   }
 
   emitError(conversationId: string, error: string) {
-    console.error(`[Emitter Error] ${conversationId}:`, error);
+    logger.error(`[Emitter Error] ${conversationId}:`+  error);
     pusher.trigger(`private-${conversationId}`, "ai.error", {
       error,
       timestamp: Date.now(),

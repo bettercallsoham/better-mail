@@ -45,7 +45,6 @@ const connectDb = async (): Promise<void> => {
     await sequelize.sync({ alter: true });
     logger.info("Db Connected Succesfully");
   } catch (error: any) {
-    console.log(error);
     logger.error("Error while connecting db :" + error);
     process.exit(1);
   }

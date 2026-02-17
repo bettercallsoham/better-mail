@@ -14,7 +14,8 @@ export const getTelegramLink = asyncHandler(
     }
     const token = crypto.randomUUID();
 
-    await redis.set(`tg:link:${token}`, userId, "EX", 600);
+    const redisKey = `integration:telegram:link:${token}`; // Matches the Service
+    await redis.set(redisKey, userId, "EX", 600);
 
     const deepLink = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}?start=${token}`;
 

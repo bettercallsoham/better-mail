@@ -179,7 +179,7 @@ export class GmailApiService {
     } catch (error: any) {
       // Message might have been deleted or is no longer accessible
       if (error.response?.status === 404) {
-        console.warn(`Message not found: ${messageId}`);
+        logger.warn(`Message not found: ${messageId}`);
         return null;
       }
       throw error;
