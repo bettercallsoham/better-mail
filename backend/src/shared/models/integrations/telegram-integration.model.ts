@@ -11,7 +11,7 @@ class TelegramIntegration extends Model<
   InferCreationAttributes<TelegramIntegration>
 > {
   declare integration_id: string;
-
+  declare user_id: string;
   declare chat_id: string;
   declare username: string | null;
   declare first_name: string | null;
@@ -25,6 +25,16 @@ TelegramIntegration.init(
       type: DataTypes.UUID,
       allowNull: false,
       primaryKey: true,
+    },
+
+    user_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: "users", 
+        key: "id",
+      },
+      onDelete: "CASCADE", // If user is deleted, remove their TG integration
     },
 
     chat_id: {
@@ -57,11 +67,7 @@ TelegramIntegration.init(
     tableName: "telegram_integrations",
     timestamps: false,
     underscored: true,
-    indexes: [
-      {
-        fields: ["integration_id"],
-      },
-    ],
+    indexes: [{ fields: ["chat_id"], unique: true }, { fields: ["user_id"] }],
   },
 );
 

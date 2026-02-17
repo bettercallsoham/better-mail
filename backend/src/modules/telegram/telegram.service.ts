@@ -3,61 +3,129 @@ import { Integration, TelegramIntegration } from "../../shared/models";
 import { IntegrationProvider, IntegrationStatus } from "../../shared/models";
 import { redis } from "../../shared/config/redis";
 import { logger } from "../../shared/utils/logger";
+import { conversationQueue } from "../../shared/queues/conversation.queue";
 
 export class TelegramService {
-  private readonly CHAT_ID_CACHE_TTL = 7200; // 2 hours
+  private readonly CACHE_TTL = 7200; // 2 hours
 
-  /**
-   * Send a message to the user via Telegram.
-   * Switched to HTML parse mode for better stability with AI-generated content.
-   */
+  private escape(text: string): string {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
   async sendMessage(userId: string, text: string) {
+    console.log("Recieved final Text", text);
     const cacheKey = `tg:chat_id:${userId}`;
     let chatId = await redis.get(cacheKey);
 
     if (!chatId) {
-      const integration = await Integration.findOne({
-        where: {
-          user_id: userId,
-          provider: IntegrationProvider.TELEGRAM,
-          status: IntegrationStatus.ACTIVE,
-        },
-        include: [{ model: TelegramIntegration, as: "telegram" }],
+      const tgRecord = await TelegramIntegration.findOne({
+        where: { user_id: userId },
       });
-
-      if (!integration || !integration.telegram) return;
-
-      chatId = integration.telegram.chat_id;
-      await redis.set(cacheKey, chatId, "EX", this.CHAT_ID_CACHE_TTL);
+      if (!tgRecord) return;
+      chatId = tgRecord.chat_id;
+      await redis.set(cacheKey, chatId, "EX", this.CACHE_TTL);
     }
 
     try {
-      // Using HTML mode prevents "Bad Request: can't parse entities" for characters like ( . ! )
-      await telegramBot.api.sendMessage(String(chatId), text, {
+      await telegramBot.api.sendMessage(String(chatId), this.escape(text), {
         parse_mode: "HTML",
       });
     } catch (error: any) {
-      logger.error(`Failed to send Telegram message to user ${userId}: ${error.message}`);
-      
-      // Fallback: if HTML tags are broken, send as plain text
+      logger.error(`[TG Send Error] User ${userId}: ${error.message}`);
+      // Fallback for extreme cases
       if (error.description?.includes("can't parse entities")) {
         await telegramBot.api.sendMessage(String(chatId), text);
       }
     }
   }
 
-  /**
-   * Handle the /start flow with a cleaner, product-first tone.
-   */
+  async streamToTelegram(
+    chatId: string,
+    text: string,
+    messageId: number | null,
+    isFinal = false,
+  ): Promise<number | null> {
+    const safeText = this.escape(text);
+    try {
+      if (!messageId) {
+        const sent = await telegramBot.api.sendMessage(
+          chatId,
+          safeText || "...",
+          { parse_mode: "HTML" },
+        );
+        return sent.message_id;
+      }
+      if (text.trim().length > 0) {
+        await telegramBot.api.editMessageText(chatId, messageId, safeText, {
+          parse_mode: "HTML",
+        });
+      }
+      return messageId;
+    } catch (error: any) {
+      if (error.description?.includes("message is not modified"))
+        return messageId;
+      logger.error(`[TG Stream Error]: ${error.message}`);
+      return messageId;
+    }
+  }
+
+  async sendActionRequired(
+    chatId: string,
+    description: string,
+    conversationId: string,
+  ) {
+    await telegramBot.api.sendMessage(
+      chatId,
+      `✋ <b>Action Required</b>\n\n${this.escape(description)}`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "✅ Approve",
+                callback_data: `approve:${conversationId}`,
+              },
+              { text: "❌ Reject", callback_data: `reject:${conversationId}` },
+            ],
+          ],
+        },
+      },
+    );
+  }
+
+  async handleIncomingMessage(ctx: any) {
+    const chatId = String(ctx.chat.id);
+    const text = ctx.message.text;
+
+    const userId = await this.getUserIdByChatId(chatId);
+    if (!userId) {
+      return ctx.reply("Please link your account first using /start");
+    }
+
+    const conversationId = `tg_${chatId}`;
+
+    await conversationQueue.add("process-message", {
+      conversationId,
+      userId,
+      messageId: `tg_${ctx.message.message_id}`,
+      messageContent: text,
+    });
+
+    await ctx.replyWithChatAction("typing");
+  }
+
   async handleStart(ctx: any) {
     const token = ctx.match;
-    const chatId = ctx.chat?.id;
+    const chatId = String(ctx.chat?.id);
 
     if (!chatId) return;
 
-    // 1. Unauthenticated / New User
     if (!token) {
-      const welcomeMsg = 
+      const welcomeMsg =
         `<b>BetterMail</b> 📬\n\n` +
         `Your inbox, but smarter. Connect to get real-time alerts and manage emails via chat.\n\n` +
         `➡️ <b>To link your account:</b>\n` +
@@ -66,9 +134,9 @@ export class TelegramService {
         `3. Select <b>Connect Telegram</b>\n\n` +
         `<i>Waiting for connection...</i>`;
 
-      return await ctx.reply(welcomeMsg, { 
-        parse_mode: "HTML", 
-        disable_web_page_preview: true 
+      return await ctx.reply(welcomeMsg, {
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
       });
     }
 
@@ -77,14 +145,13 @@ export class TelegramService {
 
     if (!userId) {
       return await ctx.reply(
-        `⚠️ <b>Link Expired</b>\n\nPlease generate a new connection link from your BetterMail settings.`,
-        { parse_mode: "HTML" }
+        `⚠️ <b>Link Expired</b>\n\nPlease generate a new connection link in Settings.`,
+        { parse_mode: "HTML" },
       );
     }
 
     await redis.del(redisKey);
 
-    // 2. Integration Logic
     let [integration] = await Integration.findOrCreate({
       where: { user_id: userId, provider: IntegrationProvider.TELEGRAM },
       defaults: {
@@ -98,34 +165,58 @@ export class TelegramService {
       await integration.update({ status: IntegrationStatus.ACTIVE });
     }
 
-    // 3. Profile Data
     let photoUrl = null;
     try {
-      const photos = await ctx.api.getUserProfilePhotos(ctx.from.id, { limit: 1 });
+      const photos = await ctx.api.getUserProfilePhotos(ctx.from.id, {
+        limit: 1,
+      });
       if (photos.total_count > 0) {
         const file = await ctx.api.getFile(photos.photos[0][0].file_id);
         photoUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
       }
     } catch (err) {
-      logger.error("Could not fetch TG profile data: " + err);
+      logger.error("TG Profile Data Error: " + err);
     }
 
     await TelegramIntegration.upsert({
       integration_id: integration.id,
-      chat_id: String(chatId),
+      user_id: userId,
+      chat_id: chatId,
       username: ctx.from?.username || null,
       first_name: ctx.from?.first_name || null,
       last_name: ctx.from?.last_name || null,
       photo_url: photoUrl,
     });
 
-    // Seed the cache immediately
-    await redis.set(`tg:chat_id:${userId}`, String(chatId), "EX", this.CHAT_ID_CACHE_TTL);
+    await Promise.all([
+      redis.set(`tg:chat_id:${userId}`, chatId, "EX", this.CACHE_TTL),
+      redis.set(`tg:user_id_by_chat:${chatId}`, userId, "EX", this.CACHE_TTL),
+    ]);
 
     await ctx.reply(
-      `✅ <b>Account Linked</b>\n\nYou're all set. BetterMail will now send important updates here.`,
-      { parse_mode: "HTML" }
+      `✅ <b>Account Linked</b>\n\nYou're all set! I can now help you manage your emails here.`,
+      { parse_mode: "HTML" },
     );
+  }
+
+  private async getUserIdByChatId(chatId: string): Promise<string | null> {
+    const cacheKey = `tg:user_id_by_chat:${chatId}`;
+
+    const cachedUserId = await redis.get(cacheKey);
+    if (cachedUserId) return cachedUserId;
+
+    const tgRecord = await TelegramIntegration.findOne({
+      where: { chat_id: String(chatId) },
+      attributes: ["user_id"],
+    });
+
+    const userId = tgRecord?.user_id || null;
+
+    if (userId) {
+      await redis.set(cacheKey, userId, "EX", this.CACHE_TTL);
+    }
+
+    return userId;
   }
 
   async disconnect(userId: string) {
@@ -135,7 +226,7 @@ export class TelegramService {
 
     if (integration) {
       await integration.update({ status: IntegrationStatus.REVOKED });
-      await redis.del(`tg:chat_id:${userId}`);
+      await Promise.all([redis.del(`tg:chat_id:${userId}`)]);
     }
   }
 }

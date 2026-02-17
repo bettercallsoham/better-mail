@@ -19,6 +19,7 @@ interface ProcessConversationMessageJob {
 const conversationService = new ConversationService(elasticClient);
 const agentFactory = new AgentFactory();
 const emitter = new AIEmitter();
+
 const orchestrator = new AIOrchestratorService(
   conversationService,
   agentFactory,

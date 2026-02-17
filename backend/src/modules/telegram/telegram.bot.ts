@@ -9,6 +9,10 @@ export const setupTelegramBot = () => {
   });
 
   telegramBot.on("message:text", async (ctx) => {
-    await ctx.reply("Message received 👀");
+    if (ctx.message.text.startsWith("/")) return;
+    await telegramService.handleIncomingMessage(ctx);
   });
+
+
 };
+

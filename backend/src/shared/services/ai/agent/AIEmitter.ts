@@ -1,15 +1,20 @@
 import { logger } from "@sentry/node";
 import { pusher } from "../../../config/pusher";
-
+import { TelegramService } from "../../../../modules/telegram/telegram.service";
 export class AIEmitter {
   /**
    * Emits tokens word-by-word for the typewriter effect.
    */
+
+  private telegramService = new TelegramService();
+
   emitToken(conversationId: string, token: string) {
     pusher.trigger(`private-${conversationId}`, "ai.token", {
       token,
       timestamp: Date.now(),
     });
+
+    
   }
 
   /**
@@ -63,7 +68,7 @@ export class AIEmitter {
   }
 
   emitError(conversationId: string, error: string) {
-    logger.error(`[Emitter Error] ${conversationId}:`+  error);
+    logger.error(`[Emitter Error] ${conversationId}:` + error);
     pusher.trigger(`private-${conversationId}`, "ai.error", {
       error,
       timestamp: Date.now(),

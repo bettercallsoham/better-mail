@@ -10,8 +10,11 @@ import { buildContext } from "./helper";
 import { gpt41LLM } from "../../../config/llm";
 import crypto from "crypto";
 import { logger } from "@sentry/node";
+import { TelegramService } from "../../../../modules/telegram/telegram.service";
 
 export class AIOrchestratorService {
+  private telegramService = new TelegramService();
+
   constructor(
     private conversationService: ConversationService,
     private agentFactory: AgentFactory,
@@ -34,18 +37,14 @@ export class AIOrchestratorService {
 
       let stream;
       if (isInterrupted) {
-        // 1. CHECK FOR PENDING TOOL CALLS
         const lastMessage =
           state.values?.messages?.[state.values.messages.length - 1];
         const hasToolCalls = lastMessage?.tool_calls?.length > 0;
 
-        // 2. TRANSLATE NATURAL LANGUAGE TO DECISION
-        // If there are pending tool calls, LangGraph middleware REQUIRES the 'decisions' format.
         if (hasToolCalls) {
           const isPositive = /yes|approve|do it|proceed|go ahead|delete/i.test(
             messageContent,
           );
-
           stream = await agent.stream(
             new Command({
               resume: {
@@ -57,14 +56,12 @@ export class AIOrchestratorService {
             { ...config, streamMode: ["messages", "updates"] },
           );
         } else {
-          // Fallback for non-tool interrupts
           stream = await agent.stream(new Command({ resume: messageContent }), {
             ...config,
             streamMode: ["messages", "updates"],
           });
         }
       } else {
-        // Standard flow (New Turn)
         const { summary, messages: history } =
           await this.conversationService.getConversationContext(conversationId);
         const messages = [
@@ -78,11 +75,9 @@ export class AIOrchestratorService {
       }
 
       await this.handleStream(stream, {
-        agent,
         conversationId,
         userId,
         messageId,
-        config,
         isFirstMessage: !state.values?.messages?.length,
         messageContent,
       });
@@ -99,7 +94,6 @@ export class AIOrchestratorService {
   }) {
     const { conversationId, userId, approved } = input;
     const config = this.getAgentConfig(conversationId, userId);
-    const decisionStatus = approved ? "approved" : "rejected";
 
     try {
       const agent = await this.agentFactory.createChatAgent();
@@ -108,7 +102,6 @@ export class AIOrchestratorService {
         state.values?.messages?.[state.values.messages.length - 1];
       const pendingCalls = lastMsg?.tool_calls || [];
 
-      // Resume graph with structured decision
       const stream = await agent.stream(
         new Command({
           resume: {
@@ -121,11 +114,9 @@ export class AIOrchestratorService {
       );
 
       await this.handleStream(stream, {
-        agent,
         conversationId,
         userId,
-        config,
-        decisionStatus,
+        decisionStatus: approved ? "approved" : "rejected",
       });
     } catch (error: any) {
       this.handleError(conversationId, error);
@@ -134,44 +125,106 @@ export class AIOrchestratorService {
 
   private async handleStream(stream: any, ctx: any) {
     let finalText = "";
-    let capturedToolCalls: any[] = [];
+    let tgMessageId: number | null = null;
+    let lastStreamedLength = 0;
+    const capturedToolCalls: any[] = [];
+
+    const isTelegram = ctx.conversationId.startsWith("tg_");
+    const chatId = isTelegram ? ctx.conversationId.replace("tg_", "") : null;
 
     for await (const [mode, data] of stream) {
+      // 1. Process Updates (Tools and Interrupts)
       if (mode === "updates") {
+        // Safely check if model_request exists and has messages
+        if (data.model_request?.messages) {
+          const msg = data.model_request.messages[0];
+          if (msg?.tool_calls?.length > 0) {
+            // Tool calls are handled here if needed
+          }
+        }
+
+        // Handle standard tool output capture
+        if (data.tools) {
+          Object.entries(data.tools).forEach(([toolName, output]) => {
+            capturedToolCalls.push({ toolName, output });
+            if (isTelegram && chatId && toolName === "search_emails") {
+              this.telegramService.sendMessage(
+                ctx.userId,
+                "🔍 <i>Searching your inbox...</i>",
+              );
+            }
+          });
+        }
+
         // Handle Interrupts
         if ("__interrupt__" in data) {
           const interrupt = data.__interrupt__[0].value;
-          return this.emitter.emitActionRequired(ctx.conversationId, {
-            actionId: crypto.randomUUID(),
-            items: interrupt.action_requests,
-            description:
+          if (isTelegram && chatId) {
+            return this.telegramService.sendActionRequired(
+              chatId,
               interrupt.review_configs?.[0]?.description ||
-              "Approval required.",
-          });
-        }
-
-        // Capture Tool Outputs
-        if (data.tools) {
-          Object.entries(data.tools).forEach(([toolName, output]) => {
-            capturedToolCalls.push({
-              toolName,
-              output,
-              status: ctx.decisionStatus || "auto_executed",
-            });
-          });
+                "Approval required.",
+              ctx.conversationId,
+            );
+          }
+          return this.emitter.emitActionRequired(ctx.conversationId, interrupt);
         }
       }
 
-      if (mode === "messages" && data[0]?.content) {
-        const token = data[0].content;
-        finalText += token;
-        this.emitter.emitToken(ctx.conversationId, token);
+      // 2. Process Messages (Streaming tokens)
+      if (mode === "messages") {
+        const msg = data[0];
+
+        // CRITICAL: Ensure we are looking at the Message Chunk, not the metadata object
+        // Metadata objects in the stream don't have 'content'
+        if (
+          msg &&
+          "content" in msg &&
+          typeof msg.content === "string" &&
+          !msg.tool_calls?.length
+        ) {
+          const token = msg.content;
+          finalText += token;
+
+          // Emit to Web UI (Pusher)
+          this.emitter.emitToken(ctx.conversationId, token);
+
+          // Buffer for Telegram to avoid spamming the API
+          if (
+            isTelegram &&
+            chatId &&
+            finalText.length - lastStreamedLength > 40
+          ) {
+            tgMessageId = await this.telegramService.streamToTelegram(
+              chatId,
+              finalText,
+              tgMessageId,
+              false,
+            );
+            lastStreamedLength = finalText.length;
+          }
+        }
+      }
+    }
+
+    // 3. Finalize the Telegram response
+    if (isTelegram && chatId) {
+      if (tgMessageId) {
+        // Edit the existing stream bubble with the final text
+        await this.telegramService.streamToTelegram(
+          chatId,
+          finalText,
+          tgMessageId,
+          true,
+        );
+      } else if (finalText.trim().length > 0) {
+        // If the message was too short to trigger the stream loop, send it now
+        await this.telegramService.sendMessage(ctx.userId, finalText);
       }
     }
 
     await this.persistCompletion(ctx, finalText, capturedToolCalls);
   }
-
   private async persistCompletion(ctx: any, content: string, toolCalls: any[]) {
     if (!content && toolCalls.length === 0) return;
 
@@ -193,15 +246,12 @@ export class AIOrchestratorService {
     };
 
     await this.conversationService.createMessage(assistantMessage);
-
-    if (ctx.isFirstMessage) {
+    if (ctx.isFirstMessage)
       await this.generateAndSaveTitle(
         ctx.conversationId,
         ctx.userId,
         ctx.messageContent,
       );
-    }
-
     this.emitter.emitComplete(ctx.conversationId, assistantMessage.messageId);
   }
 
@@ -225,7 +275,7 @@ export class AIOrchestratorService {
     try {
       const response = await gpt41LLM.invoke([
         new SystemMessage(
-          "Create a 3-5 word concise title for this conversation. Return ONLY the title.",
+          "Create a 3-5 word title for this chat. Return ONLY the title.",
         ),
         new HumanMessage(firstMsg),
       ]);
@@ -249,7 +299,6 @@ export class AIOrchestratorService {
   private getAgentConfig(thread_id: string, userId: string) {
     return { configurable: { thread_id, userId, conversationId: thread_id } };
   }
-
   private handleError(conversationId: string, error: any) {
     logger.error(`[Orchestrator Fatal]:`, error);
     this.emitter.emitError(conversationId, error.message);
