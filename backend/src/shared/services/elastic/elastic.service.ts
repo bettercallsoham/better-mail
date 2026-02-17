@@ -226,8 +226,8 @@ export class ElasticsearchService {
           // Metadata for incremental summarization
           summaryMetadata: {
             properties: {
-              summarizedUpToDate: { type: "date" }, // Latest email date included in summary
-              lastSummarizedAt: { type: "date" }, // When summary was last generated
+              summarizedUpToDate: { type: "date" },
+              lastSummarizedAt: { type: "date" }, 
             },
           },
         },
@@ -253,7 +253,7 @@ export class ElasticsearchService {
         number_of_replicas: 1,
       },
       mappings: {
-        dynamic: false, // Allow child objects to control their own dynamic behavior
+        dynamic: false, 
         properties: {
           id: { type: "keyword" },
           userId: { type: "keyword" },
@@ -352,7 +352,6 @@ export class ElasticsearchService {
           updatedAt: { type: "date" },
           completedAt: { type: "date" },
 
-          // FLEXIBLE METADATA: Solves the strict_dynamic_mapping_exception
           metadata: {
             type: "object",
             dynamic: true,

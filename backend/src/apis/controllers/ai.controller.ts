@@ -41,7 +41,14 @@ export const summarizeThread = asyncHandler(
   async (req: Request, res: Response) => {
     const { threadId } = req.params as { threadId: string };
     const { emailAddress, forceRefresh = false } = req.body;
-    const userId = (req as any).user.id;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
 
     if (!emailAddress) {
       return res.status(400).json({
