@@ -10,10 +10,10 @@ import { buildContext } from "./helper";
 import { gpt41LLM } from "../../../config/llm";
 import crypto from "crypto";
 import { logger } from "@sentry/node";
-import { TelegramService } from "../../../../modules/telegram/telegram.service";
+import { TelegramHandler } from "../../../../modules/telegram/telegram.handler";
 
 export class AIOrchestratorService {
-  private telegramService = new TelegramService();
+  private telegramHandler = new TelegramHandler();
 
   constructor(
     private conversationService: ConversationService,
@@ -148,7 +148,7 @@ export class AIOrchestratorService {
           Object.entries(data.tools).forEach(([toolName, output]) => {
             capturedToolCalls.push({ toolName, output });
             if (isTelegram && chatId && toolName === "search_emails") {
-              this.telegramService.sendMessage(
+              this.telegramHandler.sendMessage(
                 ctx.userId,
                 "🔍 <i>Searching your inbox...</i>",
               );
@@ -160,7 +160,7 @@ export class AIOrchestratorService {
         if ("__interrupt__" in data) {
           const interrupt = data.__interrupt__[0].value;
           if (isTelegram && chatId) {
-            return this.telegramService.sendActionRequired(
+            return this.telegramHandler.sendActionRequired(
               chatId,
               interrupt.review_configs?.[0]?.description ||
                 "Approval required.",
@@ -192,7 +192,7 @@ export class AIOrchestratorService {
             chatId &&
             finalText.length - lastStreamedLength > 40
           ) {
-            tgMessageId = await this.telegramService.streamToTelegram(
+            tgMessageId = await this.telegramHandler.streamToTelegram(
               chatId,
               finalText,
               tgMessageId,
@@ -206,14 +206,14 @@ export class AIOrchestratorService {
 
     if (isTelegram && chatId) {
       if (tgMessageId) {
-        await this.telegramService.streamToTelegram(
+        await this.telegramHandler.streamToTelegram(
           chatId,
           finalText,
           tgMessageId,
           true,
         );
       } else if (finalText.trim().length > 0) {
-        await this.telegramService.sendMessage(ctx.userId, finalText);
+        await this.telegramHandler.sendMessage(ctx.userId, finalText);
       }
     }
 

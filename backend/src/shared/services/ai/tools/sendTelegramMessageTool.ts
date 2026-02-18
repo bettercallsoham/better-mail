@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { TelegramService } from "../../../../modules/telegram/telegram.service";
+import { TelegramHandler } from "../../../../modules/telegram/telegram.handler";
 
 const sendTelegramSchema = z.object({
   message: z
@@ -20,10 +20,10 @@ export const sendTelegramMessageTool = tool(
       return "Error: User identity missing. Message not sent.";
     }
 
-    const telegramService = new TelegramService();
+    const telegramHandler = new TelegramHandler();
 
     try {
-      await telegramService.sendMessage(userId, input.message);
+      await telegramHandler.sendMessage(userId, input.message);
 
       return JSON.stringify({
         success: true,
