@@ -5,7 +5,7 @@ import {
   validateThreadSummarization,
   validateRagChat,
 } from "../validators/ai.validator";
-import { summarizeThread, ragChat } from "../controllers/ai.controller";
+import { summarizeThread } from "../controllers/ai.controller";
 
 const router = Router();
 
@@ -16,13 +16,5 @@ router.post(
   verifyEmailOwnership,
   summarizeThread,
 );
-
-// router.post(
-//   "/chat",
-//   verifyAccessToken(),
-//   validateRagChat,
-//   verifyEmailOwnership,
-//   ragChat,
-// );
 
 export default router;
