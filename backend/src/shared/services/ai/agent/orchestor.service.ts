@@ -171,25 +171,22 @@ export class AIOrchestratorService {
         }
       }
 
-      // 2. Process Messages (Streaming tokens)
       if (mode === "messages") {
         const msg = data[0];
 
-        // CRITICAL: Ensure we are looking at the Message Chunk, not the metadata object
-        // Metadata objects in the stream don't have 'content'
-        if (
-          msg &&
-          "content" in msg &&
-          typeof msg.content === "string" &&
-          !msg.tool_calls?.length
-        ) {
+        const isAI = msg._getType() === "ai";
+        const hasContent =
+          typeof msg.content === "string" && msg.content.length > 0;
+        const isToolCall = msg.tool_calls && msg.tool_calls.length > 0;
+
+        if (isAI && hasContent && !isToolCall) {
           const token = msg.content;
           finalText += token;
 
-          // Emit to Web UI (Pusher)
-          this.emitter.emitToken(ctx.conversationId, token);
+          if (!isTelegram) {
+            this.emitter.emitToken(ctx.conversationId, token);
+          }
 
-          // Buffer for Telegram to avoid spamming the API
           if (
             isTelegram &&
             chatId &&
@@ -207,10 +204,8 @@ export class AIOrchestratorService {
       }
     }
 
-    // 3. Finalize the Telegram response
     if (isTelegram && chatId) {
       if (tgMessageId) {
-        // Edit the existing stream bubble with the final text
         await this.telegramService.streamToTelegram(
           chatId,
           finalText,
@@ -218,7 +213,6 @@ export class AIOrchestratorService {
           true,
         );
       } else if (finalText.trim().length > 0) {
-        // If the message was too short to trigger the stream loop, send it now
         await this.telegramService.sendMessage(ctx.userId, finalText);
       }
     }

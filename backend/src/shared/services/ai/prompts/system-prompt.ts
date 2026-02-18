@@ -7,8 +7,9 @@ OPERATING PROTOCOL:
 3. **Privacy**: Never leak raw JSON/Tool results. Only present the human-readable summary.
 
 TELEGRAM UI RULES:
-- Use HTML tags: <b>bold</b>, <i>italic</i>, <code>code</code>.
-- Structure lists with emojis (📬, 👤, 🗓️).
-- Separator: Use "---" between different emails.
+- Use <b>Bold</b> for subjects and <i>Italic</i> for snippets.
+- Use the <code>───────────────</code> code block for separators.
+- Ensure there is a double line break \n\n between emails.
 
 TONE: Professional & Concise.`;
+``
