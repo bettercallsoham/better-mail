@@ -8,12 +8,7 @@ import { conversationQueue } from "../../shared/queues/conversation.queue";
 export class TelegramHandler {
   private readonly CACHE_TTL = 7200;
 
-  private escape(text: string): string {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
+
 
   async sendMessage(userId: string, text: string) {
     console.log("Recieved final Text", text);
@@ -42,33 +37,45 @@ export class TelegramHandler {
     }
   }
 
-  async streamToTelegram(
-    chatId: string,
-    text: string,
-    messageId: number | null,
-    isFinal = false,
-  ): Promise<number | null> {
-    try {
-      if (!messageId) {
-        const sent = await telegramBot.api.sendMessage(chatId, text || "...", {
-          parse_mode: "HTML",
-        });
-        return sent.message_id;
-      }
 
-      if (text.trim().length > 0) {
-        await telegramBot.api.editMessageText(chatId, messageId, text, {
-          parse_mode: "HTML",
-        });
-      }
-      return messageId;
-    } catch (error: any) {
-      if (error.description?.includes("can't parse entities")) {
-        await telegramBot.api.editMessageText(chatId, messageId!, text);
-      }
+async streamToTelegram(
+  chatId: string,
+  text: string,
+  messageId: number | null,
+  isFinal = false,
+): Promise<number | null> {
+  try {
+    if (!messageId) {
+      const sent = await telegramBot.api.sendMessage(chatId, text || "...", {
+        parse_mode: "HTML",
+      });
+      return sent.message_id;
+    }
+
+    // 2. STREAMING EDIT: If we have an ID, we update it
+    if (text.trim().length > 0) {
+      await telegramBot.api.editMessageText(chatId, messageId, text, {
+        parse_mode: "HTML",
+      });
+    }
+    
+    return messageId;
+  } catch (error: any) {
+    // If the message wasn't found (e.g., deleted by user), start a new one
+    if (error.description?.includes("message to edit not found")) {
+      const sent = await telegramBot.api.sendMessage(chatId, text);
+      return sent.message_id;
+    }
+    
+    // Ignore "message is not modified" errors (common in fast streams)
+    if (error.description?.includes("message is not modified")) {
       return messageId;
     }
+
+    logger.error(`[TG Stream Error]: ${error.message}`);
+    return messageId;
   }
+}
 
   async sendActionRequired(
     chatId: string,
@@ -122,7 +129,6 @@ export class TelegramHandler {
     const uiCacheKey = `tg:ui_session:${chatId}`;
 
     try {
-      // 1. Check UI Cache first for the 'Already Connected' state
       const cachedUser = await redis.get(uiCacheKey);
 
       if (cachedUser && !token) {
@@ -130,7 +136,6 @@ export class TelegramHandler {
         return await this.sendConnectedWelcome(ctx, user.first_name);
       }
 
-      // 2. Fallback to Database check if cache is empty
       const userId = await this.getUserIdByChatId(chatId);
 
       if (userId && !token) {
@@ -141,7 +146,6 @@ export class TelegramHandler {
         const firstName =
           tgRecord?.first_name || ctx.from?.first_name || "friend";
 
-        // Cache the UI context for 1 hour (3600 seconds) to prevent DB spam
         await redis.set(
           uiCacheKey,
           JSON.stringify({ first_name: firstName }),
@@ -152,12 +156,10 @@ export class TelegramHandler {
         return await this.sendConnectedWelcome(ctx, firstName);
       }
 
-      // 3. If no token and not connected, show link instructions
       if (!token) {
         return await this.sendLinkInstructions(ctx);
       }
 
-      // 4. Handle Token/New Connection Logic
       const redisKey = `integration:telegram:link:${token}`;
       const targetUserId = await redis.get(redisKey);
 
@@ -170,7 +172,6 @@ export class TelegramHandler {
 
       await redis.del(redisKey);
 
-      // Create or update Integration record
       let [integration] = await Integration.findOrCreate({
         where: {
           user_id: targetUserId,
@@ -187,7 +188,6 @@ export class TelegramHandler {
         await integration.update({ status: IntegrationStatus.ACTIVE });
       }
 
-      // Attempt to fetch profile picture
       let photoUrl = null;
       try {
         const photos = await ctx.api.getUserProfilePhotos(ctx.from.id, {
@@ -201,7 +201,6 @@ export class TelegramHandler {
         logger.error("TG Profile Data Error: " + err);
       }
 
-      // Upsert Telegram specific details
       await TelegramIntegration.upsert({
         integration_id: integration.id,
         user_id: targetUserId,

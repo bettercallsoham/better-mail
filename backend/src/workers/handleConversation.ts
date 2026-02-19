@@ -42,7 +42,7 @@ export const conversationWorker = new Worker<ProcessConversationMessageJob>(
       await orchestrator.processMessage({
         conversationId,
         userId,
-        messageId,
+        // messageId,
         messageContent,
       });
 

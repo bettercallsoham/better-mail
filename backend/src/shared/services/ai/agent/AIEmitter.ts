@@ -1,12 +1,9 @@
 import { logger } from "@sentry/node";
 import { pusher } from "../../../config/pusher";
-import { TelegramHandler } from "../../../../modules/telegram/telegram.handler";
 export class AIEmitter {
   /**
    * Emits tokens word-by-word for the typewriter effect.
    */
-
-  private telegramHandler = new TelegramHandler();
 
   emitToken(conversationId: string, token: string) {
     pusher.trigger(`private-${conversationId}`, "ai.token", {

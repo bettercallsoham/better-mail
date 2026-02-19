@@ -7,9 +7,7 @@ import { getUserEmails } from "../../../../apis/utils/email-helper";
 const searchEmailsSchema = z.object({
   query: z
     .string()
-    .describe(
-      "Search query with keywords. Use this for general searches like 'google', 'apollo', 'project update', etc. Do NOT use filter syntax here.",
-    ),
+    .describe("Keywords to find in email subject or body (e.g., 'invoice')"),
   filters: z
     .object({
       isRead: z.boolean().optional().describe("Filter by read/unread status"),
@@ -48,7 +46,6 @@ const searchEmailsSchema = z.object({
 
 export const searchEmailsTool = tool(
   async (input, config) => {
-
     const userId = config.configurable?.userId;
 
     if (!userId) {

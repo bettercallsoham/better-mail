@@ -1,12 +1,11 @@
 import { Command } from "@langchain/langgraph";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
 import {
   ConversationMessage,
   ConversationService,
 } from "../../elastic/conversation.service";
 import { AgentFactory } from "./AgentsFactory";
 import { AIEmitter } from "./AIEmitter";
-import { buildContext } from "./helper";
 import { gpt41LLM } from "../../../config/llm";
 import crypto from "crypto";
 import { logger } from "@sentry/node";
@@ -24,259 +23,196 @@ export class AIOrchestratorService {
   async processMessage(input: {
     conversationId: string;
     userId: string;
-    messageId: string;
     messageContent: string;
   }) {
-    const { conversationId, userId, messageId, messageContent } = input;
+    const { conversationId, userId, messageContent } = input;
     const config = this.getAgentConfig(conversationId, userId);
+    const isTelegram = conversationId.startsWith("tg_");
 
     try {
       const agent = await this.agentFactory.createChatAgent();
+
       const state = (await agent.getState(config)) as any;
-      const isInterrupted = state.next && state.next.length > 0;
-
-      let stream;
-      if (isInterrupted) {
-        const lastMessage =
-          state.values?.messages?.[state.values.messages.length - 1];
-        const hasToolCalls = lastMessage?.tool_calls?.length > 0;
-
-        if (hasToolCalls) {
-          const isPositive = /yes|approve|do it|proceed|go ahead|delete/i.test(
-            messageContent,
-          );
-          stream = await agent.stream(
-            new Command({
-              resume: {
-                decisions: lastMessage.tool_calls.map(() => ({
-                  type: isPositive ? "approve" : "reject",
-                })),
-              },
-            }),
-            { ...config, streamMode: ["messages", "updates"] },
-          );
-        } else {
-          stream = await agent.stream(new Command({ resume: messageContent }), {
-            ...config,
-            streamMode: ["messages", "updates"],
-          });
-        }
-      } else {
-        const { summary, messages: history } =
-          await this.conversationService.getConversationContext(conversationId);
-        const messages = [
-          ...buildContext({ summary, messages: history }),
-          new HumanMessage(messageContent),
-        ];
-        stream = await agent.stream(
-          { messages },
-          { ...config, streamMode: ["messages", "updates"] },
-        );
-      }
-
-      await this.handleStream(stream, {
-        conversationId,
-        userId,
-        messageId,
-        isFirstMessage: !state.values?.messages?.length,
-        messageContent,
-      });
-    } catch (error: any) {
-      this.handleError(conversationId, error);
-    }
-  }
-
-  async handleApproval(input: {
-    conversationId: string;
-    userId: string;
-    messageId: string;
-    approved: boolean;
-  }) {
-    const { conversationId, userId, approved } = input;
-    const config = this.getAgentConfig(conversationId, userId);
-
-    try {
-      const agent = await this.agentFactory.createChatAgent();
-      const state = (await agent.getState(config)) as any;
-      const lastMsg =
-        state.values?.messages?.[state.values.messages.length - 1];
-      const pendingCalls = lastMsg?.tool_calls || [];
+      const isFirstMessage =
+        !state.values?.messages || state.values.messages.length === 0;
 
       const stream = await agent.stream(
-        new Command({
-          resume: {
-            decisions: pendingCalls.map(() => ({
-              type: approved ? "approve" : "reject",
-            })),
-          },
-        }),
+        { messages: [new HumanMessage(messageContent)] },
         { ...config, streamMode: ["messages", "updates"] },
       );
 
       await this.handleStream(stream, {
         conversationId,
         userId,
-        decisionStatus: approved ? "approved" : "rejected",
+        isTelegram,
+        isFirstMessage,
+        messageContent,
       });
     } catch (error: any) {
-      this.handleError(conversationId, error);
+      this.handleError(conversationId, error, isTelegram);
     }
   }
 
+  async handleApproval(input: {
+    conversationId: string;
+    userId: string;
+    approved: boolean;
+  }) {
+    const { conversationId, userId, approved } = input;
+    const config = this.getAgentConfig(conversationId, userId);
+    const isTelegram = conversationId.startsWith("tg_");
+
+    try {
+      const agent = await this.agentFactory.createChatAgent();
+
+      // Resume the graph using the structured Command API
+      const stream = await agent.stream(
+        new Command({ resume: approved ? "approve" : "reject" }),
+        { ...config, streamMode: ["messages", "updates"] },
+      );
+
+      await this.handleStream(stream, {
+        conversationId,
+        userId,
+        isTelegram,
+        decisionStatus: approved ? "approved" : "rejected",
+      });
+    } catch (error: any) {
+      this.handleError(conversationId, error, isTelegram);
+    }
+  }
+
+  /**
+   * Unified stream handler with Client Isolation (TG vs Web).
+   */
   private async handleStream(stream: any, ctx: any) {
     let finalText = "";
     let tgMessageId: number | null = null;
     let lastStreamedLength = 0;
     const capturedToolCalls: any[] = [];
-
-    const isTelegram = ctx.conversationId.startsWith("tg_");
-    const chatId = isTelegram ? ctx.conversationId.replace("tg_", "") : null;
+    const chatId = ctx.isTelegram
+      ? ctx.conversationId.replace("tg_", "")
+      : null;
 
     for await (const [mode, data] of stream) {
-      // 1. Process Updates (Tools and Interrupts)
       if (mode === "updates") {
-        // Safely check if model_request exists and has messages
-        if (data.model_request?.messages) {
-          const msg = data.model_request.messages[0];
-          if (msg?.tool_calls?.length > 0) {
-            // Tool calls are handled here if needed
+        if (data.tools) {
+          const toolName = Object.keys(data.tools)[0];
+          if (ctx.isTelegram) {
+            await this.telegramHandler.sendMessage(
+              ctx.userId,
+              `⚙️ <i>Using ${toolName}...</i>`,
+            );
+          } else {
+            this.emitter.emitToolStart(ctx.conversationId, toolName);
           }
         }
-
-        // Handle standard tool output capture
-        if (data.tools) {
-          Object.entries(data.tools).forEach(([toolName, output]) => {
-            capturedToolCalls.push({ toolName, output });
-            if (isTelegram && chatId && toolName === "search_emails") {
-              this.telegramHandler.sendMessage(
-                ctx.userId,
-                "🔍 <i>Searching your inbox...</i>",
-              );
-            }
-          });
-        }
-
-        // Handle Interrupts
         if ("__interrupt__" in data) {
           const interrupt = data.__interrupt__[0].value;
-          if (isTelegram && chatId) {
+          if (ctx.isTelegram && chatId) {
             return this.telegramHandler.sendActionRequired(
               chatId,
-              interrupt.review_configs?.[0]?.description ||
-                "Approval required.",
+              interrupt.description,
               ctx.conversationId,
             );
+          } else {
+            return this.emitter.emitActionRequired(
+              ctx.conversationId,
+              interrupt,
+            );
           }
-          return this.emitter.emitActionRequired(ctx.conversationId, interrupt);
         }
       }
 
       if (mode === "messages") {
         const msg = data[0];
+        if (msg._getType() === "ai" && msg.content && !msg.tool_calls?.length) {
+          finalText += msg.content;
 
-        const isAI = msg._getType() === "ai";
-        const hasContent =
-          typeof msg.content === "string" && msg.content.length > 0;
-        const isToolCall = msg.tool_calls && msg.tool_calls.length > 0;
-
-        if (isAI && hasContent && !isToolCall) {
-          const token = msg.content;
-          finalText += token;
-
-          if (!isTelegram) {
-            this.emitter.emitToken(ctx.conversationId, token);
-          }
-
-          if (
-            isTelegram &&
-            chatId &&
-            finalText.length - lastStreamedLength > 40
-          ) {
-            tgMessageId = await this.telegramHandler.streamToTelegram(
-              chatId,
-              finalText,
-              tgMessageId,
-              false,
-            );
-            lastStreamedLength = finalText.length;
+          if (ctx.isTelegram && chatId) {
+            if (finalText.length - lastStreamedLength > 50) {
+              tgMessageId = await this.telegramHandler.streamToTelegram(
+                chatId,
+                finalText,
+                tgMessageId,
+                false, 
+              );
+              lastStreamedLength = finalText.length;
+            }
+          } else {
+            this.emitter.emitToken(ctx.conversationId, msg.content);
           }
         }
       }
     }
 
-    if (isTelegram && chatId) {
-      if (tgMessageId) {
-        await this.telegramHandler.streamToTelegram(
-          chatId,
-          finalText,
-          tgMessageId,
-          true,
-        );
-      } else if (finalText.trim().length > 0) {
-        await this.telegramHandler.sendMessage(ctx.userId, finalText);
-      }
+    if (ctx.isTelegram && chatId && finalText.trim().length > 0) {
+      await this.telegramHandler.streamToTelegram(
+        chatId,
+        finalText,
+        tgMessageId,
+        true,
+      );
     }
 
     await this.persistCompletion(ctx, finalText, capturedToolCalls);
   }
-  private async persistCompletion(ctx: any, content: string, toolCalls: any[]) {
-    if (!content && toolCalls.length === 0) return;
 
+  private async persistCompletion(ctx: any, content: string, toolCalls: any[]) {
+    if (!content && (!toolCalls || toolCalls.length === 0)) return;
+
+    const messageId = crypto.randomUUID();
     const assistantMessage: ConversationMessage = {
-      messageId: crypto.randomUUID(),
+      messageId,
       conversationId: ctx.conversationId,
       userId: ctx.userId,
       role: "assistant",
-      content: content || (toolCalls.length > 0 ? "Action processed." : ""),
+      content: content || "Action processed.",
       status: "completed",
       createdAt: new Date(),
       updatedAt: new Date(),
-      toolCalls: toolCalls,
       metadata: {
         model: "gpt-4.1",
         userDecision: ctx.decisionStatus || "auto_executed",
       },
-      sources: this.extractSources(toolCalls),
     };
 
     await this.conversationService.createMessage(assistantMessage);
-    if (ctx.isFirstMessage)
-      await this.generateAndSaveTitle(
+
+    if (ctx.isFirstMessage && ctx.messageContent && !ctx.isTelegram) {
+      this.generateTitleBackground(
         ctx.conversationId,
         ctx.userId,
         ctx.messageContent,
-      );
-    this.emitter.emitComplete(ctx.conversationId, assistantMessage.messageId);
+        ctx.isTelegram,
+      ).catch((err) => logger.error("[Title Gen Error]:", err));
+    }
+
+    if (!ctx.isTelegram) {
+      this.emitter.emitComplete(ctx.conversationId, messageId);
+    }
   }
 
-  private extractSources(toolCalls: any[]) {
-    return toolCalls
-      .filter((tc) => tc.toolName === "search_emails" && tc.output?.emails)
-      .flatMap((tc) =>
-        tc.output.emails.map((e: any) => ({
-          type: "email",
-          emailId: e.emailId,
-          snippet: e.snippet,
-        })),
-      );
-  }
-
-  private async generateAndSaveTitle(
-    conversationId: string,
-    userId: string,
+  private async generateTitleBackground(
+    convId: string,
+    uId: string,
     firstMsg: string,
+    isTg: boolean,
   ) {
     try {
       const response = await gpt41LLM.invoke([
-        new SystemMessage(
-          "Create a 3-5 word title for this chat. Return ONLY the title.",
-        ),
-        new HumanMessage(firstMsg),
+        {
+          role: "system",
+          content:
+            "Create a 3-5 word title for this chat. Return ONLY title text.",
+        },
+        { role: "user", content: firstMsg },
       ]);
       const title = response.content.toString().replace(/"/g, "");
+
       await this.conversationService.createOrUpdateSummary({
-        conversationId,
-        userId,
+        conversationId: convId,
+        userId: uId,
         title,
         summary: firstMsg.slice(0, 100),
         messageCount: 2,
@@ -284,17 +220,25 @@ export class AIOrchestratorService {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      this.emitter.emitTitleGenerated(conversationId, title);
+
+      if (!isTg) this.emitter.emitTitleGenerated(convId, title);
     } catch (err) {
-      logger.error("[Title Gen Error]:" + err);
+      logger.error("[Title Background Error]:", { err });
     }
   }
 
   private getAgentConfig(thread_id: string, userId: string) {
     return { configurable: { thread_id, userId, conversationId: thread_id } };
   }
-  private handleError(conversationId: string, error: any) {
-    logger.error(`[Orchestrator Fatal]:`, error);
-    this.emitter.emitError(conversationId, error.message);
+
+  private handleError(conversationId: string, error: any, isTelegram: boolean) {
+    logger.error(`[Orchestrator Fatal Error]:`, error);
+    if (isTelegram) {
+      const chatId = conversationId.replace("tg_", "");
+      console.log("ERROR HAPPEEENEDDDDD");
+      console.dir(error, { depth: null });
+    } else {
+      this.emitter.emitError(conversationId, error.message);
+    }
   }
 }
