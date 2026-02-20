@@ -34,7 +34,6 @@ class Integration extends Model<
   declare provider: IntegrationProvider;
   declare status: CreationOptional<IntegrationStatus>;
 
-  // OAuth-based integrations
   declare access_token: string | null;
   declare refresh_token: string | null;
   declare expires_at: Date | null;

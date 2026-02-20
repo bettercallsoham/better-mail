@@ -31,10 +31,10 @@ TelegramIntegration.init(
       type: DataTypes.UUID,
       allowNull: false,
       references: {
-        model: "users", 
+        model: "users",
         key: "id",
       },
-      onDelete: "CASCADE", // If user is deleted, remove their TG integration
+      onDelete: "CASCADE",
     },
 
     chat_id: {
