@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import { PostHogProvider } from "@/lib/analytics/PosthogProvider";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://bettermail.tech"),
@@ -101,7 +102,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable}  ${instrumentSerif.variable} antialiased`}
       >
-        {children}
+        <PostHogProvider>{children}</PostHogProvider>
       </body>
     </html>
   );
