@@ -1,15 +1,18 @@
 "use client";
 
+import { analytics } from "@/lib/analytics/events";
 import Image from "next/image";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function AuthPage() {
   const handleGoogleLogin = () => {
+    analytics.gmailLogin();
     window.location.href = `${API_URL}/api/v1/auth/google`;
   };
 
   const handleOutlookLogin = () => {
+    analytics.outlookLogin();
     window.location.href = `${API_URL}/api/v1/auth/outlook`;
   };
 

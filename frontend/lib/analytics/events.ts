@@ -6,9 +6,9 @@ export const analytics = {
 
   pricingViewed: () => posthog.capture("pricing_viewed"),
 
-  userSignedUp: () => posthog.capture("user_signed_up"),
+  outlookLogin: () => posthog.capture("user_outlook_login"),
 
-  userLoggedIn: () => posthog.capture("user_logged_in"),
+  gmailLogin: () => posthog.capture("user_gmail_login"),
 
   emailConnected: (provider: string) =>
     posthog.capture("email_connected", { provider }),
