@@ -47,6 +47,10 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+.font-instrument {
+  font-family: var(--font-instrument), serif;
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -123,4 +127,10 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }

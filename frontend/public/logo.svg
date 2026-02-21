@@ -1,0 +1,36 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect x="32" y="32" width="448" height="448" rx="80" ry="80" fill="black"/>
+
+  <!-- Letter B -->
+  <path d="
+    M170 140
+    Q170 120 190 120
+    H310
+    Q360 120 360 170
+    Q360 210 330 225
+    Q370 245 370 300
+    Q370 360 300 360
+    H200
+    Q170 360 170 330
+    Z
+
+    M210 160
+    H300
+    Q330 160 330 190
+    Q330 220 300 220
+    H210
+    Z
+
+    M210 260
+    H290
+    Q330 260 330 300
+    Q330 330 290 330
+    H210
+    Z
+  " fill="white"/>
+
+  <!-- Envelope -->
+  <path d="M210 180 L280 220 L350 180 Z" fill="black"/>
+  <path d="M210 180 L280 240 L350 180"
+        fill="none" stroke="black" stroke-width="6"/>
+</svg>
