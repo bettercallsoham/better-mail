@@ -26,6 +26,19 @@ import {
 export function createApp() {
   const app = express();
 
+  app.set("trust proxy", 1);
+  const corsOptions = {
+    origin: [
+      "http://localhost:3000",
+      "https://staging.abhisharma.app",
+      "https://abhisharma.app",
+    ],
+    credentials: true,
+  };
+
+  app.use(cors(corsOptions));
+  app.options("*", cors(corsOptions));
+
   app.use(express.static(path.join(__dirname, "../public")));
   const limiter = rateLimit({
     windowMs: 1 * 60 * 1000,
@@ -38,27 +51,13 @@ export function createApp() {
   });
 
   Sentry.setupExpressErrorHandler(app);
-  app.set("trust proxy", 1);
-  app.use(cors());
   app.use(helmet());
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: false }));
   app.use(limiter);
 
-  app.use(
-    cors({
-      origin: [
-        "http://localhost:3000",
-        "https://staging.abhisharma.app",
-        "https://abhisharma.app",
-      ],
-      credentials: true,
-    }),
-  );
-
   app.use(cookieparser());
 
-  // BullBoard Dashboard with authentication and security
   app.use(
     "/admin/queues",
     bullBoardEnvCheck,
