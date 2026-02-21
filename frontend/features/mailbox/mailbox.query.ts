@@ -14,6 +14,8 @@ export const mailboxKeys = {
       : ([...mailboxKeys.all, "threads"] as const),
   thread: (threadId: string) =>
     [...mailboxKeys.all, "thread", threadId] as const,
+  folders: (email?: string) =>
+    [...mailboxKeys.all, "folders", { email }] as const,
 };
 
 export function useConnectedAccounts() {
@@ -54,5 +56,14 @@ export function useThreadDetail(threadId: string) {
     queryFn: () => mailboxService.getThreadDetail(threadId),
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+  });
+}
+
+export function useFolders(email?: string) {
+  return useSuspenseQuery({
+    queryKey: mailboxKeys.folders(email),
+    queryFn: () => mailboxService.getFolders(email),
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 }

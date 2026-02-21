@@ -2,13 +2,13 @@ export interface ConnectedAccount {
   id: string;
   email: string;
   created_at: string;
-  provider?: string;  
+  provider?: string;
 }
 
 export interface GetConnectedAccountsResponse {
   message: string;
   success: boolean;
-  data: ConnectedAccount[]; 
+  data: ConnectedAccount[];
 }
 
 export interface ThreadCursor {
@@ -80,5 +80,28 @@ export interface GetThreadDetailResponse {
   data: {
     total: { value: number; relation: string };
     emails: FullEmail[];
+  };
+}
+
+export interface SystemFolders {
+  unread: number;
+  starred: number;
+  archived: number;
+  inbox: number;
+  sent: number;
+  important: number;
+  drafts: number;
+}
+
+export interface MailLabel {
+  label: string;
+  count: number;
+}
+
+export interface GetFoldersResponse {
+  success: boolean;
+  data: {
+    system: SystemFolders;
+    labels: MailLabel[];
   };
 }

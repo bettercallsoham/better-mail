@@ -1,6 +1,7 @@
 import { apiClient } from "../../lib/api/client";
 import {
   GetConnectedAccountsResponse,
+  GetFoldersResponse,
   GetThreadDetailResponse,
   GetThreadEmailsResponse,
   ThreadQueryParams,
@@ -24,4 +25,10 @@ export const mailboxService = {
 
   getThreadDetail: (threadId: string) =>
     apiClient<GetThreadDetailResponse>(`/mail/thread/${threadId}`),
+
+  getFolders: (email?: string) => {
+    const params = new URLSearchParams();
+    if (email) params.append("email", email);
+    return apiClient<GetFoldersResponse>(`/mail/folders?${params.toString()}`);
+  },
 };
