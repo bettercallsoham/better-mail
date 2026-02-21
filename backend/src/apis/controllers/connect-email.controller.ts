@@ -115,20 +115,16 @@ export const gmailConnectCallback = asyncHandler(async (req, res) => {
     });
   }
 
-  // add to handle-mailbox-connection-queue
   await handleMailboxConnectionQueue.add(handleMailboxConnectionQueue.name, {
     provider: "google",
     email: identity.email,
   });
 
-  // Invalidate user's email cache since they connected a new email
   await invalidateUserEmailsCache(userId);
 
-  res.json({
-    success: true,
-    message: "Gmail connected successfully",
-    email: identity.email,
-  });
+  return res.redirect(
+    `${process.env.FRONTEND_URL}/app/settings?provider=gmail&email=${encodeURIComponent(identity.email)}`,
+  );
 }, "gmailConnectCallback");
 
 export const outlookConnectCallback = asyncHandler(
@@ -197,14 +193,11 @@ export const outlookConnectCallback = asyncHandler(
       email: identity.email,
     });
 
-    // Invalidate user's email cache since they connected a new email
     await invalidateUserEmailsCache(userId);
 
-    res.json({
-      success: true,
-      message: "Outlook connected successfully",
-      email: identity.email,
-    });
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/app/settings?provider=gmail&email=${encodeURIComponent(identity.email)}`,
+    );
   },
   "outlookConnectCallback",
 );

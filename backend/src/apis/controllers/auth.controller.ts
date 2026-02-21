@@ -267,17 +267,13 @@ export const googleCallback = asyncHandler(async (req, res) => {
 
   const token = jwt.sign({ userId: user.id }, JWT_SECRET!, { expiresIn: "7d" });
 
-  res.json({
-    success: true,
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      signupMethod: user.signupMethod,
-      avatar: user.avatar,
-    },
+  res.cookie("access_token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
+
+  res.redirect(`${process.env.FRONTEND_URL}/app`);
 }, "googleCallback");
 
 export const outlookLogin = asyncHandler(async (_req, res) => {
@@ -363,15 +359,11 @@ export const outlookCallback = asyncHandler(async (req, res) => {
     expiresIn: "7d",
   });
 
-  res.json({
-    success: true,
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      signupMethod: user.signupMethod,
-      avatar: user.avatar,
-    },
+  res.cookie("access_token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
+
+  res.redirect(`${process.env.FRONTEND_URL}/app`);
 }, "outlookCallback");

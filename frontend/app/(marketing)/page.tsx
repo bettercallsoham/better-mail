@@ -9,8 +9,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="mx-auto max-w-5xl text-center">
         <Button onClick={() => analytics.ctaClicked("Get Started")}>
-          {" "}
-          Get started{" "}
+          Get started
         </Button>
       </section>
     </>
