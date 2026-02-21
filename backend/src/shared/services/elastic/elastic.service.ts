@@ -227,7 +227,7 @@ export class ElasticsearchService {
           summaryMetadata: {
             properties: {
               summarizedUpToDate: { type: "date" },
-              lastSummarizedAt: { type: "date" }, 
+              lastSummarizedAt: { type: "date" },
             },
           },
         },
@@ -253,7 +253,7 @@ export class ElasticsearchService {
         number_of_replicas: 1,
       },
       mappings: {
-        dynamic: false, 
+        dynamic: false,
         properties: {
           id: { type: "keyword" },
           userId: { type: "keyword" },
@@ -623,22 +623,19 @@ export class ElasticsearchService {
           ],
         },
       },
-      sort: [
-        { receivedAt: "desc" },
-        { id: "asc" }, // tiebreaker
-      ],
+      sort: [{ receivedAt: "desc" }],
       collapse: {
         field: "threadId",
         inner_hits: [
           {
             name: "thread_state",
-            size: 10, // small number is enough
+            size: 10,
             _source: ["isRead", "isStarred"],
           },
         ],
       },
       ...(cursor && {
-        search_after: [cursor.receivedAt, cursor.id],
+        search_after: [cursor.receivedAt],
       }),
     });
 

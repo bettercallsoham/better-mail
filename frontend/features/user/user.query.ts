@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { userService } from "@/lib/api/services/user.service";
+import { userService } from "@/features/user/user.api";
 
 export function useCurrentUser() {
   return useSuspenseQuery({

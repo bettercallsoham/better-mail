@@ -41,7 +41,7 @@ export const connectGmail = asyncHandler(
       300,
     );
 
-    res.json(url);
+    res.redirect(url);
   },
   "connectGmail",
 );
@@ -65,7 +65,7 @@ export const connectOutlook = asyncHandler(async (req, res) => {
     "EX",
     300,
   );
-  res.json(url);
+  res.redirect(url);
 }, "connectOutlook");
 
 export const gmailConnectCallback = asyncHandler(async (req, res) => {

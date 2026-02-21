@@ -49,12 +49,12 @@ export const getThreadEmails = asyncHandler(
       });
     }
 
-    // Parse cursor if provided (it comes as a JSON string in query params)
     let parsedCursor: { receivedAt: string; id: string } | undefined;
+
     if (cursor && typeof cursor === "string") {
       try {
         parsedCursor = JSON.parse(cursor);
-      } catch (err) {
+      } catch {
         return res.status(400).json({
           success: false,
           message: "Invalid cursor format",
@@ -62,7 +62,6 @@ export const getThreadEmails = asyncHandler(
       }
     }
 
-    
     const { emails: emailAddresses, error } = await getUserEmails(
       userId,
       email as string | undefined,
@@ -83,17 +82,28 @@ export const getThreadEmails = asyncHandler(
       });
     }
 
+    let allowedEmails = emailAddresses;
+
+    if (email && typeof email === "string") {
+      if (!emailAddresses.includes(email)) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied for this email account",
+        });
+      }
+
+      allowedEmails = [email];
+    }
 
     const elasticService = new ElasticsearchService(elasticClient);
 
     const threads = await elasticService.getInboxThreads({
-      emailAddresses,
+      emailAddresses: allowedEmails,
       size: size ? parseInt(size as string, 10) : 20,
       cursor: parsedCursor,
     });
 
-
-    res.json({
+    return res.json({
       success: true,
       data: threads,
     });

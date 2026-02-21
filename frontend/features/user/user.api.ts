@@ -1,4 +1,4 @@
-import { apiClient } from "../client";
+import { apiClient } from "../../lib/api/client";
 
 export interface User {
   id: string;
@@ -15,5 +15,5 @@ export interface GetCurrentUserResponse {
 }
 
 export const userService = {
-  getCurrentUser: () => apiClient<GetCurrentUserResponse>("/api/v1/auth/user"),
+  getCurrentUser: () => apiClient<GetCurrentUserResponse>("/auth/user"),
 };
