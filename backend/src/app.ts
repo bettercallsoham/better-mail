@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/node";
-
+import cookieparser from "cookie-parser";
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV || "development",
@@ -44,6 +44,19 @@ export function createApp() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: false }));
   app.use(limiter);
+
+  app.use(
+    cors({
+      origin: [
+        "http://localhost:3000",
+        "https://staging.abhisharma.app",
+        "https://abhisharma.app",
+      ],
+      credentials: true,
+    }),
+  );
+
+  app.use(cookieparser());
 
   // BullBoard Dashboard with authentication and security
   app.use(
