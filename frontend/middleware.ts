@@ -8,14 +8,14 @@ export function middleware(request: NextRequest) {
 
   const token = request.cookies.get(AUTH_COOKIE)?.value;
 
-  const isProtectedRoute = pathname.startsWith("/app");
-  const isAuthRoute = pathname === "/login";
+  const isProtected = pathname.startsWith("/app");
+  const isLoginPage = pathname === "/auth";
 
-  if (!token && isProtectedRoute) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (!token && isProtected) {
+    return NextResponse.redirect(new URL("/auth", request.url));
   }
 
-  if (token && isAuthRoute) {
+  if (token && isLoginPage) {
     return NextResponse.redirect(new URL("/app", request.url));
   }
 
@@ -23,5 +23,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/login"],
+  matcher: ["/app/:path*", "/auth"],
 };

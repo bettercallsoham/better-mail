@@ -2,11 +2,10 @@
 
 import posthog from "posthog-js";
 import { useEffect } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
@@ -23,8 +22,9 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!pathname) return;
     posthog.capture("$pageview");
-  }, [pathname, searchParams]);
+  }, [pathname]);
 
   return <>{children}</>;
 }
