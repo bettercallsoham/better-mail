@@ -24,7 +24,7 @@ export default function Navbar() {
         "fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-in-out",
         scrolled
           ? "py-3 backdrop-blur-xl border-b shadow-sm bg-white/70 dark:bg-black/70 border-black/5 dark:border-white/10"
-          : "py-5 bg-transparent border-transparent"
+          : "py-5 bg-transparent border-transparent",
       )}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-8">

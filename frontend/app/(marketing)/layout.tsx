@@ -55,7 +55,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
         }}
       />
 
-      <main className="mx-auto max-w-7xl px-6 py-16">{children}</main>
+      <main className="">{children}</main>
     </>
   );
 }

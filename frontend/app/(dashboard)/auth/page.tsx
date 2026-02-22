@@ -39,7 +39,7 @@ export default function AuthPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="relative z-10 w-full max-w-[380px] overflow-hidden rounded-[24px] border border-white/40 bg-white/90 p-10 shadow-2xl backdrop-blur-sm dark:border-neutral-800/50 dark:bg-black/90"
+          className="relative z-10 w-full max-w-95 overflow-hidden rounded-[24px] border border-white/40 bg-white/90 p-10 shadow-2xl backdrop-blur-sm dark:border-neutral-800/50 dark:bg-black/90"
         >
           {/* Subtle Grid with Radial Alpha Mask */}
           <div
