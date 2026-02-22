@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import Navbar from "@/components/landing-page/Navbar";
 
 export const metadata: Metadata = {
   robots: {
@@ -55,7 +56,10 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
         }}
       />
 
-      <main className="">{children}</main>
+      <main className="">
+        <Navbar />
+        {children}
+      </main>
     </>
   );
 }

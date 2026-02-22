@@ -33,20 +33,20 @@ export default function HeroSection() {
             <EmailChatDemo />
           </div>
 
-          <div className="lg:col-span-6 max-w-4xl xl:col-span-6 flex flex-col items-center justify-center text-center space-y-2  py-2 md:py-16">
+          <div className="lg:col-span-6  flex flex-col items-center justify-center text-center space-y-2  py-2 md:py-16">
             {/* Main Heading */}
-            <h1 className="relative z-20">
-              <span className=" text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold font-sans tracking-tight text-white drop-shadow-lg leading-tight">
-                Read Less & Do More with
-              </span>
-              <span className=" ml-2 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-instrument italic text-white drop-shadow-lg ">
-                Better Mail
+            <h1 className="relative z-20 flex flex-col gap-0 font-sans text-4xl sm:text-5xl lg:text-7xl font-semibold tracking-tight text-white drop-shadow-lg leading-tight">
+              <span>The best way to</span>
+              <span className="font-instrument font-medium text-blue-700 ">
+                manage emails{"  "}
+                <span className="not-italic font-sans text-white">with AI</span>
               </span>
             </h1>
 
             {/* Subtitle */}
-            <p className="relative z-20 text-muted text-sm md:text-xl font-medium  drop-shadow-md max-w-sm md:max-w-xl lg:max-w-2xl px-4 leading-relaxed">
-              AI sorts and prioritizes your inbox for better focus.
+            <p className="relative z-20 mt-4 max-w-sm md:max-w-2xl px-4 text-sm md:text-xl font-medium text-muted drop-shadow-md leading-relaxed">
+              Built to make you extraordinarily productive, Bettermail is the
+              best way to manage email with AI.
             </p>
 
             {/* CTA Button */}
@@ -68,7 +68,7 @@ export default function HeroSection() {
               <h2 className="text-sm text-white/90 font-mono font-medium">
                 Connect All Your apps
               </h2>
-              <GlassmorphicCard className="flex w-105  xl:gap-12 bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-xl p-5 transition-all duration-300 hover:bg-white/15 hover:border-white/30 hover:shadow-2xl items-center justify-center gap-50 ">
+              <GlassmorphicCard className="flex w-105   xl:gap-12 bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-xl p-5 transition-all duration-300 hover:bg-white/15 hover:border-white/30 hover:shadow-2xl items-center justify-center gap-10 ">
                 <Image
                   height={40}
                   width={40}

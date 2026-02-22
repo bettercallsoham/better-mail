@@ -105,7 +105,6 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable}  ${instrumentSerif.variable} antialiased`}
       >
         <PostHogProvider>
-          <Navbar />
           {children}
         </PostHogProvider>
       </body>
