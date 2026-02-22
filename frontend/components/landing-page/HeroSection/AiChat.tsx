@@ -111,7 +111,7 @@ export function EmailChatDemo() {
         Use AI to automate your tasks.
       </span>
 
-      <GlassmorphicCard className="w-full lg:w-[420px] h-[350px] flex  flex-col p-0 overflow-hidden">
+      <GlassmorphicCard className="w-full lg:w-105 h-87.5 flex  flex-col p-0 overflow-hidden">
         <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-white/5 backdrop-blur-sm z-10">
           <div className="w-8 h-8 rounded bg-white/20 flex items-center justify-center">
             <Brain className="w-4 h-4 text-neutral-800" />

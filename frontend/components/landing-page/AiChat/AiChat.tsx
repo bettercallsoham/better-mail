@@ -79,7 +79,7 @@ export default function AIChat() {
         transition={{ duration: 0.6 }}
         className="text-center z-20 mb-8 md:mb-12"
       >
-        <h1 className="bg-clip-text z-20 text-transparent bg-gradient-to-b from-neutral-950 to-neutral-400 text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-instrument leading-tight">
+        <h1 className="bg-clip-text z-20 text-transparent bg-linear-to-b from-neutral-950 to-neutral-400 text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-instrument leading-tight">
           Ask AI Anything
         </h1>
 
@@ -158,7 +158,7 @@ export default function AIChat() {
         </div>
 
         {/* Chat Content */}
-        <div className="h-[500px] flex flex-col bg-gray-50/30">
+        <div className="h-125 flex flex-col bg-gray-50/30">
           {messages.length === 0 ? (
             <EmptyState onSuggestionClick={handleSend} />
           ) : (
@@ -220,7 +220,7 @@ function EmptyState({
         }}
         className="mb-8"
       >
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-purple-50 border border-neutral-200 flex items-center justify-center shadow-sm">
+        <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-blue-50 to-purple-50 border border-neutral-200 flex items-center justify-center shadow-sm">
           <Image
             src="/logo.png"
             width={500}
@@ -292,7 +292,7 @@ function ChatMessage({ message }: { message: Message }) {
       }`}
     >
       {/* Avatar */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         <div className="w-8 h-8 rounded-lg bg-white border border-neutral-200 flex items-center justify-center overflow-hidden shadow-sm">
           {message.isUser ? (
             <Image

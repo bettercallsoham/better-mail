@@ -1,11 +1,11 @@
-import AIChat from "@/components/AiChat/AiChat";
-import { ContainerWrap } from "@/components/container";
-import { DashboardSection } from "@/components/DashboardSection/DashboardSection";
-import CTASection from "@/components/FAQ/CTA";
-import FAQ from "@/components/FAQ/FAQ";
-import Card from "@/components/FeaturesSection/Features";
-import Footer from "@/components/Footer/Footer";
-import HeroSection from "@/components/HeroSection/HeroSection";
+import AIChat from "@/components/landing-page/AiChat/AiChat";
+import { ContainerWrap } from "@/components/landing-page/container";
+import { DashboardSection } from "@/components/landing-page/DashboardSection/DashboardSection";
+import CTASection from "@/components/landing-page/FAQ/CTA";
+import FAQ from "@/components/landing-page/FAQ/FAQ";
+import Card from "@/components/landing-page/FeaturesSection/Features";
+import Footer from "@/components/landing-page/Footer/Footer";
+import HeroSection from "@/components/landing-page/HeroSection/HeroSection";
 import ImageCompare from "@/components/ui/ImageCompare";
 import Navbar from "@/components/landing-page/Navbar";
 export default function Home() {

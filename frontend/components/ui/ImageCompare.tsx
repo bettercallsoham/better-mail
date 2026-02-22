@@ -6,7 +6,7 @@ export default function CompareDashboard() {
     <div className="p-4 sm:p-6 gap-6 flex flex-col items-center justify-center pt-10 md:pt-2 md:h-[80vh] rounded-3xl dark:bg-neutral-900 bg-neutral-50 dark:border-neutral-800 w-full">
       {/* Header - responsive for all screen sizes */}
       <div className="w-full max-w-4xl px-2 sm:px-4">
-        <h1 className="bg-clip-text text-transparent bg-gradient-to-b from-neutral-950 to-neutral-400 dark:from-neutral-50 dark:to-neutral-400 text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-instrument leading-tight">
+        <h1 className="bg-clip-text text-transparent bg-linear-to-b from-neutral-950 to-neutral-400 dark:from-neutral-50 dark:to-neutral-400 text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-instrument leading-tight">
           You&apos;re Missing an
           <span className="block sm:inline sm:ml-2 font-instrument">
             Amazing Experience

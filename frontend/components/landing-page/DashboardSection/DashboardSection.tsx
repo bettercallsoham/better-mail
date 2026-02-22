@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Brain, Inbox, Workflow } from "lucide-react";
 import { motion } from "motion/react";
-import { BorderBeam } from "../ui/border-beam";
+import { BorderBeam } from "../../ui/border-beam";
 // import GridShowcase from "./TechStackGrid";
 
 export function DashboardSection() {

@@ -18,7 +18,7 @@ import {
 import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView } from "motion/react";
 import Image from "next/image";
-import { AnimatedBeam } from "../ui/animated-beam";
+import { AnimatedBeam } from "../../ui/animated-beam";
 
 export default function Bento() {
   return (

@@ -63,7 +63,7 @@ export default function Navbar() {
           <div className="flex items-center gap-4">
             <AnimatedThemeToggler />
             <Link
-              href="/dashboard"
+              href="/auth"
               className="px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 active:scale-95 bg-black text-white dark:bg-white dark:text-black shadow-lg"
             >
               Get Started

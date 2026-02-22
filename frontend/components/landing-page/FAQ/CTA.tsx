@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 export default function CTASection() {
   return (
-    <section className="relative w-full py-20  md:py-32 bg-gradient-to-b from-white via-blue-50/30 to-white overflow-hidden">
+    <section className="relative w-full py-20  md:py-32 bg-linear-to-b from-white via-blue-50/30 to-white overflow-hidden">
       {/* Background Grid */}
       <div
         className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.03)_1px,transparent_1px)]"
@@ -38,7 +38,7 @@ export default function CTASection() {
             viewport={{ once: true }}
             className="relative flex-1 flex items-center mb-20 lg:mb-0 justify-center order-2 lg:order-1"
           >
-            <div className="relative w-full max-w-[300px] md:max-w-md aspect-square flex items-center justify-center">
+            <div className="relative w-full max-w-75 md:max-w-md aspect-square flex items-center justify-center">
               {/* Center Logo */}
               <motion.div
                 initial={{ scale: 0 }}
@@ -52,7 +52,7 @@ export default function CTASection() {
                 viewport={{ once: true }}
                 className="relative z-10"
               >
-                <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 p-3 md:p-4 shadow-2xl flex items-center justify-center">
+                <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-linear-to-br from-blue-500 to-purple-600 p-3 md:p-4 shadow-2xl flex items-center justify-center">
                   <Image
                     src="/logo.png"
                     width={80}
@@ -65,7 +65,7 @@ export default function CTASection() {
 
               {/* Orbiting Icons - Inner Circle */}
               <OrbitingCircles
-                className="size-[35px] md:size-[40px] border-none bg-white shadow-lg rounded-full"
+                className="size-8.75 md:size-10 border-none bg-white shadow-lg rounded-full"
                 duration={20}
                 radius={110}
                 iconSize={35}
@@ -95,7 +95,7 @@ export default function CTASection() {
 
               {/* Orbiting Icons - Outer Circle */}
               <OrbitingCircles
-                className="size-[45px] md:size-[50px] border-none bg-white shadow-lg rounded-full"
+                className="size-11.25 md:size-12.5 border-none bg-white shadow-lg rounded-full"
                 duration={30}
                 radius={200}
                 iconSize={45}
@@ -174,7 +174,7 @@ export default function CTASection() {
               className="flex justify-center lg:justify-start"
             >
               <Link
-                href="/signup"
+                href="/auth"
                 className={cn(
                   "group relative inline-flex items-center justify-center gap-2 px-6 py-3 md:px-8 md:py-4 rounded-xl text-base md:text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0",
                   "bg-black/90 text-white hover:bg-black border border-white/20"

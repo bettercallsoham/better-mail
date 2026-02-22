@@ -52,7 +52,7 @@ export default function HeroSection() {
             {/* CTA Button */}
             <div className="relative z-20 pt-4">
               <Link
-                href="/signup"
+                href="/auth"
                 className="group inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-base md:text-lg font-semibold hover:bg-gray-900 transition-all duration-300 shadow-2xl hover:shadow-3xl hover:-translate-y-1 active:translate-y-0 border border-white/10"
               >
                 <span>Try for Free</span>
