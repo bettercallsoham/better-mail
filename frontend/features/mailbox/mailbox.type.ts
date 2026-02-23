@@ -16,25 +16,24 @@ export interface ThreadCursor {
   id: string;
 }
 
+// ── Label ─────────────────────────────────────────────────────────────────────
+export interface EmailLabel {
+  id: string;
+  name: string;
+  color?: string;
+}
+
 export interface ThreadEmail {
   threadId: string;
   latestEmailId: string;
   subject: string;
   snippet: string;
   receivedAt: string;
-
-  from: {
-    email: string;
-    name?: string;
-  };
-
-  to: {
-    email: string;
-    name?: string;
-  }[];
-
+  from: { email: string; name?: string };
+  to:   { email: string; name?: string }[];
   isUnread: boolean;
   isStarred: boolean;
+  labels?: EmailLabel[];
 }
 
 export interface GetThreadEmailsResponse {
@@ -43,6 +42,14 @@ export interface GetThreadEmailsResponse {
   data: {
     threads: ThreadEmail[];
     nextCursor: ThreadCursor | null;
+  };
+}
+
+// ── Sender threads ─────────────────────────────────────────────────────────────
+export interface GetSenderThreadsResponse {
+  success: boolean;
+  data: {
+    threads: ThreadEmail[];
   };
 }
 
@@ -67,6 +74,7 @@ export interface FullEmail {
   provider: "gmail" | "outlook";
   subject: string;
   bodyHtml: string;
+  bodyText?: string;
   snippet: string;
   from: EmailAddress;
   to: EmailAddress[];
@@ -74,9 +82,9 @@ export interface FullEmail {
   isRead: boolean;
   hasAttachments: boolean;
   threadId: string;
-  // Metadata for UI toggles
   isStarred: boolean;
   isDraft: boolean;
+  labels?: EmailLabel[];
 }
 
 export interface GetThreadDetailResponse {
@@ -108,4 +116,14 @@ export interface GetFoldersResponse {
     system: SystemFolders;
     labels: MailLabel[];
   };
+}
+
+// ── Action mutation params ─────────────────────────────────────────────────────
+export interface ThreadActionParams {
+  threadId: string;
+  emailAddress: string;
+}
+
+export interface LabelActionParams extends ThreadActionParams {
+  label: string;
 }

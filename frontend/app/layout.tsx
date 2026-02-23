@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { PostHogProvider } from "@/lib/analytics/PosthogProvider";
-import Navbar from "@/components/landing-page/Navbar";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://bettermail.tech"),
@@ -102,11 +101,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable}  ${instrumentSerif.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable}  ${instrumentSerif.variable} font-sans antialiased`}
       >
-        <PostHogProvider>
-          {children}
-        </PostHogProvider>
+        <PostHogProvider>{children}</PostHogProvider>
       </body>
     </html>
   );
