@@ -60,7 +60,6 @@ export const gpt41LLM = new AzureChatOpenAI({
 });
 
 export const gpt4oMiniLLM = new AzureChatOpenAI({
-  // Same changes
   azureOpenAIApiKey: AZURE_OPEN_AI_KEY!,
   azureOpenAIApiInstanceName: GPT_4O_MINI_ENDPOINT!
     .split("https://")[1]

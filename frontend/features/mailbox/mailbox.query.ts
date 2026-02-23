@@ -4,6 +4,7 @@ import {
 } from "@tanstack/react-query";
 import { mailboxService } from "./mailbox.api";
 import { ThreadCursor } from "./mailbox.type";
+import { useMutation } from "@tanstack/react-query";
 
 export const mailboxKeys = {
   all: ["mailboxes"] as const,
@@ -65,5 +66,24 @@ export function useFolders(email?: string) {
     queryFn: () => mailboxService.getFolders(email),
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
+  });
+}
+
+export function useConnectAccount() {
+  return useMutation({
+    mutationFn: async (provider: "gmail" | "outlook") => {
+      const response =
+        provider === "gmail"
+          ? await mailboxService.connectGmail()
+          : await mailboxService.connectOutlook();
+
+      return response;
+    },
+    onSuccess: (data) => {
+      console.log(data);
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
   });
 }

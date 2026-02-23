@@ -1,5 +1,4 @@
 import {
-  IconSend,
   IconStar,
   IconArchive,
   IconMail,
@@ -7,6 +6,7 @@ import {
   IconAlertCircle,
   IconClock,
   IconTag,
+  IconSend2,
 } from "@tabler/icons-react";
 
 import { MailLabel, SystemFolders } from "@/features/mailbox/mailbox.type";
@@ -46,7 +46,7 @@ export const SYSTEM_FOLDER_CONFIG: {
     key: "sent",
     folder: "sent",
     label: "Sent",
-    icon: <IconSend size={18} stroke={1.5} />,
+    icon: <IconSend2 size={18} stroke={1.5} />,
   },
   {
     key: "archived",

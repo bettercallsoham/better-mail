@@ -45,6 +45,13 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* ── App surface tokens ── */
+  --color-app-sidebar-bg: var(--app-sidebar-bg);
+  --color-app-sidebar-border: var(--app-sidebar-border);
+  --color-app-sidebar-hover: var(--app-sidebar-hover);
+  --color-app-sidebar-active: var(--app-sidebar-active);
+  --color-app-sidebar-muted: var(--app-sidebar-muted);
 }
 
 .font-instrument {
@@ -84,6 +91,12 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+
+  --app-sidebar-bg:     #f4f4f4;  
+  --app-sidebar-border: #e5e5e5;   
+  --app-sidebar-hover:  #ebebeb;   
+  --app-sidebar-active: #e0e0e0;   
+  --app-sidebar-muted:  #d4d4d4;   
 }
 
 .dark {
@@ -118,6 +131,17 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+
+  
+  --app-sidebar-bg:     #1c1c1f;   
+  --app-sidebar-border: #2e2e32;   
+  --app-sidebar-hover:  #26262a;   
+  --app-sidebar-active: #2e2e32;  
+  --app-sidebar-muted:  #2e2e32;   
+
+  --popover:            #1c1c1f;
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --border:             #2e2e32;
 }
 
 @layer base {

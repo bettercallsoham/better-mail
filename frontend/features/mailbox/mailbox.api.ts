@@ -1,5 +1,6 @@
 import { apiClient } from "../../lib/api/client";
 import {
+  ConnectResponse,
   GetConnectedAccountsResponse,
   GetFoldersResponse,
   GetThreadDetailResponse,
@@ -10,6 +11,10 @@ import {
 export const mailboxService = {
   getConnectedAccounts: () =>
     apiClient<GetConnectedAccountsResponse>("/mail/connected-accounts"),
+
+  connectGmail: () => apiClient<ConnectResponse>("/connect/gmail"),
+
+  connectOutlook: () => apiClient<ConnectResponse>("/connect/outlook"),
 
   getThreadEmails: (params: ThreadQueryParams) => {
     const searchParams = new URLSearchParams();

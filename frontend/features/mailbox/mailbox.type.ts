@@ -46,6 +46,10 @@ export interface GetThreadEmailsResponse {
   };
 }
 
+export interface ConnectResponse {
+  url: string;
+}
+
 export interface ThreadQueryParams {
   email?: string;
   size?: number;

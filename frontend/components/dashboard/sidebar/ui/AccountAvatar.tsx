@@ -13,7 +13,7 @@ export function AccountAvatar({ email, avatar, size = "md", isActive }: Props) {
   const dim = size === "sm" ? "h-7 w-7 text-[11px]" : "h-8 w-8 text-xs";
 
   return (
-    <div className="relative flex-shrink-0">
+    <div className="relative cursor-pointer shrink-0">
       {avatar ? (
         <Image
           src={avatar}
