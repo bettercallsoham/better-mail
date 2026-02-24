@@ -5,6 +5,7 @@ import { EmailAccount } from "../../models";
 import { GmailMessage, SendEmailInput } from "./interfaces";
 import { Rfc822Builder } from "../RFC.service";
 import { logger } from "@sentry/node";
+import { scheduleSubscriptionRenewal } from "../../queues/email-subscription.queue";
 
 export class GmailApiService {
   private client?: AxiosInstance;
@@ -149,23 +150,29 @@ export class GmailApiService {
     return messages;
   }
 
-  public async watchMailbox(): Promise<{
-    historyId: string;
-    expiration: string;
-  }> {
-    const client = await this.getClient();
+ public async watchMailbox(): Promise<{
+  historyId:  string;
+  expiration: string;
+}> {
+  const client = await this.getClient();
 
-    const res = await client.post("/users/me/watch", {
-      topicName: process.env.GMAIL_PUBSUB_TOPIC!,
-      labelIds: ["INBOX"],
-      labelFilterAction: "include",
-    });
+  const res = await client.post("/users/me/watch", {
+    topicName:         process.env.GMAIL_PUBSUB_TOPIC!,
+    labelIds:          ["INBOX"],
+    labelFilterAction: "include",
+  });
 
-    return {
-      historyId: res.data.historyId,
-      expiration: res.data.expiration,
-    };
-  }
+  await scheduleSubscriptionRenewal({
+    email:     this.email,
+    provider:  "gmail",
+    expiresAt: new Date(parseInt(res.data.expiration)), // Google returns ms epoch string
+  });
+
+  return {
+    historyId:  res.data.historyId,
+    expiration: res.data.expiration,
+  };
+}
 
   private async fetchMessage(messageId: string): Promise<GmailMessage | null> {
     const client = await this.getClient();

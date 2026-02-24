@@ -8,6 +8,7 @@ import {
   SendEmailInput,
 } from "./interfaces";
 import { logger } from "@sentry/node";
+import { scheduleSubscriptionRenewal } from "../../queues/email-subscription.queue";
 
 export class OutlookApiService {
   private client?: AxiosInstance;
@@ -73,21 +74,24 @@ export class OutlookApiService {
   }
 
   public async createEmailSubscription() {
-    // Check if a valid subscription already exists in the database
     const account = await EmailAccount.findOne({
       where: { email: this.email },
     });
 
-    if (!account) {
-      throw new Error(`Email account not found: ${this.email}`);
-    }
+    if (!account) throw new Error(`Email account not found: ${this.email}`);
 
-    // If subscription exists and hasn't expired, return it
     if (
       account.subscription_id &&
       account.subscription_expiration &&
       new Date(account.subscription_expiration) > new Date()
     ) {
+      await scheduleSubscriptionRenewal({
+        email: this.email,
+        provider: "outlook",
+        subscriptionId: account.subscription_id,
+        expiresAt: new Date(account.subscription_expiration),
+      });
+
       return {
         subscriptionId: account.subscription_id,
         expirationDateTime: account.subscription_expiration.toISOString(),
@@ -96,7 +100,6 @@ export class OutlookApiService {
       };
     }
 
-    // If subscription exists but expired, try to delete it from Microsoft
     if (account.subscription_id) {
       try {
         await this.deleteSubscription(account.subscription_id);
@@ -108,9 +111,7 @@ export class OutlookApiService {
       }
     }
 
-    // Create new subscription
     const client = await this.getClient();
-
     const expirationDate = new Date(
       Date.now() + 6 * 24 * 60 * 60 * 1000,
     ).toISOString();
@@ -126,32 +127,27 @@ export class OutlookApiService {
           expirationDateTime: expirationDate,
           clientState: process.env.OUTLOOK_CLIENT_STATE,
         },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
+        { headers: { "Content-Type": "application/json" } },
       );
     } catch (error: any) {
       logger.error("Outlook subscription creation error:", {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
-        request: {
-          changeType: "created,updated",
-          resource: "me/messages",
-          notificationUrl: process.env.OUTLOOK_WEBHOOK_URL,
-          expirationDateTime: expirationDate,
-          clientState: process.env.OUTLOOK_CLIENT_STATE,
-        },
       });
       throw error;
     }
 
-    // Save subscription details to database
     await account.update({
       subscription_id: res.data.id,
       subscription_expiration: new Date(res.data.expirationDateTime),
+    });
+
+    await scheduleSubscriptionRenewal({
+      email: this.email,
+      provider: "outlook",
+      subscriptionId: res.data.id,
+      expiresAt: new Date(res.data.expirationDateTime),
     });
 
     return {
@@ -164,7 +160,6 @@ export class OutlookApiService {
 
   public async renewSubscription(subscriptionId: string) {
     const client = await this.getClient();
-
     const newExpiration = new Date(
       Date.now() + 6 * 24 * 60 * 60 * 1000,
     ).toISOString();
@@ -173,18 +168,17 @@ export class OutlookApiService {
       expirationDateTime: newExpiration,
     });
 
-    // Update expiration time in database
     await EmailAccount.update(
-      {
-        subscription_expiration: new Date(res.data.expirationDateTime),
-      },
-      {
-        where: {
-          email: this.email,
-          subscription_id: subscriptionId,
-        },
-      },
+      { subscription_expiration: new Date(res.data.expirationDateTime) },
+      { where: { email: this.email, subscription_id: subscriptionId } },
     );
+
+    await scheduleSubscriptionRenewal({
+      email: this.email,
+      provider: "outlook",
+      subscriptionId: res.data.id,
+      expiresAt: new Date(res.data.expirationDateTime),
+    });
 
     return {
       subscriptionId: res.data.id,
@@ -206,7 +200,6 @@ export class OutlookApiService {
 
     return this.client;
   }
-
 
   /**
    * Fetch attachment metadata for a specific message
@@ -443,11 +436,9 @@ export class OutlookApiService {
   ): Promise<string> {
     const client = await this.getClient();
 
-    // 1. Create forward draft (Outlook automatically includes original message)
     const draft = await client.post(`/me/messages/${messageId}/createForward`);
     const draftId = draft.data.id;
 
-    // 2. Update draft with custom HTML and recipients
     const updatePayload: any = {
       body: {
         contentType: "HTML",
@@ -472,7 +463,6 @@ export class OutlookApiService {
 
     await client.patch(`/me/messages/${draftId}`, updatePayload);
 
-    // 3. Add additional attachments separately if any
     if (input.attachments?.length) {
       for (const attachment of input.attachments) {
         await client.post(`/me/messages/${draftId}/attachments`, {
