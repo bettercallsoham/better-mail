@@ -21,15 +21,13 @@ import { useUIStore } from "@/lib/store/ui.store";
 
 // ─── Query keys ───────────────────────────────────────────────────────────────
 export const mailboxKeys = {
-  all:           ["mailboxes"] as const,
-  connected:     () => [...mailboxKeys.all, "connected"] as const,
-  threads:       (email?: string) =>
-    email
-      ? ([...mailboxKeys.all, "threads", email] as const)
-      : ([...mailboxKeys.all, "threads"] as const),
-  thread:        (threadId: string) =>
+  all: ["mailboxes"] as const,
+  connected: () => [...mailboxKeys.all, "connected"] as const,
+  threads: (email?: string, folder?: string) =>
+    ["threads", email, folder] as const,
+  thread: (threadId: string) =>
     [...mailboxKeys.all, "thread", threadId] as const,
-  folders:       (email?: string) =>
+  folders: (email?: string) =>
     [...mailboxKeys.all, "folders", { email }] as const,
   senderThreads: (senderEmail: string) =>
     [...mailboxKeys.all, "sender", senderEmail] as const,
@@ -38,32 +36,33 @@ export const mailboxKeys = {
 // ─── Accounts ─────────────────────────────────────────────────────────────────
 export function useConnectedAccounts() {
   return useSuspenseQuery({
-    queryKey:  mailboxKeys.connected(),
-    queryFn:   mailboxService.getConnectedAccounts,
-    staleTime: 5  * 60 * 1000,
-    gcTime:    10 * 60 * 1000,
+    queryKey: mailboxKeys.connected(),
+    queryFn: mailboxService.getConnectedAccounts,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 }
 
 function selectThreadData(data: InfiniteData<GetThreadEmailsResponse>) {
-  const threads   = data.pages.flatMap((p) => p.data.threads);
+  const threads = data.pages.flatMap((p) => p.data.threads);
   const threadIds = threads.map((t) => t.threadId);
   return { threads, threadIds };
 }
 
-export function useThreadEmails(email?: string) {
+export function useThreadEmails(email?: string, folder: string = "inbox") {
   return useSuspenseInfiniteQuery({
-    queryKey:         mailboxKeys.threads(email),
+    queryKey: mailboxKeys.threads(email, folder), // folder in cache key
     queryFn: ({ pageParam }) =>
       mailboxService.getThreadEmails({
         email,
         size: 20,
         page: pageParam,
+        folder,
       }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
       lastPage.success ? (lastPage.data.nextPage ?? null) : null,
-    select:    selectThreadData,
+    select: selectThreadData,
     staleTime: 30 * 1000,
   });
 }
@@ -71,10 +70,10 @@ export function useThreadEmails(email?: string) {
 // ─── Thread detail ────────────────────────────────────────────────────────────
 export function useThreadDetail(threadId: string) {
   return useSuspenseQuery({
-    queryKey:  mailboxKeys.thread(threadId),
-    queryFn:   () => mailboxService.getThreadDetail(threadId),
+    queryKey: mailboxKeys.thread(threadId),
+    queryFn: () => mailboxService.getThreadDetail(threadId),
     staleTime: 15 * 60 * 1000,
-    gcTime:    30 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -82,22 +81,22 @@ export function useThreadDetail(threadId: string) {
 // Non-suspense — loads in background so SenderPane doesn't block rendering
 export function useThreadsBySender(senderEmail: string) {
   return useQuery({
-    queryKey:  mailboxKeys.senderThreads(senderEmail),
-    queryFn:   () => mailboxService.getThreadsBySender(senderEmail),
-    enabled:   !!senderEmail,
-    staleTime: 2  * 60 * 1000,
-    gcTime:    10 * 60 * 1000,
-    select:    (data) => data?.data?.threads ?? [],
+    queryKey: mailboxKeys.senderThreads(senderEmail),
+    queryFn: () => mailboxService.getThreadsBySender(senderEmail),
+    enabled: !!senderEmail,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    select: (data) => data?.data?.threads ?? [],
   });
 }
 
 // ─── Folders ──────────────────────────────────────────────────────────────────
 export function useFolders(email?: string) {
   return useSuspenseQuery({
-    queryKey:  mailboxKeys.folders(email),
-    queryFn:   () => mailboxService.getFolders(email),
+    queryKey: mailboxKeys.folders(email),
+    queryFn: () => mailboxService.getFolders(email),
     staleTime: 60 * 1000,
-    gcTime:    5  * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 }
 
@@ -115,10 +114,13 @@ export function useConnectAccount() {
 }
 
 // ─── Prefetch ─────────────────────────────────────────────────────────────────
-export const prefetchThreadDetail = (queryClient: QueryClient, threadId: string) =>
+export const prefetchThreadDetail = (
+  queryClient: QueryClient,
+  threadId: string,
+) =>
   queryClient.prefetchQuery({
-    queryKey:  mailboxKeys.thread(threadId),
-    queryFn:   () => mailboxService.getThreadDetail(threadId),
+    queryKey: mailboxKeys.thread(threadId),
+    queryFn: () => mailboxService.getThreadDetail(threadId),
     staleTime: 15 * 60 * 1000,
   });
 
@@ -161,9 +163,9 @@ function patchThreadInCache(
 
 // ─── Toggle star ──────────────────────────────────────────────────────────────
 export function useToggleStar() {
-  const queryClient   = useQueryClient();
+  const queryClient = useQueryClient();
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const threadsKey    = mailboxKeys.threads(selectedEmail ?? undefined);
+  const threadsKey = mailboxKeys.threads(selectedEmail ?? undefined);
 
   return useMutation({
     mutationFn: (vars: ThreadActionParams & { isStarred: boolean }) =>
@@ -192,9 +194,9 @@ export function useToggleStar() {
 
 // ─── Toggle read ──────────────────────────────────────────────────────────────
 export function useToggleRead() {
-  const queryClient   = useQueryClient();
+  const queryClient = useQueryClient();
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const threadsKey    = mailboxKeys.threads(selectedEmail ?? undefined);
+  const threadsKey = mailboxKeys.threads(selectedEmail ?? undefined);
 
   return useMutation({
     mutationFn: (vars: ThreadActionParams & { isUnread: boolean }) =>
@@ -223,14 +225,14 @@ export function useToggleRead() {
 
 // ─── Archive ──────────────────────────────────────────────────────────────────
 export function useArchiveThread() {
-  const queryClient   = useQueryClient();
+  const queryClient = useQueryClient();
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const threadsKey    = mailboxKeys.threads(selectedEmail ?? undefined);
+  const threadsKey = mailboxKeys.threads(selectedEmail ?? undefined);
 
   return useMutation({
     mutationFn: mailboxService.archiveThread,
-    onError:    () => toast.error("Failed to archive"),
-    onSuccess:  () => {
+    onError: () => toast.error("Failed to archive"),
+    onSuccess: () => {
       toast.success("Archived");
       queryClient.invalidateQueries({ queryKey: threadsKey });
     },
@@ -239,14 +241,14 @@ export function useArchiveThread() {
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
 export function useDeleteThread() {
-  const queryClient   = useQueryClient();
+  const queryClient = useQueryClient();
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const threadsKey    = mailboxKeys.threads(selectedEmail ?? undefined);
+  const threadsKey = mailboxKeys.threads(selectedEmail ?? undefined);
 
   return useMutation({
     mutationFn: mailboxService.deleteThread,
-    onError:    () => toast.error("Failed to delete"),
-    onSuccess:  () => {
+    onError: () => toast.error("Failed to delete"),
+    onSuccess: () => {
       toast.success("Deleted");
       queryClient.invalidateQueries({ queryKey: threadsKey });
     },
@@ -257,15 +259,15 @@ export function useDeleteThread() {
 export function useAddLabel() {
   return useMutation({
     mutationFn: mailboxService.addLabel,
-    onSuccess:  () => toast.success("Label added"),
-    onError:    () => toast.error("Failed to add label"),
+    onSuccess: () => toast.success("Label added"),
+    onError: () => toast.error("Failed to add label"),
   });
 }
 
 export function useRemoveLabel() {
   return useMutation({
     mutationFn: mailboxService.removeLabel,
-    onSuccess:  () => toast.success("Label removed"),
-    onError:    () => toast.error("Failed to remove label"),
+    onSuccess: () => toast.success("Label removed"),
+    onError: () => toast.error("Failed to remove label"),
   });
 }

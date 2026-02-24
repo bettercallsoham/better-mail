@@ -33,6 +33,8 @@ export const validateGetThreadEmails = [
     .isInt({ min: 0 })
     .withMessage("Page must be a non-negative integer"),
 
+  query("folder").optional(),
+
   handleValidationErrors,
 ];
 

@@ -78,7 +78,7 @@ function FolderSkeleton({ rows = 6, compact }: { rows?: number; compact?: boolea
           key={i}
           style={{ opacity: 1 - i * 0.13 }}
           className={cn(
-            "rounded-lg animate-pulse bg-[var(--app-sidebar-muted)]",
+            "rounded-lg animate-pulse bg-app-sidebar-muted",
             compact ? "h-9 w-9" : "h-8 w-full",
           )}
         />

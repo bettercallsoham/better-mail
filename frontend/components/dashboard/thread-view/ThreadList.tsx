@@ -32,15 +32,17 @@ export function ThreadList({ className }: { className?: string }) {
 }
 
 function ThreadListContent({ email }: { email?: string }) {
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useThreadEmails(email);
-
-  const activeThreadId   = useUIStore((s) => s.activeThreadId);
-  const focusedThreadId  = useUIStore((s) => s.focusedThreadId);
-  const layoutMode       = useUIStore((s) => s.layoutMode);
-  const setActiveThread  = useUIStore((s) => s.setActiveThread);
+  const activeThreadId = useUIStore((s) => s.activeThreadId);
+  const focusedThreadId = useUIStore((s) => s.focusedThreadId);
+  const layoutMode = useUIStore((s) => s.layoutMode);
+  const setActiveThread = useUIStore((s) => s.setActiveThread);
   const setFocusedThread = useUIStore((s) => s.setFocusedThread);
-  const setThreadIds     = useUIStore((s) => s.setThreadIds);
+  const setThreadIds = useUIStore((s) => s.setThreadIds);
+  const activeFolder = useUIStore((s) => s.activeFolder);
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useThreadEmails(email, activeFolder);
+
   const { prefetchThread } = useMailboxPrefetch();
 
   // Keep store threadIds in sync for overlay prev/next navigation
@@ -75,10 +77,15 @@ function ThreadListContent({ email }: { email?: string }) {
   const isFlow = layoutMode === "flow";
 
   return (
-    <div className={cn("flex-1 overflow-y-auto overscroll-contain", isFlow && "py-1")}>
+    <div
+      className={cn(
+        "flex-1 overflow-y-auto overscroll-contain",
+        isFlow && "py-1",
+      )}
+    >
       {groups.map(({ label, items }) => (
         <div key={label}>
-          <div className="sticky top-0 z-10 px-4 py-1.5 bg-white/90 dark:bg-[#111]/90 backdrop-blur-sm border-b border-black/[0.04] dark:border-white/[0.04]">
+          <div className="sticky top-0 z-10 px-4 py-1.5 bg-white/90 dark:bg-[#111]/90 backdrop-blur-sm border-b border-black/4 dark:border-white/4">
             <span className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-white/25 select-none">
               {label}
             </span>
@@ -117,10 +124,10 @@ function ThreadListSkeleton() {
       {Array.from({ length: 12 }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 px-4 h-[48px] border-b border-black/[0.04] dark:border-white/[0.04]"
+          className="flex items-center gap-3 px-4 h-12 border-b border-black/4 dark:border-white/4"
         >
-          <Skeleton className="w-[7px] h-[7px] rounded-full" />
-          <Skeleton className="w-[140px] h-3 rounded" />
+          <Skeleton className="w-1.75 h-1.75 rounded-full" />
+          <Skeleton className="w-35 h-3 rounded" />
           <Skeleton className="flex-1 h-3 rounded" />
           <Skeleton className="w-10 h-3 rounded" />
         </div>

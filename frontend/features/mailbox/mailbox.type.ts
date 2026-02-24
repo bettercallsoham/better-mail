@@ -51,9 +51,10 @@ export interface ConnectResponse {
 }
 
 export interface ThreadQueryParams {
-  email?: string;
-  size?:  number;
-  page?:  number;
+  email?:  string;
+  size?:   number;
+  page?:   number;
+  folder?: string; 
 }
 
 export interface EmailAddress {

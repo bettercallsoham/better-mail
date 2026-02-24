@@ -560,7 +560,7 @@ export class ElasticsearchService {
               minimum_should_match: 1,
             },
           }
-        : { match_all: {} }; // Use match_all when no query text
+        : { match_all: {} }; 
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
@@ -608,19 +608,47 @@ export class ElasticsearchService {
   async getInboxThreads(params: {
     emailAddresses: string[];
     size?: number;
-    page?: number; 
+    page?: number;
+    folder?: string;
   }) {
-    const { emailAddresses, size = 20, page = 0 } = params;
+    const { emailAddresses, size = 20, page = 0, folder = "inbox" } = params;
+
+    const folderFilter = () => {
+      const lower = folder.toLowerCase();
+      const upper = folder.toUpperCase();
+
+      switch (lower) {
+        case "starred":
+          return { term: { isStarred: true } };
+        case "archived":
+          return { term: { isArchived: true } };
+        case "drafts":
+          return { term: { isDraft: true } };
+        case "unread":
+          return { term: { isRead: false } };
+        default:
+          return {
+            terms: {
+              labels: [
+                lower,
+                upper,
+                folder.charAt(0).toUpperCase() + folder.slice(1).toLowerCase(),
+              ],
+            },
+          };
+      }
+    };
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
       size,
-      from: page * size, // offset pagination
+      from: page * size,
       query: {
         bool: {
           filter: [
             { terms: { emailAddress: emailAddresses } },
             { term: { isDeleted: false } },
+            folderFilter(),
           ],
         },
       },
@@ -631,7 +659,7 @@ export class ElasticsearchService {
           {
             name: "thread_state",
             size: 10,
-            _source: ["isRead", "isStarred"],
+            _source: ["isRead", "isStarred", "labels"],
           },
         ],
       },
@@ -654,6 +682,14 @@ export class ElasticsearchService {
           to: source.to,
           isUnread: states.some((s) => s._source?.isRead === false),
           isStarred: states.some((s) => s._source?.isStarred === true),
+          // Merge labels from all emails in thread, deduplicate, lowercase
+          labels: [
+            ...new Set(
+              states.flatMap((s) =>
+                (s._source?.labels ?? []).map((l: string) => l.toLowerCase()),
+              ),
+            ),
+          ],
         };
       }),
 

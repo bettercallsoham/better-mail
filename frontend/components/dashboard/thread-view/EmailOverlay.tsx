@@ -28,7 +28,6 @@ import {
 import { useThreadSummary } from "@/features/ai/ai.query";
 import type { FullEmail, EmailLabel } from "@/features/mailbox/mailbox.type";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LabelChip } from "@/components/dashboard/thread-view/LabelChip";
 import { cn } from "@/lib/utils";
 
 // ─── Sender avatar ────────────────────────────────────────────────J────────────
@@ -151,7 +150,7 @@ function EmailCard({ email, defaultOpen }: { email: FullEmail; defaultOpen: bool
       open={defaultOpen}
       className="group/card rounded-xl border border-black/[0.07] dark:border-white/[0.07] bg-white dark:bg-[#1c1c1f] overflow-hidden open:shadow-sm dark:open:shadow-black/30 transition-shadow duration-200"
     >
-      <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none select-none hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors">
+      <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none select-none hover:bg-black/2 dark:hover:bg-white/3 transition-colors">
         <Avatar name={email.from.name} email={email.from.email} size={8} />
 
         <div className="flex-1 min-w-0">
@@ -159,20 +158,14 @@ function EmailCard({ email, defaultOpen }: { email: FullEmail; defaultOpen: bool
             <p className="text-[13px] font-semibold text-gray-900 dark:text-white truncate leading-snug">
               {email.from.name || email.from.email}
             </p>
-            {labels.length > 0 && (
-              <div className="flex items-center gap-0.5 flex-shrink-0">
-                {labels.map((l) => (
-                  <LabelChip key={l.id} label={l} variant="dot" />
-                ))}
-              </div>
-            )}
+          
           </div>
           <p className="text-[11.5px] text-gray-400 dark:text-white/30 truncate leading-snug mt-px">
             To: {toNames}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <span className="text-[11.5px] text-gray-400 dark:text-white/30 tabular-nums whitespace-nowrap">
             {date}
           </span>
@@ -184,7 +177,7 @@ function EmailCard({ email, defaultOpen }: { email: FullEmail; defaultOpen: bool
         </div>
       </summary>
 
-      <div className="border-t border-black/[0.05] dark:border-white/[0.05]">
+      <div className="border-t border-black/5 dark:border-white/5">
         {email.bodyHtml ? (
           <IframeBody html={email.bodyHtml} />
         ) : (
@@ -202,9 +195,9 @@ function EmailCard({ email, defaultOpen }: { email: FullEmail; defaultOpen: bool
               key={label}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium",
-                "border border-black/[0.09] dark:border-white/[0.10]",
+                "border border-black/9 dark:border-white/10",
                 "text-gray-600 dark:text-white/50",
-                "hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:text-gray-800 dark:hover:text-white/80",
+                "hover:bg-black/4 dark:hover:bg-white/6 hover:text-gray-800 dark:hover:text-white/80",
                 "transition-colors duration-100",
               )}
             >
@@ -223,8 +216,8 @@ function AISummaryBar({ threadId, emailAddress }: { threadId: string; emailAddre
 
   if (isLoading) {
     return (
-      <div className="flex-shrink-0 flex items-center gap-2.5 px-5 py-2.5 bg-violet-50/80 dark:bg-violet-950/20 border-b border-violet-100/80 dark:border-violet-900/30">
-        <IconSparkles size={12} className="text-violet-400 flex-shrink-0 animate-pulse" />
+      <div className="shrink-0 flex items-center gap-2.5 px-5 py-2.5 bg-violet-50/80 dark:bg-violet-950/20 border-b border-violet-100/80 dark:border-violet-900/30">
+        <IconSparkles size={12} className="text-violet-400 shrink-0 animate-pulse" />
         <Skeleton className="h-2.5 flex-1 max-w-sm rounded-full" />
       </div>
     );
@@ -245,12 +238,12 @@ function AISummaryBar({ threadId, emailAddress }: { threadId: string; emailAddre
   };
 
   return (
-    <div className="flex-shrink-0 flex items-start gap-2.5 px-5 py-2.5 bg-violet-50/60 dark:bg-violet-950/15 border-b border-violet-100/60 dark:border-violet-900/25">
-      <IconSparkles size={12} className="text-violet-500 dark:text-violet-400 flex-shrink-0 mt-0.5" />
+    <div className="shrink-0 flex items-start gap-2.5 px-5 py-2.5 bg-violet-50/60 dark:bg-violet-950/15 border-b border-violet-100/60 dark:border-violet-900/25">
+      <IconSparkles size={12} className="text-violet-500 dark:text-violet-400 shrink-0 mt-0.5" />
       <p className="flex-1 text-[12px] text-gray-600 dark:text-white/50 leading-relaxed">{text}</p>
-      <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+      <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
         <span className="text-[10px] text-gray-400 dark:text-white/25 capitalize">{sentiment}</span>
-        <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", priorityColor[priority] ?? "bg-gray-300")} />
+        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", priorityColor[priority] ?? "bg-gray-300")} />
       </div>
     </div>
   );
@@ -298,7 +291,7 @@ function OverlayContent({ threadId }: { threadId: string }) {
     <div className="flex flex-col h-full min-h-0">
 
       {/* Toolbar */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3 border-b border-black/[0.06] dark:border-white/[0.06]">
+      <div className="shrink-0 flex items-center gap-3 px-5 py-3 border-b border-black/6 dark:border-white/6">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[13.5px] font-semibold text-gray-900 dark:text-white leading-snug tracking-[-0.01em]">
             {firstEmail.subject || "(no subject)"}
@@ -309,15 +302,13 @@ function OverlayContent({ threadId }: { threadId: string }) {
             </span>
             {allLabels.length > 0 && (
               <div className="flex items-center gap-1">
-                {allLabels.map((l) => (
-                  <LabelChip key={l.id} label={l} variant="badge" />
-                ))}
+             
               </div>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5 flex-shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0">
           <ToolBtn
             label={isStarred ? "Unstar" : "Star"}
             onClick={() => toggleStar({ ...actionVars, isStarred })}
@@ -407,12 +398,12 @@ function OverlaySkeleton() {
       {[1, 2].map((i) => (
         <div key={i} className="rounded-xl border border-black/[0.07] dark:border-white/[0.07] p-4">
           <div className="flex items-center gap-3">
-            <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+            <Skeleton className="w-8 h-8 rounded-full shrink-0" />
             <div className="flex-1 space-y-1.5">
               <Skeleton className="h-3 w-1/3 rounded" />
               <Skeleton className="h-2.5 w-1/2 rounded" />
             </div>
-            <Skeleton className="h-2.5 w-20 rounded flex-shrink-0" />
+            <Skeleton className="h-2.5 w-20 rounded shrink-0" />
           </div>
         </div>
       ))}
@@ -454,7 +445,7 @@ export function EmailOverlay() {
       />
       <div
         className={cn(
-          "relative z-10 w-full sm:w-[700px] lg:w-[800px]",
+          "relative z-10 w-full sm:w-175 lg:w-200",
           "max-h-[90vh] flex flex-col",
           "rounded-2xl overflow-hidden",
           "bg-white dark:bg-[#18181b]",

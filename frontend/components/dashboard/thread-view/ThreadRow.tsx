@@ -4,7 +4,6 @@ import { memo } from "react";
 import { cn } from "@/lib/utils";
 import type { ThreadEmail } from "@/features/mailbox/mailbox.type";
 import { formatThreadDate } from "@/lib/date";
-import { LabelChip } from "@/components/dashboard/thread-view/LabelChip";
 
 interface ThreadRowProps {
   thread: ThreadEmail;
@@ -12,7 +11,6 @@ interface ThreadRowProps {
   isFocused: boolean;
   mode: "velocity" | "flow";
   onSelect: () => void;
-  /** Called on mouseenter + focus — sets focusedThread & prefetches */
   onHover: () => void;
 }
 
@@ -35,7 +33,6 @@ function VelocityRow({
   thread, isActive, isFocused, onSelect, onHover,
 }: Omit<ThreadRowProps, "mode">) {
   const sender = thread.from.name || thread.from.email;
-  const labels = thread.labels ?? [];
 
   return (
     <div
@@ -46,31 +43,31 @@ function VelocityRow({
       onFocus={onHover}
       onKeyDown={(e) => e.key === "Enter" && onSelect()}
       className={cn(
-        "group relative flex items-center gap-3 px-4 h-[48px]",
+        "group relative flex items-center gap-3 px-4 h-12",
         "cursor-pointer select-none overflow-hidden",
-        "border-b border-black/[0.04] dark:border-white/[0.04]",
+        "border-b border-black/4 dark:border-white/4",
         "transition-colors duration-75",
         isFocused && !isActive
-          ? "bg-black/[0.025] dark:bg-white/[0.05]"
-          : "hover:bg-black/[0.02] dark:hover:bg-white/[0.03]",
+          ? "bg-black/2.5 dark:bg-white/5"
+          : "hover:bg-black/2 dark:hover:bg-white/3",
         isActive && [
-          "bg-blue-50/80 dark:bg-white/[0.08]",
-          "before:absolute before:inset-y-0 before:left-0 before:w-[3px]",
+          "bg-blue-50/80 dark:bg-white/8",
+          "before:absolute before:inset-y-0 before:left-0 before:w-0.75",
           "before:bg-blue-500 dark:before:bg-white/70 before:rounded-r-full",
         ],
       )}
     >
       {/* Unread dot */}
-      <div className="w-2 flex-shrink-0 flex justify-center">
+      <div className="w-2 shrink-0 flex justify-center">
         {thread.isUnread && (
-          <span className="block w-[7px] h-[7px] rounded-full bg-blue-500 dark:bg-blue-400" />
+          <span className="block w-1.75 h-1.75 rounded-full bg-blue-500 dark:bg-blue-400" />
         )}
       </div>
 
       {/* Sender — fixed width column */}
       <span
         className={cn(
-          "flex-shrink-0 w-[148px] truncate text-[13px] tracking-[-0.01em]",
+          "shrink-0 w-37 truncate text-[13px] tracking-[-0.01em]",
           thread.isUnread
             ? "font-semibold text-gray-900 dark:text-white"
             : "font-normal text-gray-500 dark:text-white/45",
@@ -83,7 +80,7 @@ function VelocityRow({
       <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
         <span
           className={cn(
-            "flex-shrink-0 max-w-[42%] truncate text-[13px] tracking-[-0.01em]",
+            "shrink-0 max-w-[42%] truncate text-[13px] tracking-[-0.01em]",
             thread.isUnread
               ? "font-semibold text-gray-900 dark:text-white"
               : "font-normal text-gray-700 dark:text-white/65",
@@ -96,19 +93,12 @@ function VelocityRow({
         </span>
       </div>
 
-      {/* Label dots */}
-      {labels.length > 0 && (
-        <div className="flex items-center gap-1 flex-shrink-0 ml-1">
-          {labels.slice(0, 3).map((l) => (
-            <LabelChip key={l.id} label={l} variant="dot" />
-          ))}
-        </div>
-      )}
+    
 
       {/* Date */}
       <span
         className={cn(
-          "flex-shrink-0 ml-2 text-[11.5px] tabular-nums whitespace-nowrap",
+          "shrink-0 ml-2 text-[11.5px] tabular-nums whitespace-nowrap",
           thread.isUnread
             ? "text-gray-600 dark:text-white/55"
             : "text-gray-400 dark:text-white/25",
@@ -139,17 +129,17 @@ function FlowRow({
       onKeyDown={(e) => e.key === "Enter" && onSelect()}
       className={cn(
         "group relative flex items-center gap-3",
-        "mx-2 my-[2px] px-3 py-[9px] rounded-xl",
+        "mx-2 my-0.5 px-3 py-2.25 rounded-xl",
         "cursor-pointer select-none transition-colors duration-100",
         isFocused && !isActive
-          ? "bg-black/[0.04] dark:bg-white/[0.06]"
-          : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
-        isActive && "bg-gray-100/80 dark:bg-white/[0.09]",
+          ? "bg-black/4 dark:bg-white/6"
+          : "hover:bg-black/3 dark:hover:bg-white/4",
+        isActive && "bg-gray-100/80 dark:bg-white/9",
       )}
     >
       {/* Avatar */}
       <span
-        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-semibold text-white shadow-sm"
+        className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-semibold text-white shadow-sm"
         style={{ background: `hsl(${hue} 52% 46%)` }}
       >
         {initials}
@@ -192,15 +182,9 @@ function FlowRow({
           <p className="flex-1 truncate text-[11.5px] text-gray-400 dark:text-white/25">
             {thread.snippet}
           </p>
-          {labels.length > 0 && (
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {labels.slice(0, 4).map((l) => (
-                <LabelChip key={l.id} label={l} variant="dot" />
-              ))}
-            </div>
-          )}
+        
           {thread.isUnread && (
-            <span className="w-[7px] h-[7px] rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0" />
+            <span className="w-1.75 h-1.75 rounded-full bg-blue-500 dark:bg-blue-400 shrink-0" />
           )}
         </div>
       </div>

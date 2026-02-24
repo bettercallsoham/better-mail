@@ -40,25 +40,16 @@ export const getConnectedMailboxes = asyncHandler(
 export const getThreadEmails = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
-    const { email, size, page } = req.query;
+    const { email, size, page, folder } = req.query;
 
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated",
-      });
+      return res.status(401).json({ success: false, message: "User not authenticated" });
     }
 
-    const { emails: emailAddresses, error } = await getUserEmails(
-      userId,
-      email as string | undefined,
-    );
+    const { emails: emailAddresses, error } = await getUserEmails(userId, email as string | undefined);
 
     if (error) {
-      return res.status(403).json({
-        success: false,
-        message: error,
-      });
+      return res.status(403).json({ success: false, message: error });
     }
 
     if (emailAddresses.length === 0) {
@@ -73,10 +64,7 @@ export const getThreadEmails = asyncHandler(
 
     if (email && typeof email === "string") {
       if (!emailAddresses.includes(email)) {
-        return res.status(403).json({
-          success: false,
-          message: "Access denied for this email account",
-        });
+        return res.status(403).json({ success: false, message: "Access denied for this email account" });
       }
       allowedEmails = [email];
     }
@@ -85,18 +73,15 @@ export const getThreadEmails = asyncHandler(
 
     const threads = await elasticService.getInboxThreads({
       emailAddresses: allowedEmails,
-      size: size ? parseInt(size as string, 10) : 20,
-      page: page ? parseInt(page as string, 10) : 0,
+      size:   size   ? parseInt(size as string, 10)   : 20,
+      page:   page   ? parseInt(page as string, 10)   : 0,
+      folder: (folder as string) ?? "inbox",
     });
 
-    return res.json({
-      success: true,
-      data: threads,
-    });
+    return res.json({ success: true, data: threads });
   },
   "getThreadEmails",
 );
-
 export const getEmailsByThreadId = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;

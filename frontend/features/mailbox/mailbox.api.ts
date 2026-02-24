@@ -25,6 +25,7 @@ export const mailboxService = {
     if (params.size) searchParams.append("size", params.size.toString());
     if (params.page !== undefined && params.page !== null)
       searchParams.append("page", params.page.toString());
+    if (params.folder) searchParams.append("folder", params.folder);
     return apiClient<GetThreadEmailsResponse>(
       `/mail/thread-emails?${searchParams.toString()}`,
     );

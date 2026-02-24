@@ -110,7 +110,7 @@ export function buildLabelFolders(labels?: MailLabel[]): FolderItem[] {
     .filter((l) => !SYSTEM_LABEL_ALIASES.has(l.label.toLowerCase()))
     .map((l) => ({
       label: formatLabelName(l.label),
-      folder: `label:${l.label}`,
+      folder: l.label, 
       icon: <IconTag size={16} stroke={1.5} />,
       count: l.count,
     }));
