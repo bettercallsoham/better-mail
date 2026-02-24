@@ -560,7 +560,7 @@ export class ElasticsearchService {
               minimum_should_match: 1,
             },
           }
-        : { match_all: {} }; 
+        : { match_all: {} };
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
@@ -612,6 +612,20 @@ export class ElasticsearchService {
     folder?: string;
   }) {
     const { emailAddresses, size = 20, page = 0, folder = "inbox" } = params;
+
+    const SYSTEM_LABELS = new Set([
+      "inbox",
+      "sent",
+      "starred",
+      "important",
+      "draft",
+      "drafts",
+      "unread",
+      "archived",
+      "spam",
+      "trash",
+      "all",
+    ]);
 
     const folderFilter = () => {
       const lower = folder.toLowerCase();
@@ -682,14 +696,13 @@ export class ElasticsearchService {
           to: source.to,
           isUnread: states.some((s) => s._source?.isRead === false),
           isStarred: states.some((s) => s._source?.isStarred === true),
-          // Merge labels from all emails in thread, deduplicate, lowercase
           labels: [
             ...new Set(
               states.flatMap((s) =>
                 (s._source?.labels ?? []).map((l: string) => l.toLowerCase()),
               ),
             ),
-          ],
+          ].filter((l) => !SYSTEM_LABELS.has(l)),
         };
       }),
 

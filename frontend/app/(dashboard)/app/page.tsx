@@ -72,7 +72,7 @@ export default function AppPage() {
             localStorage.setItem(storageKey, JSON.stringify(layout));
           } catch {}
         }}
-        className="h-full"
+        className="h-full "
       >
         {/* Thread list */}
         <Panel

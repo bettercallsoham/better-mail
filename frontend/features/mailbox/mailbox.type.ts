@@ -11,11 +11,7 @@ export interface GetConnectedAccountsResponse {
   data: ConnectedAccount[];
 }
 
-export interface EmailLabel {
-  id: string;
-  name: string;
-  color?: string;
-}
+
 
 export interface ThreadEmail {
   threadId:    string;
@@ -27,7 +23,7 @@ export interface ThreadEmail {
   to:          { email: string; name?: string }[];
   isUnread:    boolean;
   isStarred:   boolean;
-  labels?:     EmailLabel[];
+  labels:      string[];
 }
 
 export interface GetThreadEmailsResponse {
@@ -78,7 +74,7 @@ export interface FullEmail {
   threadId:       string;
   isStarred:      boolean;
   isDraft:        boolean;
-  labels?:        EmailLabel[];
+  labels?:        string[];
 }
 
 export interface GetThreadDetailResponse {

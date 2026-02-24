@@ -207,7 +207,6 @@ export class OutlookApiService {
     return this.client;
   }
 
-  /* ===================== ATTACHMENT HANDLING ===================== */
 
   /**
    * Fetch attachment metadata for a specific message

@@ -6,12 +6,12 @@ import type { ThreadEmail } from "@/features/mailbox/mailbox.type";
 import { formatThreadDate } from "@/lib/date";
 
 interface ThreadRowProps {
-  thread: ThreadEmail;
-  isActive: boolean;
+  thread:    ThreadEmail;
+  isActive:  boolean;
   isFocused: boolean;
-  mode: "velocity" | "flow";
-  onSelect: () => void;
-  onHover: () => void;
+  mode:      "velocity" | "flow";
+  onSelect:  () => void;
+  onHover:   () => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -28,11 +28,45 @@ function senderHue(email?: string): number {
   return email.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
 }
 
-// ─── Velocity (Superhuman dense row) ─────────────────────────────────────────
-function VelocityRow({
-  thread, isActive, isFocused, onSelect, onHover,
-}: Omit<ThreadRowProps, "mode">) {
+function labelColor(label: string): string {
+  const hue = label.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  return `hsl(${hue} 55% 45%)`;
+}
+
+function formatLabel(l: string) {
+  return l.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// ─── Label chips ──────────────────────────────────────────────────────────────
+function LabelChips({ labels }: { labels: string[] }) {
+  if (!labels.length) return null;
+  const visible  = labels.slice(0, 2);
+  const overflow = labels.length - 2;
+
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      {visible.map((l) => (
+        <span
+          key={l}
+          className="inline-flex items-center px-1.5 py-px rounded text-[10px] font-medium text-white leading-tight"
+          style={{ backgroundColor: labelColor(l) }}
+        >
+          {formatLabel(l)}
+        </span>
+      ))}
+      {overflow > 0 && (
+        <span className="text-[10px] text-gray-400 dark:text-white/30 font-medium">
+          +{overflow}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Velocity ─────────────────────────────────────────────────────────────────
+function VelocityRow({ thread, isActive, isFocused, onSelect, onHover }: Omit<ThreadRowProps, "mode">) {
   const sender = thread.from.name || thread.from.email;
+  const labels = thread.labels ?? [];
 
   return (
     <div
@@ -64,28 +98,24 @@ function VelocityRow({
         )}
       </div>
 
-      {/* Sender — fixed width column */}
-      <span
-        className={cn(
-          "shrink-0 w-37 truncate text-[13px] tracking-[-0.01em]",
-          thread.isUnread
-            ? "font-semibold text-gray-900 dark:text-white"
-            : "font-normal text-gray-500 dark:text-white/45",
-        )}
-      >
+      {/* Sender */}
+      <span className={cn(
+        "shrink-0 w-37 truncate text-[13px] tracking-[-0.01em]",
+        thread.isUnread
+          ? "font-semibold text-gray-900 dark:text-white"
+          : "font-normal text-gray-500 dark:text-white/45",
+      )}>
         {sender}
       </span>
 
       {/* Subject · snippet */}
       <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
-        <span
-          className={cn(
-            "shrink-0 max-w-[42%] truncate text-[13px] tracking-[-0.01em]",
-            thread.isUnread
-              ? "font-semibold text-gray-900 dark:text-white"
-              : "font-normal text-gray-700 dark:text-white/65",
-          )}
-        >
+        <span className={cn(
+          "shrink-0 max-w-[42%] truncate text-[13px] tracking-[-0.01em]",
+          thread.isUnread
+            ? "font-semibold text-gray-900 dark:text-white"
+            : "font-normal text-gray-700 dark:text-white/65",
+        )}>
           {thread.subject || "(no subject)"}
         </span>
         <span className="truncate text-[12px] text-gray-400 dark:text-white/25">
@@ -93,27 +123,28 @@ function VelocityRow({
         </span>
       </div>
 
-    
+      {/* Labels — visible on hover */}
+      {labels.length > 0 && (
+        <div className="hidden group-hover:flex shrink-0">
+          <LabelChips labels={labels} />
+        </div>
+      )}
 
       {/* Date */}
-      <span
-        className={cn(
-          "shrink-0 ml-2 text-[11.5px] tabular-nums whitespace-nowrap",
-          thread.isUnread
-            ? "text-gray-600 dark:text-white/55"
-            : "text-gray-400 dark:text-white/25",
-        )}
-      >
+      <span className={cn(
+        "shrink-0 ml-2 text-[11.5px] tabular-nums whitespace-nowrap",
+        thread.isUnread
+          ? "text-gray-600 dark:text-white/55"
+          : "text-gray-400 dark:text-white/25",
+      )}>
         {formatThreadDate(thread.receivedAt)}
       </span>
     </div>
   );
 }
 
-// ─── Flow (3-row card with avatar) ───────────────────────────────────────────
-function FlowRow({
-  thread, isActive, isFocused, onSelect, onHover,
-}: Omit<ThreadRowProps, "mode">) {
+// ─── Flow ─────────────────────────────────────────────────────────────────────
+function FlowRow({ thread, isActive, isFocused, onSelect, onHover }: Omit<ThreadRowProps, "mode">) {
   const sender   = thread.from.name || thread.from.email;
   const hue      = senderHue(thread.from.email);
   const initials = senderInitials(thread.from.name, thread.from.email);
@@ -145,7 +176,7 @@ function FlowRow({
         {initials}
       </span>
 
-      {/* 3-row content */}
+      {/* Content */}
       <div className="flex-1 min-w-0">
         {/* Row 1: sender + date */}
         <div className="flex items-baseline justify-between gap-2">
@@ -177,12 +208,18 @@ function FlowRow({
           {thread.subject || "(no subject)"}
         </p>
 
-        {/* Row 3: snippet + labels + unread dot */}
+        {/* Row 3: snippet + labels on hover + unread dot */}
         <div className="flex items-center gap-2 mt-[3px]">
           <p className="flex-1 truncate text-[11.5px] text-gray-400 dark:text-white/25">
             {thread.snippet}
           </p>
-        
+
+          {labels.length > 0 && (
+            <div className="hidden group-hover:flex shrink-0">
+              <LabelChips labels={labels} />
+            </div>
+          )}
+
           {thread.isUnread && (
             <span className="w-1.75 h-1.75 rounded-full bg-blue-500 dark:bg-blue-400 shrink-0" />
           )}

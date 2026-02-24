@@ -1,12 +1,17 @@
 "use client";
 
-import { Suspense, useState, useRef, useEffect } from "react";
+import { Suspense, useState, useCallback } from "react";
 import { format } from "date-fns";
 import {
   IconSparkles,
   IconMail,
   IconNotes,
   IconClock,
+  IconCopy,
+  IconTag,
+  IconCheck,
+  IconChevronDown,
+  IconBolt,
 } from "@tabler/icons-react";
 import { useUIStore } from "@/lib/store/ui.store";
 import {
@@ -14,10 +19,81 @@ import {
   useThreadsBySender,
 } from "@/features/mailbox/mailbox.query";
 import { useThreadSummary } from "@/features/ai/ai.query";
-import type { ThreadEmail, EmailLabel } from "@/features/mailbox/mailbox.type";
+import type {
+  ThreadEmail,
+  EmailLabel,
+  FullEmail,
+} from "@/features/mailbox/mailbox.type";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClientOnly } from "@/components/ClientOnly";
 import { cn } from "@/lib/utils";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const SYSTEM_LABELS = new Set([
+  "inbox",
+  "sent",
+  "starred",
+  "important",
+  "draft",
+  "drafts",
+  "unread",
+  "archived",
+  "spam",
+  "trash",
+  "all",
+  "category_promotions",
+  "category_social",
+  "category_updates",
+  "category_forums",
+  "category_primary",
+]);
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const labelHue = (l: string) =>
+  l.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+const fmtLabel = (l: string) =>
+  l.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const avatarHue = (s: string) =>
+  s.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+
+function initials(name?: string, email?: string): string {
+  const src = name?.trim() || email?.trim() || "?";
+  const parts = src.split(/\s+/).filter(Boolean);
+  return (
+    parts.length >= 2 ? parts[0][0] + parts[1][0] : src.slice(0, 2)
+  ).toUpperCase();
+}
+
+// ── Fix: EmailLabel is { id, name, color? } not a string ──
+function extractLabels(emails: FullEmail[]): string[] {
+  return [
+    ...new Set(
+      emails
+        .flatMap((e) => e.labels ?? [])
+        .map((l: EmailLabel | string) => (typeof l === "string" ? l : l.name))
+        .map((l) => l.toLowerCase().trim())
+        .filter((l) => l && !SYSTEM_LABELS.has(l)),
+    ),
+  ];
+}
+
+// ─── Shared primitives ────────────────────────────────────────────────────────
+function SectionHeader({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 mb-3">
+      <span className="text-gray-300 dark:text-white/20">{icon}</span>
+      <span className="text-[9.5px] font-bold tracking-[0.12em] uppercase text-gray-300 dark:text-white/20 select-none">
+        {label}
+      </span>
+    </div>
+  );
+}
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 export function SenderPane({ className }: { className?: string }) {
@@ -25,21 +101,18 @@ export function SenderPane({ className }: { className?: string }) {
   const activeThreadId = useUIStore((s) => s.activeThreadId);
   const focusedThreadId = useUIStore((s) => s.focusedThreadId);
 
-  // Velocity: sender pane previews the hovered/focused row (not necessarily opened)
-  const previewThreadId =
+  const previewId =
     layoutMode === "velocity"
       ? (focusedThreadId ?? activeThreadId)
       : activeThreadId;
 
-  if (!previewThreadId) {
-    return <SenderPaneEmpty className={className} />;
-  }
+  if (!previewId) return <Empty className={className} />;
 
   return (
-    <ClientOnly fallback={<SenderPaneSkeleton className={className} />}>
-      <Suspense fallback={<SenderPaneSkeleton className={className} />}>
-        <SenderPaneContent
-          threadId={previewThreadId}
+    <ClientOnly fallback={<PaneSkeleton className={className} />}>
+      <Suspense fallback={<PaneSkeleton className={className} />}>
+        <PaneContent
+          threadId={previewId}
           activeThreadId={activeThreadId}
           className={className}
         />
@@ -48,8 +121,8 @@ export function SenderPane({ className }: { className?: string }) {
   );
 }
 
-// ─── Content ──────────────────────────────────────────────────────────────────
-function SenderPaneContent({
+// ─── Main content ─────────────────────────────────────────────────────────────
+function PaneContent({
   threadId,
   activeThreadId,
   className,
@@ -61,37 +134,18 @@ function SenderPaneContent({
   const { data: threadData } = useThreadDetail(threadId);
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
   const setActiveThread = useUIStore((s) => s.setActiveThread);
+  const setActiveFolder = useUIStore((s) => s.setActiveFolder);
 
-  const firstEmail = threadData?.data?.emails?.[0];
-  const senderEmail = firstEmail?.from?.email ?? "";
-  const senderName = firstEmail?.from?.name ?? senderEmail;
-  const hue =
-    senderEmail.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
-  const initials =
-    senderName
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w[0])
-      .join("")
-      .toUpperCase() || "?";
-
-  const emailAddress = selectedEmail ?? firstEmail?.emailAddress ?? senderEmail;
-
-  // Deduplicate labels across all emails in thread
-  const labelMap = new Map<string, EmailLabel>();
-  for (const email of threadData?.data?.emails ?? []) {
-    for (const l of email.labels ?? []) {
-      if (l?.id) labelMap.set(l.id, l);
-    }
-  }
-  const threadLabels = Array.from(labelMap.values());
+  const emails = threadData?.data?.emails ?? [];
+  const first = emails[0];
+  const senderEmail = first?.from?.email ?? "";
+  const senderName = first?.from?.name ?? senderEmail;
+  const hue = avatarHue(senderEmail);
+  const emailAddr = selectedEmail ?? first?.emailAddress ?? senderEmail;
+  const labels = extractLabels(emails);
 
   const { data: senderThreads = [], isLoading: loadingThreads } =
     useThreadsBySender(senderEmail);
-
-  const subject = firstEmail?.subject ?? "";
 
   return (
     <div
@@ -100,17 +154,17 @@ function SenderPaneContent({
         className,
       )}
     >
-      {/* ── 1. Sender profile ── */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-3.5 border-b border-black/[0.05] dark:border-white/[0.05]">
-        <div className="flex items-center gap-3">
+      {/* ── Profile ── */}
+      <div className="px-5 pt-5 pb-5">
+        <div className="flex items-center gap-3 mb-3">
           <span
-            className="w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-semibold text-white flex-shrink-0 select-none shadow-sm"
-            style={{ background: `hsl(${hue} 52% 46%)` }}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-semibold text-white shrink-0 select-none shadow-sm"
+            style={{ background: `hsl(${hue} 50% 46%)` }}
           >
-            {initials}
+            {initials(senderName, senderEmail)}
           </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-gray-900 dark:text-white truncate leading-tight tracking-[-0.01em]">
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-semibold text-gray-900 dark:text-white truncate tracking-[-0.015em] leading-tight">
               {senderName}
             </p>
             <p className="text-[11px] text-gray-400 dark:text-white/35 truncate mt-0.5">
@@ -118,39 +172,56 @@ function SenderPaneContent({
             </p>
           </div>
         </div>
-
-        {subject && (
-          <p className="mt-2.5 text-[12px] text-gray-600 dark:text-white/50 leading-snug line-clamp-2 tracking-[-0.005em]">
-            {subject}
-          </p>
-        )}
-
-        <p className="mt-2 text-[11px] text-gray-400 dark:text-white/25 tabular-nums">
-          {loadingThreads
-            ? "Loading…"
-            : `${senderThreads.length} thread${senderThreads.length !== 1 ? "s" : ""} with this sender`}
-        </p>
       </div>
 
-      {/* ── 2. AI Summary ── */}
-      <AISummarySection threadId={threadId} emailAddress={emailAddress} />
-
-      {/* ── 3. Notes ── */}
-      <NotesSection senderEmail={senderEmail} />
-
-      {/* ── 4. Email history ── */}
-      <EmailHistory
-        threads={senderThreads}
-        activeThreadId={activeThreadId}
-        isLoading={loadingThreads}
-        onSelect={setActiveThread}
-      />
+      {/* ── Scrollable ── */}
+      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 border-t border-black/5 dark:border-white/5">
+        <Summary threadId={threadId} emailAddress={emailAddr} />
+        <Notes senderEmail={senderEmail} />
+        {labels.length > 0 && (
+          <div className="px-5 pb-5">
+            <div className="flex flex-wrap gap-1.5">
+              {labels.map((l) => {
+                const hue = labelHue(l);
+                return (
+                  <button
+                    key={l}
+                    onClick={() => setActiveFolder(l)}
+                    className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 hover:opacity-90"
+                    style={{
+                      backgroundColor: `hsl(${hue} 50% 44% / 0.1)`,
+                      color: `hsl(${hue} 45% 38%)`,
+                      borderLeft: `2px solid hsl(${hue} 50% 44%)`,
+                    }}
+                  >
+                    <IconTag
+                      size={10}
+                      strokeWidth={2}
+                      style={{ color: `hsl(${hue} 50% 44%)` }}
+                    />
+                    {fmtLabel(l)}
+                  </button>
+                );
+              })}
+              <button className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-gray-300 dark:text-white/20 border border-dashed border-gray-200 dark:border-white/10 hover:text-gray-400 hover:border-gray-300 dark:hover:border-white/20 transition-colors">
+                <span className="text-[10px]">+</span>
+                Add New
+              </button>
+            </div>
+          </div>
+        )}
+        {/* <EmailHistory
+          threads={senderThreads}
+          activeThreadId={activeThreadId}
+          isLoading={loadingThreads}
+          onSelect={setActiveThread}
+        /> */}
+      </div>
     </div>
   );
 }
 
-// ─── AI Summary ───────────────────────────────────────────────────────────────
-function AISummarySection({
+function Summary({
   threadId,
   emailAddress,
 }: {
@@ -158,83 +229,106 @@ function AISummarySection({
   emailAddress: string;
 }) {
   const { data, isLoading } = useThreadSummary(threadId, emailAddress);
+  const [copied, setCopied] = useState(false);
+  const s = data?.summary;
+
+  const copy = useCallback(() => {
+    if (!s?.text) return;
+    const txt = [s.text, s.keyPoints, s.actionItems]
+      .filter(Boolean)
+      .join("\n\n");
+    navigator.clipboard.writeText(String(txt)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [s]);
 
   return (
-    <div className="flex-shrink-0 px-4 py-3 border-b border-black/[0.05] dark:border-white/[0.05]">
-      <SectionLabel
-        icon={<IconSparkles size={10} strokeWidth={2} />}
-        text="Summary"
-      />
+    <div className="px-5 py-4 border-b border-black/5 dark:border-white/5">
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-3">
+        <SectionHeader
+          icon={<IconSparkles size={10} strokeWidth={2} />}
+          label="Summary"
+        />
+        {s?.text && (
+          <button
+            onClick={copy}
+            className="p-1 rounded text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors"
+          >
+            {copied ? (
+              <IconCheck
+                size={11}
+                strokeWidth={2}
+                className="text-emerald-500"
+              />
+            ) : (
+              <IconCopy size={11} strokeWidth={2} />
+            )}
+          </button>
+        )}
+      </div>
 
       {isLoading ? (
-        <div className="space-y-1.5 mt-2">
+        <div className="space-y-1.5">
           <Skeleton className="h-2.5 w-full rounded" />
           <Skeleton className="h-2.5 w-4/5 rounded" />
+          <Skeleton className="h-2.5 w-3/5 rounded" />
         </div>
-      ) : data?.summary?.text ? (
-        <div className="space-y-2 mt-2">
+      ) : s?.text ? (
+        <div className="space-y-3">
+          {/* Body text */}
           <p className="text-[12px] text-gray-600 dark:text-white/55 leading-relaxed">
-            {data.summary.text}
+            {s.text}
           </p>
 
-          {data.summary.keyPoints && (
-            <ul className="space-y-0.5">
-              {(data.summary.keyPoints as string)
-                .split("\n")
-                .filter(Boolean)
-                .map((pt, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-1.5 text-[11.5px] text-gray-500 dark:text-white/40"
-                  >
-                    <span className="mt-[5px] w-1 h-1 rounded-full bg-gray-300 dark:bg-white/20 flex-shrink-0" />
-                    {pt}
-                  </li>
-                ))}
-            </ul>
+          {/* Key points */}
+          {s.keyPoints && (
+            <>
+              <h4 className="text-[11px] font-semibold text-slate-400 uppercase tracking-tight">
+                Key Highlights
+              </h4>
+              <ul className="space-y-1.5">
+                {String(s.keyPoints)
+                  .split("\n")
+                  .filter(Boolean)
+                  .map((pt, i) => (
+                    <li
+                      key={i}
+                      className="flex items-start gap-2 text-[11.5px] text-gray-500 dark:text-white/40 leading-snug"
+                    >
+                      <span className="mt-[5px] w-1 h-1 rounded-full bg-gray-300 dark:bg-white/20 shrink-0" />
+                      {pt}
+                    </li>
+                  ))}
+              </ul>
+            </>
           )}
 
-          {data.summary.actionItems && (
-            <p className="text-[11.5px] text-amber-600 dark:text-amber-400/70 leading-relaxed">
-              ⚡ {data.summary.actionItems as string}
-            </p>
+          {/* Action items — card style */}
+          {s.actionItems && (
+            <div className="relative overflow-hidden p-4 rounded-xl border border-amber-100 dark:border-amber-500/20 bg-linear-to-br from-amber-50/50 to-white dark:from-amber-500/5 dark:to-transparent">
+              <div className="flex items-start gap-3">
+                <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-500/20 shrink-0">
+                  <IconBolt
+                    size={14}
+                    className="text-amber-600 dark:text-amber-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className=" text-[10px]  tracking-tight  text-amber-700/70 dark:text-amber-400/70">
+                    Recommended Action
+                  </p>
+                  <p className=" text-xs text-amber-900 dark:text-amber-200/90  font-normal">
+                    {String(s.actionItems)}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
-
-          <div className="flex items-center gap-2 pt-0.5">
-            <span
-              className={cn(
-                "text-[10px] font-medium capitalize",
-                data.summary.sentiment === "positive" &&
-                  "text-emerald-500 dark:text-emerald-400",
-                data.summary.sentiment === "negative" &&
-                  "text-red-500 dark:text-red-400",
-                data.summary.sentiment === "neutral" &&
-                  "text-gray-400 dark:text-white/25",
-              )}
-            >
-              {data.summary.sentiment}
-            </span>
-            <span
-              className={cn(
-                "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                data.summary.priority === "high" && "bg-red-400",
-                data.summary.priority === "medium" && "bg-amber-400",
-                data.summary.priority === "low" &&
-                  "bg-gray-300 dark:bg-white/20",
-              )}
-            />
-            <span className="text-[10px] text-gray-400 dark:text-white/25 capitalize">
-              {data.summary.priority} priority
-            </span>
-            {data.cached && (
-              <span className="ml-auto text-[10px] text-gray-300 dark:text-white/15">
-                cached
-              </span>
-            )}
-          </div>
         </div>
       ) : (
-        <p className="mt-2 text-[12px] text-gray-300 dark:text-white/20 italic">
+        <p className="text-[12px] text-gray-300 dark:text-white/20 italic">
           No summary available
         </p>
       )}
@@ -243,177 +337,64 @@ function AISummarySection({
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
-function NotesSection({ senderEmail }: { senderEmail: string }) {
+function Notes({ senderEmail }: { senderEmail: string }) {
   const storageKey = `note:${senderEmail}`;
-  const [note, setNote] = useState("");
-  const [editing, setEditing] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
+  const [note, setNote] = useState(() => {
     try {
-      setNote(localStorage.getItem(storageKey) ?? "");
-    } catch {}
-    setEditing(false);
-  }, [storageKey]);
+      return localStorage.getItem(storageKey) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    if (editing) textareaRef.current?.focus();
-  }, [editing]);
-
-  function save(val: string) {
-    setNote(val);
-    try {
-      localStorage.setItem(storageKey, val);
-    } catch {}
-  }
-
-  return (
-    <div className="shrink-0 px-4 py-3 border-b border-black/5 dark:border-white/5">
-      <div className="flex items-center justify-between mb-2">
-        <SectionLabel
-          icon={<IconNotes size={10} strokeWidth={2} />}
-          text="Notes"
-        />
-        <button
-          onClick={() => setEditing((v) => !v)}
-          className="text-[11px] text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55 transition-colors"
-        >
-          {editing ? "done" : "edit"}
-        </button>
-      </div>
-
-      {editing ? (
-        <textarea
-          ref={textareaRef}
-          value={note}
-          onChange={(e) => save(e.target.value)}
-          placeholder="Add a note about this sender…"
-          rows={3}
-          className={cn(
-            "w-full resize-none rounded-lg px-3 py-2 text-[12.5px] leading-relaxed",
-            "bg-black/3 dark:bg-white/5",
-            "border border-black/8 dark:border-white/8",
-            "text-gray-700 dark:text-white/70 placeholder:text-gray-300 dark:placeholder:text-white/20",
-            "focus:outline-none focus:ring-1 focus:ring-blue-400 dark:focus:ring-white/20",
-          )}
-        />
-      ) : note ? (
-        <p
-          onClick={() => setEditing(true)}
-          className="text-[12.5px] text-gray-600 dark:text-white/55 leading-relaxed cursor-text whitespace-pre-wrap line-clamp-4"
-        >
-          {note}
-        </p>
-      ) : (
-        <button
-          onClick={() => setEditing(true)}
-          className="text-[12px] text-gray-300 dark:text-white/20 hover:text-gray-400 transition-colors italic"
-        >
-          Add a note…
-        </button>
-      )}
-    </div>
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const val = e.target.value;
+      setNote(val);
+      try {
+        localStorage.setItem(storageKey, val);
+      } catch {}
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    },
+    [storageKey],
   );
-}
 
-// ─── Email history ────────────────────────────────────────────────────────────
-function EmailHistory({
-  threads,
-  activeThreadId,
-  isLoading,
-  onSelect,
-}: {
-  threads: ThreadEmail[];
-  activeThreadId: string | null;
-  isLoading: boolean;
-  onSelect: (id: string) => void;
-}) {
   return (
-    <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-      <div className="px-4 py-2.5 flex-shrink-0">
-        <SectionLabel
-          icon={<IconClock size={10} strokeWidth={2} />}
-          text="Emails"
+    <div className="px-5 py-4 border-b border-black/[0.05] dark:border-white/[0.05]">
+      <div className="flex items-center justify-between">
+        <SectionHeader
+          icon={<IconNotes size={10} strokeWidth={2} />}
+          label="Notes"
         />
-      </div>
-
-      <div className="flex-1 overflow-y-auto overscroll-contain">
-        {isLoading ? (
-          <div className="px-4 space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="space-y-1.5">
-                <Skeleton className="h-3 w-full rounded" />
-                <Skeleton className="h-2.5 w-3/4 rounded" />
-              </div>
-            ))}
-          </div>
-        ) : threads.length === 0 ? (
-          <p className="px-4 py-3 text-[12px] text-gray-300 dark:text-white/20 text-center italic">
-            No threads found
-          </p>
-        ) : (
-          threads.map((t) => {
-            const isActive = t.threadId === activeThreadId;
-
-            return (
-              <button
-                key={t.threadId}
-                onClick={() => onSelect(t.threadId)}
-                className={cn(
-                  "relative w-full text-left px-4 py-2.5 overflow-hidden",
-                  "border-b border-black/[0.04] dark:border-white/[0.04]",
-                  "transition-colors duration-75",
-                  "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
-                  isActive && "bg-blue-50/60 dark:bg-white/[0.06]",
-                )}
-              >
-                {isActive && (
-                  <span className="absolute inset-y-0 left-0 w-[2px] bg-blue-400 dark:bg-white/40 rounded-r-full" />
-                )}
-                <div className="flex items-center justify-between gap-2 mb-0.5">
-                  <span
-                    className={cn(
-                      "truncate text-[12px]",
-                      t.isUnread
-                        ? "font-semibold text-gray-900 dark:text-white"
-                        : "font-normal text-gray-600 dark:text-white/50",
-                    )}
-                  >
-                    {t.subject || "(no subject)"}
-                  </span>
-                  <span className="flex-shrink-0 text-[11px] text-gray-400 dark:text-white/25 tabular-nums whitespace-nowrap">
-                    {format(new Date(t.receivedAt), "MMM d")}
-                  </span>
-                </div>
-
-                {t.snippet && (
-                  <p className="truncate text-[11.5px] text-gray-400 dark:text-white/28 mb-1">
-                    {t.snippet}
-                  </p>
-                )}
-              </button>
-            );
-          })
+        {saved && (
+          <span className="text-[10px] text-emerald-500 -mt-2">saved</span>
         )}
       </div>
+      <textarea
+        value={note}
+        onChange={handleChange}
+        placeholder="Press N to start writing a note…"
+        rows={3}
+        className={cn(
+          "w-full resize-none rounded-xl px-3.5 py-3 text-[12px] leading-relaxed",
+          "bg-gray-50 dark:bg-white/[0.03]",
+          "border border-gray-100 dark:border-white/[0.06]",
+          "text-gray-700 dark:text-white/70",
+          "placeholder:text-gray-300 dark:placeholder:text-white/20",
+          "focus:outline-none focus:ring-1 focus:ring-gray-200 dark:focus:ring-white/10",
+          "transition-colors duration-150",
+        )}
+      />
     </div>
   );
 }
 
-// ─── Shared section label ─────────────────────────────────────────────────────
-function SectionLabel({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-gray-400 dark:text-white/25">{icon}</span>
-      <span className="text-[10px] font-bold tracking-widest uppercase text-gray-400 dark:text-white/25 select-none">
-        {text}
-      </span>
-    </div>
-  );
-}
 
-// ─── Empty / Skeleton ─────────────────────────────────────────────────────────
-function SenderPaneEmpty({ className }: { className?: string }) {
+
+// ─── Empty ────────────────────────────────────────────────────────────────────
+function Empty({ className }: { className?: string }) {
   return (
     <div
       className={cn(
@@ -422,7 +403,7 @@ function SenderPaneEmpty({ className }: { className?: string }) {
       )}
     >
       <IconMail
-        size={24}
+        size={22}
         strokeWidth={1.2}
         className="text-gray-200 dark:text-white/10"
       />
@@ -433,40 +414,34 @@ function SenderPaneEmpty({ className }: { className?: string }) {
   );
 }
 
-function SenderPaneSkeleton({ className }: { className?: string }) {
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+function PaneSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      <div className="px-4 pt-4 pb-3 border-b border-black/[0.05] dark:border-white/[0.05] space-y-3">
-        <div className="flex items-center gap-3">
-          <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
-          <div className="flex-1 space-y-1.5">
-            <Skeleton className="h-3 w-2/3 rounded" />
-            <Skeleton className="h-2.5 w-1/2 rounded" />
-          </div>
-        </div>
-        <Skeleton className="h-2.5 w-full rounded" />
-        <div className="flex gap-1">
-          <Skeleton className="h-4 w-14 rounded-md" />
-          <Skeleton className="h-4 w-10 rounded-md" />
+    <div className={cn("flex flex-col h-full p-5 gap-5", className)}>
+      <div className="flex items-center gap-3">
+        <Skeleton className="w-10 h-10 rounded-full shrink-0" />
+        <div className="flex-1 space-y-1.5">
+          <Skeleton className="h-3.5 w-2/3 rounded" />
+          <Skeleton className="h-2.5 w-1/2 rounded" />
+          <Skeleton className="h-2.5 w-1/3 rounded" />
         </div>
       </div>
-      <div className="px-4 py-3 border-b border-black/[0.05] dark:border-white/[0.05] space-y-2">
-        <Skeleton className="h-2 w-12 rounded" />
+      <div className="flex gap-1.5">
+        <Skeleton className="h-6 w-16 rounded-full" />
+        <Skeleton className="h-6 w-12 rounded-full" />
+      </div>
+      <div className="space-y-2 pt-1">
+        <div className="flex gap-1.5">
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-5 w-20 rounded-full" />
+        </div>
         <Skeleton className="h-2.5 w-full rounded" />
         <Skeleton className="h-2.5 w-4/5 rounded" />
+        <Skeleton className="h-2.5 w-3/5 rounded" />
       </div>
-      <div className="px-4 py-3 border-b border-black/[0.05] dark:border-white/[0.05] space-y-2">
+      <div className="space-y-2 pt-1">
         <Skeleton className="h-2 w-10 rounded" />
-        <Skeleton className="h-14 w-full rounded-lg" />
-      </div>
-      <div className="flex-1 px-4 py-3 space-y-3">
-        <Skeleton className="h-2 w-10 rounded" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="space-y-1.5">
-            <Skeleton className="h-3 w-full rounded" />
-            <Skeleton className="h-2.5 w-3/4 rounded" />
-          </div>
-        ))}
+        <Skeleton className="h-20 w-full rounded-xl" />
       </div>
     </div>
   );

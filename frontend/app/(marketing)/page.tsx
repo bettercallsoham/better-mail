@@ -10,7 +10,7 @@ import ImageCompare from "@/components/ui/ImageCompare";
 import Navbar from "@/components/landing-page/Navbar";
 export default function Home() {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen ">
       <Navbar />
       <main className="flex-1">
         <HeroSection />
