@@ -608,13 +608,14 @@ export class ElasticsearchService {
   async getInboxThreads(params: {
     emailAddresses: string[];
     size?: number;
-    cursor?: { receivedAt: string; id: string };
+    page?: number; 
   }) {
-    const { emailAddresses, size = 20, cursor } = params;
+    const { emailAddresses, size = 20, page = 0 } = params;
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
       size,
+      from: page * size, // offset pagination
       query: {
         bool: {
           filter: [
@@ -634,9 +635,6 @@ export class ElasticsearchService {
           },
         ],
       },
-      ...(cursor && {
-        search_after: [cursor.receivedAt],
-      }),
     });
 
     const hits = result.hits.hits;
@@ -648,32 +646,20 @@ export class ElasticsearchService {
 
         return {
           threadId: source.threadId,
-
-          // latest email info
-          latestEmailId: hit._id,
+          lastEmailId: hit._id,
           subject: source.subject,
           snippet: source.snippet,
           receivedAt: source.receivedAt,
-
           from: source.from,
           to: source.to,
-
-          // thread-level flags
           isUnread: states.some((s) => s._source?.isRead === false),
           isStarred: states.some((s) => s._source?.isStarred === true),
         };
       }),
 
-      nextCursor:
-        hits.length > 0
-          ? {
-              receivedAt: (hits[hits.length - 1]._source as any).receivedAt,
-              id: hits[hits.length - 1]._id,
-            }
-          : null,
+      nextPage: hits.length === size ? page + 1 : null,
     };
   }
-
   /**
    * Get all emails in a specific thread
    */

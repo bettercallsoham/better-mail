@@ -1,30 +1,28 @@
-"use client";
-
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 
 export type LayoutMode = "velocity" | "flow" | "zen";
 
-interface UIState {
+interface LayoutSlice {
   layoutMode: LayoutMode;
   sidebarCollapsed: boolean;
-
-  selectedEmailAddress: string | null;
-  activeFolder: string;
-
-  activeThreadId: string | null;
-  /** Keyboard-highlighted row — NOT yet opened */
-  focusedThreadId: string | null;
-  selectedThreadIds: string[];
-  /** Ordered IDs from the visible thread list — for overlay prev/next */
-  threadIds: string[];
-
   setLayoutMode: (mode: LayoutMode) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+}
 
+interface MailboxSlice {
+  selectedEmailAddress: string | null;
+  activeFolder: string;
   setSelectedEmailAddress: (email: string | null) => void;
   setActiveFolder: (folder: string) => void;
+}
 
+interface ThreadSlice {
+  activeThreadId: string | null;
+  focusedThreadId: string | null;
+  selectedThreadIds: string[];
+  threadIds: string[];
   setActiveThread: (id: string | null) => void;
   setFocusedThread: (id: string | null) => void;
   setThreadIds: (ids: string[]) => void;
@@ -32,25 +30,21 @@ interface UIState {
   clearSelection: () => void;
 }
 
-export const useUIStore = create<UIState>((set, get) => ({
+type UIState = LayoutSlice & MailboxSlice & ThreadSlice;
+
+export const useUIStore = create<UIState>()((set, get) => ({
   layoutMode: "velocity",
   sidebarCollapsed: false,
-
-  selectedEmailAddress: null,
-  activeFolder: "inbox",
-
-  activeThreadId: null,
-  focusedThreadId: null,
-  selectedThreadIds: [],
-  threadIds: [],
 
   setLayoutMode: (mode) =>
     set({ layoutMode: mode, activeThreadId: null, focusedThreadId: null }),
 
-  toggleSidebar: () =>
-    set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+
+  selectedEmailAddress: null,
+  activeFolder: "inbox",
 
   setSelectedEmailAddress: (email) =>
     set({
@@ -67,6 +61,11 @@ export const useUIStore = create<UIState>((set, get) => ({
       focusedThreadId: null,
       selectedThreadIds: [],
     }),
+
+  activeThreadId: null,
+  focusedThreadId: null,
+  selectedThreadIds: [],
+  threadIds: [],
 
   setActiveThread: (id) =>
     set({
@@ -90,3 +89,39 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   clearSelection: () => set({ selectedThreadIds: [] }),
 }));
+
+export const useLayoutStore = () =>
+  useUIStore(
+    useShallow((s) => ({
+      layoutMode: s.layoutMode,
+      sidebarCollapsed: s.sidebarCollapsed,
+      setLayoutMode: s.setLayoutMode,
+      toggleSidebar: s.toggleSidebar,
+      setSidebarCollapsed: s.setSidebarCollapsed,
+    })),
+  );
+
+export const useMailboxStore = () =>
+  useUIStore(
+    useShallow((s) => ({
+      selectedEmailAddress: s.selectedEmailAddress,
+      activeFolder: s.activeFolder,
+      setSelectedEmailAddress: s.setSelectedEmailAddress,
+      setActiveFolder: s.setActiveFolder,
+    })),
+  );
+
+export const useThreadStore = () =>
+  useUIStore(
+    useShallow((s) => ({
+      activeThreadId: s.activeThreadId,
+      focusedThreadId: s.focusedThreadId,
+      selectedThreadIds: s.selectedThreadIds,
+      threadIds: s.threadIds,
+      setActiveThread: s.setActiveThread,
+      setFocusedThread: s.setFocusedThread,
+      setThreadIds: s.setThreadIds,
+      toggleThreadSelection: s.toggleThreadSelection,
+      clearSelection: s.clearSelection,
+    })),
+  );

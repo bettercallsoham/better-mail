@@ -16,15 +16,15 @@ export const mailboxService = {
   getConnectedAccounts: () =>
     apiClient<GetConnectedAccountsResponse>("/mail/connected-accounts"),
 
-  connectGmail:   () => apiClient<ConnectResponse>("/connect/gmail"),
+  connectGmail: () => apiClient<ConnectResponse>("/connect/gmail"),
   connectOutlook: () => apiClient<ConnectResponse>("/connect/outlook"),
 
-  // ── Threads ───────────────────────────────────────────────────────────────
   getThreadEmails: (params: ThreadQueryParams) => {
     const searchParams = new URLSearchParams();
-    if (params.email)  searchParams.append("email",  params.email);
-    if (params.size)   searchParams.append("size",   params.size.toString());
-    if (params.cursor) searchParams.append("cursor", params.cursor);
+    if (params.email) searchParams.append("email", params.email);
+    if (params.size) searchParams.append("size", params.size.toString());
+    if (params.page !== undefined && params.page !== null)
+      searchParams.append("page", params.page.toString());
     return apiClient<GetThreadEmailsResponse>(
       `/mail/thread-emails?${searchParams.toString()}`,
     );
@@ -36,7 +36,9 @@ export const mailboxService = {
   // ── Sender threads ─────────────────────────────────────────────────────────
   // GET /mail/from/:senderEmail
   getThreadsBySender: (senderEmail: string) =>
-    apiClient<GetSenderThreadsResponse>(`/mail/from/${encodeURIComponent(senderEmail)}`),
+    apiClient<GetSenderThreadsResponse>(
+      `/mail/from/${encodeURIComponent(senderEmail)}`,
+    ),
 
   // ── Folders / Labels ──────────────────────────────────────────────────────
   getFolders: (email?: string) => {

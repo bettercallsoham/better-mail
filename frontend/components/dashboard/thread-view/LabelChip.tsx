@@ -18,7 +18,6 @@ function labelColor(label: EmailLabel): string {
 }
 
 export function LabelChip({ label, variant = "dot" }: LabelChipProps) {
-  // Guard: never crash if label or label.name is somehow missing
   if (!label?.name) return null;
 
   const color = labelColor(label);

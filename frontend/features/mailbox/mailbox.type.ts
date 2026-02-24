@@ -11,12 +11,6 @@ export interface GetConnectedAccountsResponse {
   data: ConnectedAccount[];
 }
 
-export interface ThreadCursor {
-  receivedAt: string;
-  id: string;
-}
-
-// ── Label ─────────────────────────────────────────────────────────────────────
 export interface EmailLabel {
   id: string;
   name: string;
@@ -24,28 +18,27 @@ export interface EmailLabel {
 }
 
 export interface ThreadEmail {
-  threadId: string;
-  latestEmailId: string;
-  subject: string;
-  snippet: string;
-  receivedAt: string;
-  from: { email: string; name?: string };
-  to:   { email: string; name?: string }[];
-  isUnread: boolean;
-  isStarred: boolean;
-  labels?: EmailLabel[];
+  threadId:    string;
+  lastEmailId: string;
+  subject:     string;
+  snippet:     string;
+  receivedAt:  string;
+  from:        { email: string; name?: string };
+  to:          { email: string; name?: string }[];
+  isUnread:    boolean;
+  isStarred:   boolean;
+  labels?:     EmailLabel[];
 }
 
 export interface GetThreadEmailsResponse {
-  success: boolean;
+  success:  boolean;
   message?: string;
   data: {
-    threads: ThreadEmail[];
-    nextCursor: ThreadCursor | null;
+    threads:  ThreadEmail[];
+    nextPage: number | null;
   };
 }
 
-// ── Sender threads ─────────────────────────────────────────────────────────────
 export interface GetSenderThreadsResponse {
   success: boolean;
   data: {
@@ -59,50 +52,50 @@ export interface ConnectResponse {
 
 export interface ThreadQueryParams {
   email?: string;
-  size?: number;
-  cursor?: string;
+  size?:  number;
+  page?:  number;
 }
 
 export interface EmailAddress {
   email: string;
-  name: string;
+  name:  string;
 }
 
 export interface FullEmail {
-  id: string;
-  emailAddress: string;
-  provider: "gmail" | "outlook";
-  subject: string;
-  bodyHtml: string;
-  bodyText?: string;
-  snippet: string;
-  from: EmailAddress;
-  to: EmailAddress[];
-  receivedAt: string;
-  isRead: boolean;
+  id:             string;
+  emailAddress:   string;
+  provider:       "gmail" | "outlook";
+  subject:        string;
+  bodyHtml:       string;
+  bodyText?:      string;
+  snippet:        string;
+  from:           EmailAddress;
+  to:             EmailAddress[];
+  receivedAt:     string;
+  isRead:         boolean;
   hasAttachments: boolean;
-  threadId: string;
-  isStarred: boolean;
-  isDraft: boolean;
-  labels?: EmailLabel[];
+  threadId:       string;
+  isStarred:      boolean;
+  isDraft:        boolean;
+  labels?:        EmailLabel[];
 }
 
 export interface GetThreadDetailResponse {
   success: boolean;
   data: {
-    total: { value: number; relation: string };
+    total:  { value: number; relation: string };
     emails: FullEmail[];
   };
 }
 
 export interface SystemFolders {
-  unread: number;
-  starred: number;
-  archived: number;
-  inbox: number;
-  sent: number;
+  unread:    number;
+  starred:   number;
+  archived:  number;
+  inbox:     number;
+  sent:      number;
   important: number;
-  drafts: number;
+  drafts:    number;
 }
 
 export interface MailLabel {
@@ -118,9 +111,8 @@ export interface GetFoldersResponse {
   };
 }
 
-// ── Action mutation params ─────────────────────────────────────────────────────
 export interface ThreadActionParams {
-  threadId: string;
+  threadId:     string;
   emailAddress: string;
 }
 

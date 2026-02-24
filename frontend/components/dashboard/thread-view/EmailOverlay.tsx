@@ -38,7 +38,7 @@ function Avatar({ name, email, size = 8 }: { name?: string; email: string; size?
   return (
     <span
       className={cn(
-        "flex-shrink-0 rounded-full flex items-center justify-center text-[11px] font-semibold text-white",
+        "shrink-0 rounded-full flex items-center justify-center text-[11px] font-semibold text-white",
         `w-${size} h-${size}`,
       )}
       style={{ background: `hsl(${hue} 52% 46%)` }}
@@ -71,7 +71,7 @@ function ToolBtn({
       className={cn(
         "w-7 h-7 rounded-lg flex items-center justify-center",
         "text-gray-400 dark:text-white/30",
-        "hover:bg-black/[0.06] dark:hover:bg-white/[0.08]",
+        "hover:bg-black/6 dark:hover:bg-white/8",
         "hover:text-gray-700 dark:hover:text-white/70",
         "disabled:opacity-25 disabled:cursor-not-allowed",
         "transition-all duration-100",
@@ -85,7 +85,7 @@ function ToolBtn({
 }
 
 function Divider() {
-  return <span className="w-px h-4 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5 flex-shrink-0" />;
+  return <span className="w-px h-4 bg-black/8 dark:bg-white/8 mx-0.5 shrink-0" />;
 }
 
 // ─── Fast iframe body — no horizontal scroll, instant resize ──────────────────
@@ -129,12 +129,10 @@ function IframeBody({ html }: { html: string }) {
       sandbox="allow-same-origin"
       title="Email content"
       className="w-full border-0 block"
-      // height 0 initially → no layout shift, resize on load
       style={{ height: 0 }}
       onLoad={(e) => {
         const iframe = e.target as HTMLIFrameElement;
         fit(iframe);
-        // Re-fit after remote images may have loaded
         setTimeout(() => fit(iframe), 400);
         setTimeout(() => fit(iframe), 1200);
       }}

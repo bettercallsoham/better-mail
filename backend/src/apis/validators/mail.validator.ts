@@ -28,7 +28,10 @@ export const validateGetThreadEmails = [
     .isInt({ min: 1, max: 100 })
     .withMessage("Size must be between 1 and 100"),
 
-  query("cursor").optional().isString().withMessage("Cursor must be a string"),
+  query("page")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("Page must be a non-negative integer"),
 
   handleValidationErrors,
 ];

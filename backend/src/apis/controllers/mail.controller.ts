@@ -40,26 +40,13 @@ export const getConnectedMailboxes = asyncHandler(
 export const getThreadEmails = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
-    const { email, size, cursor } = req.query;
+    const { email, size, page } = req.query;
 
     if (!userId) {
       return res.status(401).json({
         success: false,
         message: "User not authenticated",
       });
-    }
-
-    let parsedCursor: { receivedAt: string; id: string } | undefined;
-
-    if (cursor && typeof cursor === "string") {
-      try {
-        parsedCursor = JSON.parse(cursor);
-      } catch {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid cursor format",
-        });
-      }
     }
 
     const { emails: emailAddresses, error } = await getUserEmails(
@@ -77,7 +64,7 @@ export const getThreadEmails = asyncHandler(
     if (emailAddresses.length === 0) {
       return res.json({
         success: true,
-        data: { threads: [], nextCursor: null },
+        data: { threads: [], nextPage: null },
         message: "No connected email accounts",
       });
     }
@@ -91,7 +78,6 @@ export const getThreadEmails = asyncHandler(
           message: "Access denied for this email account",
         });
       }
-
       allowedEmails = [email];
     }
 
@@ -100,7 +86,7 @@ export const getThreadEmails = asyncHandler(
     const threads = await elasticService.getInboxThreads({
       emailAddresses: allowedEmails,
       size: size ? parseInt(size as string, 10) : 20,
-      cursor: parsedCursor,
+      page: page ? parseInt(page as string, 10) : 0,
     });
 
     return res.json({
@@ -1253,7 +1239,6 @@ export const sendDraft = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-   
     // Send via provider
     let sentMessageId: string;
     if (existingDraft.provider === "gmail") {

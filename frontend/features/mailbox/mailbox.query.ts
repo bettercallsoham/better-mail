@@ -14,9 +14,7 @@ import { toast } from "sonner";
 import { mailboxService } from "./mailbox.api";
 import {
   GetThreadEmailsResponse,
-  LabelActionParams,
   ThreadActionParams,
-  ThreadCursor,
   ThreadEmail,
 } from "./mailbox.type";
 import { useUIStore } from "@/lib/store/ui.store";
@@ -47,8 +45,6 @@ export function useConnectedAccounts() {
   });
 }
 
-// ─── Thread list ──────────────────────────────────────────────────────────────
-// Stable selector — defined outside to never cause render loops
 function selectThreadData(data: InfiniteData<GetThreadEmailsResponse>) {
   const threads   = data.pages.flatMap((p) => p.data.threads);
   const threadIds = threads.map((t) => t.threadId);
@@ -61,12 +57,12 @@ export function useThreadEmails(email?: string) {
     queryFn: ({ pageParam }) =>
       mailboxService.getThreadEmails({
         email,
-        size:   20,
-        cursor: pageParam ? JSON.stringify(pageParam) : undefined,
+        size: 20,
+        page: pageParam,
       }),
-    initialPageParam: null as ThreadCursor | null,
+    initialPageParam: 0,
     getNextPageParam: (lastPage) =>
-      lastPage.success ? (lastPage.data.nextCursor ?? null) : null,
+      lastPage.success ? (lastPage.data.nextPage ?? null) : null,
     select:    selectThreadData,
     staleTime: 30 * 1000,
   });
