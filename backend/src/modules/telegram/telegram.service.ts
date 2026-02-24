@@ -23,7 +23,9 @@ interface UIEmailItem {
 export class TelegramService {
   private readonly CACHE_TTL: number = 7200;
   private readonly MAX_TG_LENGTH: number = 3800; // Safe margin for HTML parsing
-  private elasticService: ElasticsearchService = new ElasticsearchService(elasticClient);
+  private elasticService: ElasticsearchService = new ElasticsearchService(
+    elasticClient,
+  );
 
   public async handleUnread(ctx: Context): Promise<void> {
     const userId = await this.requireUserId(ctx);
@@ -32,7 +34,9 @@ export class TelegramService {
     try {
       const emails = await this.executeEmailSearch(userId, { isRead: false });
       await this.renderEmailGrid(ctx, emails, "📬 <b>Recent Unread Emails</b>");
-    } catch (error) { this.logAndReplyError(ctx, "Unread", error); }
+    } catch (error) {
+      this.logAndReplyError(ctx, "Unread", error);
+    }
   }
 
   public async handleSummary(ctx: Context): Promise<void> {
@@ -42,52 +46,87 @@ export class TelegramService {
     try {
       const today = new Date().toISOString().split("T")[0];
       const emails = await this.executeEmailSearch(userId, { dateFrom: today });
-      await this.renderEmailGrid(ctx, emails, "🗓️ <b>Today's Inbox Activity</b>");
-    } catch (error) { this.logAndReplyError(ctx, "Summary", error); }
+      await this.renderEmailGrid(
+        ctx,
+        emails,
+        "🗓️ <b>Today's Inbox Activity</b>",
+      );
+    } catch (error) {
+      this.logAndReplyError(ctx, "Summary", error);
+    }
   }
 
   public async handleSearchPrompt(ctx: Context): Promise<void> {
-    await ctx.reply("🔎 <b>Search Mode</b>\nType keywords to find emails.", { parse_mode: "HTML" });
+    await ctx.reply("🔎 <b>Search Mode</b>\nType keywords to find emails.", {
+      parse_mode: "HTML",
+    });
   }
 
   public async sendSettings(ctx: Context): Promise<void> {
     await ctx.reply("⚙️ <b>Settings</b>", {
       parse_mode: "HTML",
       reply_markup: {
-        inline_keyboard: [[{ text: "🔗 Manage Accounts", url: "https://bettermail.tech/settings" }]]
+        inline_keyboard: [
+          [
+            {
+              text: "🔗 Manage Accounts",
+              url: "https://bettermail.tech/settings",
+            },
+          ],
+        ],
       },
     });
   }
 
-  private async executeEmailSearch(userId: string, filters: SavedSearchFilters): Promise<UIEmailItem[]> {
+  private async executeEmailSearch(
+    userId: string,
+    filters: SavedSearchFilters,
+  ): Promise<UIEmailItem[]> {
     const { emails: emailAddresses, error } = await getUserEmails(userId);
-    if (error || !emailAddresses?.length) throw new Error("No linked accounts.");
+    if (error || !emailAddresses?.length)
+      throw new Error("No linked accounts.");
 
-    const result = await this.elasticService.searchEmails({ emailAddresses, query: "", size: 5, filters });
+    const result = await this.elasticService.searchEmails({
+      emailAddresses,
+      query: "",
+      size: 5,
+      filters,
+    });
 
-    return Promise.all(result.emails.map(async (e: UnifiedEmailDocument) => {
-      const shortId = crypto.randomBytes(4).toString("hex");
-      await redis.set(`tg:btn:${shortId}`, e.threadId, "EX", 7200);
+    return Promise.all(
+      result.emails.map(async (e:any) => {
+        const shortId = crypto.randomBytes(4).toString("hex");
+        await redis.set(`tg:btn:${shortId}`, e.threadId, "EX", 7200);
 
-      return {
-        id: shortId,
-        subject: this.escapeHtml(e.subject || "(No Subject)"),
-        from: this.escapeHtml(e.from?.name || e.from?.email || "Unknown"),
-        snippet: this.escapeHtml(e.snippet || ""),
-        content: e.bodyText || e.bodyHtml || e.snippet || "No content", // Full body captured here
-        date: new Date(e.receivedAt).toLocaleDateString(),
-      };
-    }));
+        return {
+          id: shortId,
+          subject: this.escapeHtml(e.subject || "(No Subject)"),
+          from: this.escapeHtml(e.from?.name || e.from?.email || "Unknown"),
+          snippet: this.escapeHtml(e.snippet || ""),
+          content: e.bodyText || e.bodyHtml || e.snippet || "No content", // Full body captured here
+          date: new Date(e.receivedAt).toLocaleDateString(),
+        };
+      }),
+    );
   }
 
-  private async renderEmailGrid(ctx: Context, emails: UIEmailItem[], title: string): Promise<void> {
+  private async renderEmailGrid(
+    ctx: Context,
+    emails: UIEmailItem[],
+    title: string,
+  ): Promise<void> {
     if (emails.length === 0) {
-      await ctx.reply(`${title}\n\nYour inbox is currently clear! ✨`, { parse_mode: "HTML" });
+      await ctx.reply(`${title}\n\nYour inbox is currently clear! ✨`, {
+        parse_mode: "HTML",
+      });
       return;
     }
 
     const content = emails
-      .map((e, i) => `${i + 1}. <b>${e.subject}</b>\n👤 ${e.from}\n<i>${e.snippet.slice(0, 80)}...</i>`)
+      .map(
+        (e, i) =>
+          `${i + 1}. <b>${e.subject}</b>\n👤 ${e.from}\n<i>${e.snippet.slice(0, 80)}...</i>`,
+      )
       .join("\n\n<code>────────────────</code>\n\n");
 
     const inline_keyboard = emails.map((e, i) => [
@@ -96,7 +135,10 @@ export class TelegramService {
       { text: "🗑️ Trash", callback_data: `trash:${e.id}` },
     ]);
 
-    await ctx.reply(`${title}\n\n${content}`, { parse_mode: "HTML", reply_markup: { inline_keyboard } });
+    await ctx.reply(`${title}\n\n${content}`, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard },
+    });
   }
 
   public async handleCallback(ctx: Context): Promise<void> {
@@ -109,49 +151,68 @@ export class TelegramService {
     if (action === "view") await this.handleViewFullThread(ctx, threadId);
   }
 
-  private async handleViewFullThread(ctx: Context, threadId: string): Promise<void> {
+  private async handleViewFullThread(
+    ctx: Context,
+    threadId: string,
+  ): Promise<void> {
     const userId = await this.requireUserId(ctx);
     if (!userId) return;
     await ctx.replyWithChatAction("typing");
 
     try {
       const { emails: addrs } = await getUserEmails(userId);
-      const { emails } = await this.elasticService.getEmailsByThreadId({ threadId, emailAddresses: addrs || [] });
+      const { emails } = await this.elasticService.getEmailsByThreadId({
+        threadId,
+        emailAddresses: addrs || [],
+      });
       if (!emails?.length) return void ctx.reply("❌ Thread not accessible.");
 
       const subject = this.escapeHtml(emails[0].subject || "(No Subject)");
       const header = `🧵 <b>THREAD: ${subject}</b>\n📂 <code>${threadId}</code>\n\n`;
-      
+
       const allChunks: string[] = [];
       let currentChunk = header;
 
-      emails.sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime()).forEach((e, i) => {
-        const from = this.escapeHtml(e.from.name || e.from.email);
-        const date = new Date(e.receivedAt).toLocaleString();
-        const body = this.escapeHtml(e.bodyText || e.snippet || "No content.");
-        
-        const emailHeader = `👤 <b>From:</b> ${from}\n📅 <b>Date:</b> ${date}\n\n`;
-        const emailFooter = i < emails.length - 1 ? "\n\n<code>━━━━━ (Reply) ━━━━━</code>\n\n" : "";
+      emails
+        .sort(
+          (a, b) =>
+            new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime(),
+        )
+        .forEach((e, i) => {
+          const from = this.escapeHtml(e.from.name || e.from.email);
+          const date = new Date(e.receivedAt).toLocaleString();
+          const body = this.escapeHtml(
+            e.bodyText || e.snippet || "No content.",
+          );
 
-        const fullEmailBlock = emailHeader + body + emailFooter;
+          const emailHeader = `👤 <b>From:</b> ${from}\n📅 <b>Date:</b> ${date}\n\n`;
+          const emailFooter =
+            i < emails.length - 1
+              ? "\n\n<code>━━━━━ (Reply) ━━━━━</code>\n\n"
+              : "";
 
-        if ((currentChunk + fullEmailBlock).length <= this.MAX_TG_LENGTH) {
-          currentChunk += fullEmailBlock;
-        } else {
-          if (fullEmailBlock.length > this.MAX_TG_LENGTH) {
-            if (currentChunk) allChunks.push(currentChunk);
-            let massiveBody = emailHeader + body;
-            const subParts = massiveBody.match(new RegExp(`.{1,${this.MAX_TG_LENGTH}}`, 'gs')) || [];
-            for (let j = 0; j < subParts.length - 1; j++) {
-              allChunks.push(subParts[j]);
-            }
-            currentChunk = subParts[subParts.length - 1] + emailFooter;
+          const fullEmailBlock = emailHeader + body + emailFooter;
+
+          if ((currentChunk + fullEmailBlock).length <= this.MAX_TG_LENGTH) {
+            currentChunk += fullEmailBlock;
           } else {
-            allChunks.push(currentChunk);
-            currentChunk = fullEmailBlock;
+            if (fullEmailBlock.length > this.MAX_TG_LENGTH) {
+              if (currentChunk) allChunks.push(currentChunk);
+              let massiveBody = emailHeader + body;
+              const subParts =
+                massiveBody.match(
+                  new RegExp(`.{1,${this.MAX_TG_LENGTH}}`, "gs"),
+                ) || [];
+              for (let j = 0; j < subParts.length - 1; j++) {
+                allChunks.push(subParts[j]);
+              }
+              currentChunk = subParts[subParts.length - 1] + emailFooter;
+            } else {
+              allChunks.push(currentChunk);
+              currentChunk = fullEmailBlock;
+            }
           }
-        }
-      });
+        });
 
       if (currentChunk) allChunks.push(currentChunk);
 
@@ -162,21 +223,27 @@ export class TelegramService {
       await ctx.reply(allChunks[allChunks.length - 1], {
         parse_mode: "HTML",
         reply_markup: {
-          inline_keyboard: [[
-            { text: "✉️ Reply All", callback_data: `reply_all:${threadId}` },
-            { text: "📥 Archive", callback_data: `archive:${threadId}` }
-          ]]
-        }
+          inline_keyboard: [
+            [
+              { text: "✉️ Reply All", callback_data: `reply_all:${threadId}` },
+              { text: "📥 Archive", callback_data: `archive:${threadId}` },
+            ],
+          ],
+        },
       });
-
-    } catch (error) { this.logAndReplyError(ctx, "Thread", error); }
+    } catch (error) {
+      this.logAndReplyError(ctx, "Thread", error);
+    }
   }
 
   private async requireUserId(ctx: Context): Promise<string | null> {
     const chatId = ctx.chat?.id.toString();
     if (!chatId) return null;
     const userId = await this.getUserIdByChatId(chatId);
-    if (!userId) { await ctx.reply("Please link your account first using /start"); return null; }
+    if (!userId) {
+      await ctx.reply("Please link your account first using /start");
+      return null;
+    }
     return userId;
   }
 
@@ -186,14 +253,19 @@ export class TelegramService {
   }
 
   private escapeHtml(text: string): string {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
   public async getUserIdByChatId(chatId: string): Promise<string | null> {
     const cacheKey = `tg:user_id_by_chat:${chatId}`;
     const cached = await redis.get(cacheKey);
     if (cached) return cached;
-    const tgRecord = await TelegramIntegration.findOne({ where: { chat_id: chatId } });
+    const tgRecord = await TelegramIntegration.findOne({
+      where: { chat_id: chatId },
+    });
     if (tgRecord?.user_id) {
       await redis.set(cacheKey, tgRecord.user_id, "EX", this.CACHE_TTL);
       return tgRecord.user_id;
