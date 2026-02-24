@@ -31,12 +31,12 @@ router.get(
   mailController.getFolders,
 );
 
-router.get(
-  "/folder/:folder",
-  verifyAccessToken(),
-  mailValidator.validateGetEmailsByFolder,
-  mailController.getEmailsByFolder,
-);
+// router.get(
+//   "/folder/:folder",
+//   verifyAccessToken(),
+//   mailValidator.validateGetEmailsByFolder,
+//   mailController.getEmailsByFolder,
+// );
 
 router.get(
   "/search",

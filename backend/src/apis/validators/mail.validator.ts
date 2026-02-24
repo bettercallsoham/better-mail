@@ -288,11 +288,11 @@ export const validateEmailAction = [
 export const validateSearch = [
   query("query")
     .exists()
-    .withMessage("search query is required")
+    .withMessage("Search query is required")
     .isString()
-    .withMessage("query must be a string")
+    .withMessage("Query must be a string")
     .isLength({ min: 1 })
-    .withMessage("query cannot be empty")
+    .withMessage("Query cannot be empty")
     .trim(),
 
   query("from")
@@ -304,9 +304,12 @@ export const validateSearch = [
   query("size")
     .optional()
     .isInt({ min: 1, max: 100 })
-    .withMessage("size must be between 1 and 100"),
+    .withMessage("Size must be between 1 and 100"),
 
-  query("cursor").optional().isString().withMessage("cursor must be a string"),
+  query("page")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("Page must be a non-negative integer"),
 
   query("isRead")
     .optional()
@@ -341,7 +344,7 @@ export const validateSearch = [
   query("labels")
     .optional()
     .isString()
-    .withMessage("labels must be a JSON string or single label"),
+    .withMessage("Labels must be a JSON string or single label"),
 
   query("dateFrom")
     .optional()
@@ -355,7 +358,6 @@ export const validateSearch = [
 
   handleValidationErrors,
 ];
-
 export const validateGetInboxZero = [
   query("from")
     .optional()

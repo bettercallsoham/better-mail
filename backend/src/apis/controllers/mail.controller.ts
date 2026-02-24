@@ -515,7 +515,7 @@ export const searchEmails = asyncHandler(
       query,
       from: fromEmail,
       size,
-      cursor,
+      page,
       isRead,
       isStarred,
       isArchived,
@@ -528,13 +528,9 @@ export const searchEmails = asyncHandler(
     } = req.query;
 
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated",
-      });
+      return res.status(401).json({ success: false, message: "User not authenticated" });
     }
 
-    // Get user's emails (uses cache)
     const { emails: emailAddresses, error } = await getUserEmails(
       userId,
       fromEmail as string | undefined,
@@ -547,101 +543,67 @@ export const searchEmails = asyncHandler(
       });
     }
 
-    try {
-      const elasticService = new ElasticsearchService(elasticClient);
-
-      // Parse cursor if provided
-      let parsedCursor;
-      if (cursor && typeof cursor === "string") {
-        try {
-          parsedCursor = JSON.parse(cursor);
-        } catch (e) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid cursor format",
-          });
-        }
+    let parsedLabels: string[] | undefined;
+    if (labels && typeof labels === "string") {
+      try {
+        parsedLabels = JSON.parse(labels);
+      } catch {
+        parsedLabels = [labels];
       }
-
-      // Parse labels if provided
-      let parsedLabels;
-      if (labels && typeof labels === "string") {
-        try {
-          parsedLabels = JSON.parse(labels);
-        } catch (e) {
-          parsedLabels = [labels];
-        }
-      }
-
-      // Track search execution time
-      const startTime = Date.now();
-
-      const result = await elasticService.searchEmails({
-        emailAddresses,
-        query: query as string,
-        size: size ? parseInt(size as string) : 20,
-        cursor: parsedCursor,
-        filters: {
-          isRead: isRead !== undefined ? isRead === "true" : undefined,
-          isStarred: isStarred !== undefined ? isStarred === "true" : undefined,
-          isArchived:
-            isArchived !== undefined ? isArchived === "true" : undefined,
-          hasAttachments:
-            hasAttachments !== undefined
-              ? hasAttachments === "true"
-              : undefined,
-          from: filterFrom as string | undefined,
-          to: filterTo as string | undefined,
-          labels: parsedLabels,
-          dateFrom: dateFrom as string | undefined,
-          dateTo: dateTo as string | undefined,
-        },
-      });
-
-      const executionTimeMs = Date.now() - startTime;
-
-      // Add to queue for async storage (truly non-blocking)
-      searchHistoryQueue
-        .add("store-search", {
-          userId,
-          searchText: query as string,
-          filters: {
-            isRead: isRead !== undefined ? isRead === "true" : undefined,
-            isStarred:
-              isStarred !== undefined ? isStarred === "true" : undefined,
-            isArchived:
-              isArchived !== undefined ? isArchived === "true" : undefined,
-            hasAttachments:
-              hasAttachments !== undefined
-                ? hasAttachments === "true"
-                : undefined,
-            from: filterFrom as string | undefined,
-            to: filterTo as string | undefined,
-            labels: parsedLabels,
-            dateFrom: dateFrom as string | undefined,
-            dateTo: dateTo as string | undefined,
-          },
-          resultsCount: result.total,
-          executionTimeMs,
-          emailAddresses,
-        })
-        .catch((err) => logger.error("Failed to queue search history:", err));
-
-      res.json({
-        success: true,
-        query,
-        total: result.total,
-        emails: result.emails,
-        nextCursor: result.nextCursor,
-      });
-    } catch (error: any) {
-      logger.error("Search failed:", error);
-
-      res.status(500).json({
-        success: false,
-        message: error.message || "Search failed",
-      });
     }
+
+    const elasticService  = new ElasticsearchService(elasticClient);
+    const startTime       = Date.now();
+
+    const result = await elasticService.searchEmails({
+      emailAddresses,
+      query:  query as string,
+      size:   size ? parseInt(size as string, 10) : 20,
+      page:   page ? parseInt(page as string, 10) : 0,
+      filters: {
+        isRead:         isRead         !== undefined ? isRead         === "true" : undefined,
+        isStarred:      isStarred      !== undefined ? isStarred      === "true" : undefined,
+        isArchived:     isArchived     !== undefined ? isArchived     === "true" : undefined,
+        hasAttachments: hasAttachments !== undefined ? hasAttachments === "true" : undefined,
+        from:           filterFrom as string | undefined,
+        to:             filterTo   as string | undefined,
+        labels:         parsedLabels,
+        dateFrom:       dateFrom   as string | undefined,
+        dateTo:         dateTo     as string | undefined,
+      },
+    });
+
+    const executionTimeMs = Date.now() - startTime;
+
+    searchHistoryQueue
+      .add("store-search", {
+        userId,
+        searchText: query as string,
+        filters: {
+          isRead:         isRead         !== undefined ? isRead         === "true" : undefined,
+          isStarred:      isStarred      !== undefined ? isStarred      === "true" : undefined,
+          isArchived:     isArchived     !== undefined ? isArchived     === "true" : undefined,
+          hasAttachments: hasAttachments !== undefined ? hasAttachments === "true" : undefined,
+          from:           filterFrom as string | undefined,
+          to:             filterTo   as string | undefined,
+          labels:         parsedLabels,
+          dateFrom:       dateFrom   as string | undefined,
+          dateTo:         dateTo     as string | undefined,
+        },
+        resultsCount:  result.total,
+        executionTimeMs,
+        emailAddresses,
+      })
+      .catch((err) => logger.error("Failed to queue search history:", err));
+
+    return res.json({
+      success:  true,
+      query,
+      total:    result.total,
+      page:     result.page,
+      nextPage: result.nextPage,
+      emails:   result.emails,
+    });
   },
   "searchEmails",
 );
@@ -944,92 +906,51 @@ export const deleteSavedSearch = asyncHandler(
 export const executeSavedSearch = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
-    const { id } = req.params;
-    const { size, cursor } = req.query;
+    const { id }         = req.params;
+    const { size, page } = req.query;
 
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated",
-      });
+      return res.status(401).json({ success: false, message: "User not authenticated" });
     }
 
     if (!id || Array.isArray(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid search ID",
-      });
+      return res.status(400).json({ success: false, message: "Invalid search ID" });
     }
 
-    try {
-      const elasticService = new ElasticsearchService(elasticClient);
+    const elasticService = new ElasticsearchService(elasticClient);
 
-      // Get saved search
-      const savedSearch = await elasticService.getSavedSearchById(id, userId);
-
-      if (!savedSearch) {
-        return res.status(404).json({
-          success: false,
-          message: "Saved search not found or access denied",
-        });
-      }
-
-      // Increment usage
-      await elasticService.incrementSearchUsage(id);
-
-      // Parse cursor
-      let parsedCursor;
-      if (cursor && typeof cursor === "string") {
-        try {
-          parsedCursor = JSON.parse(cursor);
-        } catch (e) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid cursor format",
-          });
-        }
-      }
-
-      // Get email addresses (use saved or user's all accounts)
-      let emailAddresses = savedSearch.query.emailAddresses;
-      if (!emailAddresses || emailAddresses.length === 0) {
-        const { emails, error } = await getUserEmails(userId);
-        if (error || emails.length === 0) {
-          return res.status(403).json({
-            success: false,
-            message: error || "No connected email accounts found",
-          });
-        }
-        emailAddresses = emails;
-      }
-
-      // Execute search
-      const result = await elasticService.searchEmails({
-        emailAddresses,
-        query: savedSearch.query.searchText,
-        size: size ? parseInt(size as string) : 20,
-        cursor: parsedCursor,
-        filters: savedSearch.query.filters,
-      });
-
-      res.json({
-        success: true,
-        savedSearch: {
-          id: savedSearch.id,
-          name: savedSearch.name,
-        },
-        total: result.total,
-        emails: result.emails,
-        nextCursor: result.nextCursor,
-      });
-    } catch (error: any) {
-      logger.error("Failed to execute saved search:", error);
-
-      res.status(500).json({
-        success: false,
-        message: error.message || "Failed to execute saved search",
-      });
+    const savedSearch = await elasticService.getSavedSearchById(id, userId);
+    if (!savedSearch) {
+      return res.status(404).json({ success: false, message: "Saved search not found or access denied" });
     }
+
+    await elasticService.incrementSearchUsage(id);
+
+    let emailAddresses = savedSearch.query.emailAddresses;
+    if (!emailAddresses?.length) {
+      const { emails, error } = await getUserEmails(userId);
+      if (error || emails.length === 0) {
+        return res.status(403).json({ success: false, message: error || "No connected email accounts found" });
+      }
+      emailAddresses = emails;
+    }
+
+    const result = await elasticService.searchEmails({
+      emailAddresses,
+      query:   savedSearch.query.searchText,
+      size:    size ? parseInt(size as string, 10) : 20,
+      page:    page ? parseInt(page as string, 10) : 0,
+      filters: savedSearch.query.filters,
+    });
+
+    return res.json({
+      success: true,
+      savedSearch: { id: savedSearch.id, name: savedSearch.name },
+      total:    result.total,
+      page:     result.page,
+      nextPage: result.nextPage,
+      emails:   result.emails,
+    });
   },
   "executeSavedSearch",
 );
@@ -1315,77 +1236,6 @@ export const getEmailById = asyncHandler(
   "getEmailById",
 );
 
-export const getEmailsByFolder = asyncHandler(
-  async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    const { folder } = req.params;
-    const { email, size, cursor } = req.query;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated",
-      });
-    }
-
-    try {
-      const { emails: emailAddresses, error } = await getUserEmails(
-        userId,
-        email as string | undefined,
-      );
-
-      if (error || emailAddresses.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: error || "No connected email accounts",
-        });
-      }
-
-      const elasticService = new ElasticsearchService(elasticClient);
-
-      // Parse cursor if provided
-      let parsedCursor;
-      if (cursor && typeof cursor === "string") {
-        try {
-          parsedCursor = JSON.parse(cursor);
-        } catch (e) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid cursor format",
-          });
-        }
-      }
-
-      // Use search with label filter
-      const folderName = Array.isArray(folder) ? folder[0] : folder;
-      const result = await elasticService.searchEmails({
-        emailAddresses,
-        query: "", // Empty query for all emails in folder
-        size: size ? parseInt(size as string) : 20,
-        cursor: parsedCursor,
-        filters: {
-          labels: [folderName.toUpperCase()], // Convert to uppercase (DRAFT, INBOX, SENT, etc.)
-        },
-      });
-
-      res.json({
-        success: true,
-        folder: folderName,
-        total: result.total,
-        emails: result.emails,
-        nextCursor: result.nextCursor,
-      });
-    } catch (error: any) {
-      logger.error("Failed to get emails by folder:", error);
-
-      res.status(500).json({
-        success: false,
-        message: error.message || "Failed to get emails by folder",
-      });
-    }
-  },
-  "getEmailsByFolder",
-);
 
 export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
