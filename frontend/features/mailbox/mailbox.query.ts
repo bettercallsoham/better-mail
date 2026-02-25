@@ -12,9 +12,16 @@ import {
 import { useCallback } from "react";
 import { mailboxService } from "./mailbox.api";
 import {
+  CreateDraftParams,
   CreateSavedSearchParams,
+  EmailActionParams,
   GetThreadEmailsResponse,
+  InboxZeroParams,
+  ReplyEmailParams,
   SearchQueryParams,
+  SendEmailParams,
+  UpdateInboxStateParams,
+  UpdateSavedSearchParams,
   UpsertThreadNoteParams,
 } from "./mailbox.type";
 
@@ -36,6 +43,10 @@ export const mailboxKeys = {
   savedSearches: () => [...mailboxKeys.all, "saved-searches"] as const,
   threadNote: (threadId: string) =>
     [...mailboxKeys.all, "thread-note", threadId] as const,
+  inboxZero: (params?: InboxZeroParams) =>
+    [...mailboxKeys.all, "inbox-zero", params] as const,
+  savedSearch: (id: string) =>
+    [...mailboxKeys.all, "saved-search", id] as const,
 };
 
 // ─── Accounts ─────────────────────────────────────────────────────────────────
@@ -201,6 +212,109 @@ export function useUpsertThreadNote() {
       queryClient.invalidateQueries({
         queryKey: mailboxKeys.threadNote(threadId),
       });
+    },
+  });
+}
+
+export function useInboxZero(params?: InboxZeroParams) {
+  return useSuspenseInfiniteQuery({
+    queryKey: mailboxKeys.inboxZero(params),
+    queryFn: ({ pageParam }) =>
+      mailboxService.getInboxZero({ ...params, cursor: pageParam as string }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? null,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useUpdateInboxState() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: UpdateInboxStateParams) =>
+      mailboxService.updateInboxState(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.inboxZero() });
+    },
+  });
+}
+
+export function useCreateDraft() {
+  return useMutation({
+    mutationFn: (params: CreateDraftParams) =>
+      mailboxService.createDraft(params),
+  });
+}
+
+export function useSendDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (draftId: string) => mailboxService.sendDraft(draftId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.all });
+    },
+  });
+}
+
+export function useDeleteDraft() {
+  return useMutation({
+    mutationFn: (draftId: string) => mailboxService.deleteDraft(draftId),
+  });
+}
+
+export function useSendEmail() {
+  return useMutation({
+    mutationFn: (params: SendEmailParams) => mailboxService.sendEmail(params),
+  });
+}
+
+export function useReplyEmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: ReplyEmailParams) => mailboxService.replyEmail(params),
+    onSuccess: (_, { replyToMessageId }) => {
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.all });
+    },
+  });
+}
+
+export function useEmailAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: EmailActionParams) =>
+      mailboxService.emailAction(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.threads() });
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.inboxZero() });
+    },
+  });
+}
+export function useExecuteSavedSearch(id: string) {
+  return useSuspenseQuery({
+    queryKey: mailboxKeys.savedSearch(id),
+    queryFn:  () => mailboxService.executeSavedSearch(id),
+    staleTime: 30 * 1000,
+    select:   (data) => data.data,
+  });
+}
+
+export function useUpdateSavedSearch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: UpdateSavedSearchParams) =>
+      mailboxService.updateSavedSearch(params),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearches() });
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearch(id) });
+    },
+  });
+}
+
+export function useDeleteSavedSearch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => mailboxService.deleteSavedSearch(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearches() });
     },
   });
 }

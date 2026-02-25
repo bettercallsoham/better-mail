@@ -358,6 +358,7 @@ export const validateSearch = [
 
   handleValidationErrors,
 ];
+
 export const validateGetInboxZero = [
   query("from")
     .optional()

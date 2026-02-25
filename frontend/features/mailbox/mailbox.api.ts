@@ -1,19 +1,34 @@
 import { apiClient } from "../../lib/api/client";
 import {
   ConnectResponse,
+  CreateDraftParams,
+  CreateDraftResponse,
   CreateSavedSearchParams,
   CreateSavedSearchResponse,
+  EmailActionParams,
+  EmailActionResponse,
+  ExecuteSavedSearchResponse,
   GetConnectedAccountsResponse,
   GetFoldersResponse,
+  GetInboxZeroResponse,
   GetRecentSearchesResponse,
   GetSavedSearchesResponse,
   GetSenderThreadsResponse,
   GetThreadDetailResponse,
   GetThreadEmailsResponse,
   GetThreadNoteResponse,
+  InboxZeroParams,
+  ReplyEmailParams,
+  ReplyEmailResponse,
   SearchEmailsResponse,
   SearchQueryParams,
+  SendDraftResponse,
+  SendEmailParams,
+  SendEmailResponse,
   ThreadQueryParams,
+  UpdateInboxStateParams,
+  UpdateSavedSearchParams,
+  UpdateSavedSearchResponse,
   UpsertThreadNoteParams,
   UpsertThreadNoteResponse,
 } from "./mailbox.type";
@@ -99,4 +114,64 @@ export const mailboxService = {
       method: "PUT",
       body: JSON.stringify({ content }),
     }),
+
+  getInboxZero: (params?: InboxZeroParams) => {
+    const searchParams = new URLSearchParams();
+    if (params?.from) searchParams.append("from", params.from);
+    if (params?.size) searchParams.append("size", params.size.toString());
+    if (params?.cursor) searchParams.append("cursor", params.cursor);
+    return apiClient<GetInboxZeroResponse>(
+      `/mail/inbox-zero?${searchParams.toString()}`,
+    );
+  },
+
+  updateInboxState: (params: UpdateInboxStateParams) =>
+    apiClient(`/mail/inbox-state`, {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+
+  createDraft: (params: CreateDraftParams) =>
+    apiClient<CreateDraftResponse>("/mail/drafts", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+
+  sendDraft: (draftId: string) =>
+    apiClient<SendDraftResponse>(`/mail/drafts/${draftId}/send`, {
+      method: "POST",
+    }),
+
+  deleteDraft: (draftId: string) =>
+    apiClient(`/mail/drafts/${draftId}`, { method: "DELETE" }),
+
+  sendEmail: (params: SendEmailParams) =>
+    apiClient<SendEmailResponse>("/mail/send-new-email", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+
+  replyEmail: (params: ReplyEmailParams) =>
+    apiClient<ReplyEmailResponse>("/mail/reply-email", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+
+  emailAction: (params: EmailActionParams) =>
+    apiClient<EmailActionResponse>("/mail/email-action", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+
+  executeSavedSearch: (id: string) =>
+    apiClient<ExecuteSavedSearchResponse>(`/mail/saved-searches/${id}/execute`),
+
+  updateSavedSearch: ({ id, ...params }: UpdateSavedSearchParams) =>
+    apiClient<UpdateSavedSearchResponse>(`/mail/saved-searches/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(params),
+    }),
+
+  deleteSavedSearch: (id: string) =>
+    apiClient(`/mail/saved-searches/${id}`, { method: "DELETE" }),
 };
