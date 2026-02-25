@@ -5,20 +5,24 @@ import { ReactNode } from "react";
 import { QueryProvider } from "@/lib/query/provider";
 import { DashboardSidebar } from "@/components/dashboard/sidebar/DashboardSidebar";
 import { DashboardProviders } from "@/components/dashboard/DashboardProviders";
+import { getUserFromToken } from "@/lib/auth/getUserFromToken";
+import { Toaster } from "@/components/ui/sonner"
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const token = (await cookies()).get("access_token");
+  if (!token) redirect("/login");
 
-  if (!token) {
-    redirect("/login");
-  }
+  const user = getUserFromToken(token.value);
+  if (!user) redirect("/login");
 
   return (
     <QueryProvider>
-      <DashboardProviders>
+
+      <DashboardProviders userId={user.id}>
         <div className="flex h-screen w-screen bg-white dark:bg-neutral-950 overflow-hidden">
           <DashboardSidebar />
           <main className="flex-1 min-w-0 overflow-hidden">{children}</main>
+          <Toaster/>
         </div>
       </DashboardProviders>
     </QueryProvider>

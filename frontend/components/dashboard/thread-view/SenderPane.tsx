@@ -1,52 +1,24 @@
 "use client";
 
 import { Suspense, useState, useCallback } from "react";
-import { format } from "date-fns";
 import {
   IconSparkles,
   IconMail,
   IconNotes,
-  IconClock,
   IconCopy,
-  IconTag,
   IconCheck,
-  IconChevronDown,
   IconBolt,
 } from "@tabler/icons-react";
 import { useUIStore } from "@/lib/store/ui.store";
 import {
   useThreadDetail,
-  useThreadsBySender,
 } from "@/features/mailbox/mailbox.query";
 import { useThreadSummary } from "@/features/ai/ai.query";
-import type {
-  ThreadEmail,
-  EmailLabel,
-  FullEmail,
-} from "@/features/mailbox/mailbox.type";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClientOnly } from "@/components/ClientOnly";
 import { cn } from "@/lib/utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const SYSTEM_LABELS = new Set([
-  "inbox",
-  "sent",
-  "starred",
-  "important",
-  "draft",
-  "drafts",
-  "unread",
-  "archived",
-  "spam",
-  "trash",
-  "all",
-  "category_promotions",
-  "category_social",
-  "category_updates",
-  "category_forums",
-  "category_primary",
-]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const labelHue = (l: string) =>
@@ -64,18 +36,7 @@ function initials(name?: string, email?: string): string {
   ).toUpperCase();
 }
 
-// ── Fix: EmailLabel is { id, name, color? } not a string ──
-function extractLabels(emails: FullEmail[]): string[] {
-  return [
-    ...new Set(
-      emails
-        .flatMap((e) => e.labels ?? [])
-        .map((l: EmailLabel | string) => (typeof l === "string" ? l : l.name))
-        .map((l) => l.toLowerCase().trim())
-        .filter((l) => l && !SYSTEM_LABELS.has(l)),
-    ),
-  ];
-}
+
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 function SectionHeader({
@@ -124,7 +85,6 @@ export function SenderPane({ className }: { className?: string }) {
 // ─── Main content ─────────────────────────────────────────────────────────────
 function PaneContent({
   threadId,
-  activeThreadId,
   className,
 }: {
   threadId: string;
@@ -133,7 +93,6 @@ function PaneContent({
 }) {
   const { data: threadData } = useThreadDetail(threadId);
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const setActiveThread = useUIStore((s) => s.setActiveThread);
   const setActiveFolder = useUIStore((s) => s.setActiveFolder);
 
   const emails = threadData?.data?.emails ?? [];
@@ -142,10 +101,8 @@ function PaneContent({
   const senderName = first?.from?.name ?? senderEmail;
   const hue = avatarHue(senderEmail);
   const emailAddr = selectedEmail ?? first?.emailAddress ?? senderEmail;
-  const labels = extractLabels(emails);
 
-  const { data: senderThreads = [], isLoading: loadingThreads } =
-    useThreadsBySender(senderEmail);
+
 
   return (
     <div
@@ -178,7 +135,7 @@ function PaneContent({
       <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 border-t border-black/5 dark:border-white/5">
         <Summary threadId={threadId} emailAddress={emailAddr} />
         <Notes senderEmail={senderEmail} />
-        {labels.length > 0 && (
+        {/* {labels.length > 0 && (
           <div className="px-5 pb-5">
             <div className="flex flex-wrap gap-1.5">
               {labels.map((l) => {
@@ -209,7 +166,7 @@ function PaneContent({
               </button>
             </div>
           </div>
-        )}
+        )} */}
         {/* <EmailHistory
           threads={senderThreads}
           activeThreadId={activeThreadId}

@@ -15,25 +15,41 @@ export function useRealtimeNotifications(userId: string | null) {
     const pusher = getPusherClient();
     const channelName = `private-user-${userId}-notifications`;
 
+    console.log("📡 Subscribing to", channelName);
     const channel = pusher.subscribe(channelName);
 
-    // 
-    channel.bind("mail.received", (data: any) => {
-      toast.success("New email received", {
-        description: `${data.total} new email(s) in ${data.email}`,
-      });
-
-      // 🔥 2. Invalidate queries
-      queryClient.invalidateQueries({
-        queryKey: mailboxKeys.threads(),
-      });
-
-      queryClient.invalidateQueries({
-        queryKey: mailboxKeys.inboxZero(),
-      });
+    channel.bind("pusher:subscription_succeeded", () => {
+      console.log("✅ Subscription succeeded");
     });
 
+    channel.bind("pusher:subscription_error", (err: any) => {
+      console.error("❌ Subscription error", err);
+    });
+
+    channel.bind(
+      "mail.received",
+      (data: {
+        messages: { id: string; threadId: string; snippet: string }[];
+        total: number;
+      }) => {
+        console.log("📬 mail.received", data);
+
+        toast.success(
+          `${data.total} new email${data.total > 1 ? "s" : ""} received`,
+          {
+            description: data.messages[0]?.snippet
+              ? data.messages[0].snippet.slice(0, 80) + "..."
+              : "You have new mail",
+          },
+        );
+
+        queryClient.invalidateQueries({ queryKey: mailboxKeys.threads() });
+        queryClient.invalidateQueries({ queryKey: mailboxKeys.inboxZero() });
+      },
+    );
+
     return () => {
+      console.log("🔌 Unsubscribing from", channelName);
       channel.unbind_all();
       pusher.unsubscribe(channelName);
     };

@@ -18,6 +18,29 @@ export function getPusherClient() {
     channelAuthorization: {
       endpoint: `${process.env.NEXT_PUBLIC_API_URL}/realtime/auth`,
       transport: "ajax",
+      headers: {
+        // cookies won't auto-send cross-origin via pusher's ajax — send token explicitly
+      },
+      customHandler: async ({ socketId, channelName }, callback) => {
+        try {
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/realtime/auth`,
+            {
+              method: "POST",
+              credentials: "include", 
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({ socket_id: socketId, channel_name: channelName }),
+            },
+          );
+
+          if (!res.ok) throw new Error("Auth failed");
+
+          const data = await res.json();
+          callback(null, data);
+        } catch (err) {
+          callback(new Error("Pusher auth failed"), null);
+        }
+      },
     },
   });
 
