@@ -9,7 +9,6 @@ export function getPusherClient() {
 
   pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
     cluster: "mt1",
-
     wsHost: process.env.NEXT_PUBLIC_SOKETI_HOST,
     wsPort: 443,
     wssPort: 443,

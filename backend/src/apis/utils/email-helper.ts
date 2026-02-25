@@ -83,3 +83,49 @@ export async function invalidateUserEmailsCache(userId: string): Promise<void> {
     logger.warn("Failed to invalidate email cache:"+ err);
   }
 }
+
+
+const EMAIL_USERS_CACHE_TTL = 3600; 
+
+/**
+ * Get all user IDs that own a specific email (with Redis caching)
+ * @param email - Email address
+ * @returns Array of user IDs
+ */
+export async function getUserIdsByEmail(
+  email: string,
+): Promise<string[]> {
+  const normalized = email.toLowerCase();
+  const cacheKey = `email:${normalized}:users`;
+
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (cacheError) {
+    logger.warn("Redis cache error (email→users): " + cacheError);
+  }
+
+  const accounts = await EmailAccount.findAll({
+    where: { email: normalized },
+    attributes: ["user_id"],
+  });
+
+  if (!accounts.length) {
+    return [];
+  }
+
+  const userIds = [
+    ...new Set(accounts.map((acc) => acc.user_id)),
+  ];
+
+  redis
+    .setex(cacheKey, EMAIL_USERS_CACHE_TTL, JSON.stringify(userIds))
+    .catch((err) => {
+      logger.warn("Failed to cache email→users:", err);
+    });
+
+  return userIds;
+}
+

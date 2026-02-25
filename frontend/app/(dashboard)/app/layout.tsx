@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 
 import { QueryProvider } from "@/lib/query/provider";
 import { DashboardSidebar } from "@/components/dashboard/sidebar/DashboardSidebar";
+import { DashboardProviders } from "@/components/dashboard/DashboardProviders";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const token = (await cookies()).get("access_token");
@@ -14,11 +15,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <QueryProvider>
-      <div className="flex h-screen w-screen bg-white dark:bg-neutral-950 overflow-hidden">
-        <DashboardSidebar />
-
-        <main className="flex-1 min-w-0 overflow-hidden">{children}</main>
-      </div>
+      <DashboardProviders>
+        <div className="flex h-screen w-screen bg-white dark:bg-neutral-950 overflow-hidden">
+          <DashboardSidebar />
+          <main className="flex-1 min-w-0 overflow-hidden">{children}</main>
+        </div>
+      </DashboardProviders>
     </QueryProvider>
   );
 }

@@ -1,12 +1,14 @@
 import { Worker, Job } from "bullmq";
 import { redis } from "../shared/config/redis";
-import { EmailAccount } from "../shared/models";
 import { GmailApiService } from "../shared/services/gmail/gmail-api.service";
 import { ElasticsearchService } from "../shared/services/elastic/elastic.service";
 import { elasticClient } from "../shared/config/elastic";
 import { logger } from "../shared/utils/logger";
 import { GmailWebhookJobData } from "../shared/queues/handle-webhook.queue";
 import { transformGmailToUnified } from "../shared/utils/helpers/gmail-helper";
+import { pusher } from "../shared/config/pusher";
+import { EmailAccount } from "../shared/models";
+import { getUserIdsByEmail } from "../apis/utils/email-helper";
 
 const elasticService = new ElasticsearchService(elasticClient);
 
@@ -33,7 +35,19 @@ async function processGmailWebhook(job: Job<GmailWebhookJobData>) {
 
   await elasticService.bulkIndexEmails(documents);
 
-  // Update historyId AFTER successful indexing
+  const accounts = await getUserIdsByEmail(email);
+
+  for (const userId of accounts) {
+    await pusher.trigger(
+      `private-user-${userId}-notifications`,
+      "mail.received",
+      {
+        messages,
+        total: documents.length,
+      },
+    );
+  }
+
   await redis.set(`gmail:history:${email}`, historyId);
 
   logger.info(
