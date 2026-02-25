@@ -1,9 +1,7 @@
 import { logger } from "@sentry/node";
 import { pusher } from "../../../config/pusher";
+
 export class AIEmitter {
-  /**
-   * Emits tokens word-by-word for the typewriter effect.
-   */
 
   emitToken(conversationId: string, token: string) {
     pusher.trigger(`private-${conversationId}`, "ai.token", {

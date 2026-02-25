@@ -56,7 +56,7 @@ export class ConversationService {
   private readonly CONVERSATIONS_INDEX = "conversations_v1";
   private readonly SUMMARIES_INDEX = "conversation_summaries_v1";
   private readonly CACHE_TTL = 300;
-  
+
   constructor(client: Client) {
     this.client = client;
   }
@@ -268,5 +268,21 @@ export class ConversationService {
       hits.length === limit ? (hits[hits.length - 1].sort as any[]) : null;
 
     return { summaries, nextCursor };
+  }
+
+  public async userOwnsConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<boolean> {
+    const result = await this.client.count({
+      index: this.CONVERSATIONS_INDEX,
+      query: {
+        bool: {
+          filter: [{ term: { conversationId } }, { term: { userId } }],
+        },
+      },
+    });
+
+    return result.count > 0;
   }
 }

@@ -104,3 +104,44 @@ export const validateUpdateAccount = [
 
   handleValidationErrors,
 ];
+
+
+export const validateRealtimeAuth = [
+  body("socket_id")
+    .exists()
+    .withMessage("socket_id is required")
+    .isString()
+    .withMessage("socket_id must be a string")
+    .matches(/^\d+\.\d+$/)
+    .withMessage("Invalid socket_id format"),
+
+  body("channel_name")
+    .exists()
+    .withMessage("channel_name is required")
+    .isString()
+    .withMessage("channel_name must be a string")
+    .custom((value) => {
+      // Must start with private-
+      if (!value.startsWith("private-")) {
+        throw new Error("Only private channels are allowed");
+      }
+
+      // Allowed patterns:
+      const notificationsPattern =
+        /^private-user-[a-zA-Z0-9_-]+-notifications$/;
+
+      const conversationPattern =
+        /^private-user-[a-zA-Z0-9_-]+-conversation-[a-zA-Z0-9_-]+$/;
+
+      if (
+        !notificationsPattern.test(value) &&
+        !conversationPattern.test(value)
+      ) {
+        throw new Error("Invalid channel format");
+      }
+
+      return true;
+    }),
+
+  handleValidationErrors,
+];
