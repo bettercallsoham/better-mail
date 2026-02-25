@@ -395,3 +395,138 @@ export interface UpdateSavedSearchResponse {
   success: boolean;
   message: string;
 }
+
+// ── Suggestions ──────────────────────────────────────────────────────────
+export interface EmailSuggestion {
+  email: string;
+  name: string;
+  lastUsed: string;
+}
+
+export interface GetEmailSuggestionsResponse {
+  success: boolean;
+  data: {
+    suggestions: EmailSuggestion[];
+    total: number;
+  };
+}
+
+// ── Emails From Sender ───────────────────────────────────────────────────
+export interface SenderInfo {
+  email: string;
+  totalCount: number;
+}
+
+export interface SenderEmail {
+  id: string;
+  providerMessageId: string;
+  providerThreadId: string;
+  threadId: string;
+  receivedAt: string;
+  sentAt: string;
+  from: {
+    email: string;
+    name: string;
+  };
+  subject: string;
+  snippet: string;
+}
+
+export interface GetEmailsFromSenderResponse {
+  success: boolean;
+  data: {
+    sender: SenderInfo;
+    emails: SenderEmail[];
+    nextCursor: {
+      receivedAt: string;
+      id: string;
+    } | null;
+  };
+}
+
+// ── Draft Detail ─────────────────────────────────────────────────────
+
+export interface DraftRecipient {
+  email: string;
+  name?: string;
+}
+
+export interface DraftAttachment {
+  id?: string;
+  filename?: string;
+  mimeType?: string;
+  size?: number;
+  url?: string;
+}
+
+export interface DraftData {
+  providerDraftId: string;
+  lastEditedAt: string;
+}
+
+export interface DraftEmail {
+  id: string;
+  emailAddress: string;
+  provider: "gmail" | "outlook";
+  providerMessageId: string;
+  providerThreadId: string;
+  threadId: string;
+  isThreadRoot: boolean;
+
+  receivedAt: string;
+  sentAt: string;
+  indexedAt: string;
+
+  from: {
+    email: string;
+    name?: string;
+  };
+
+  to: DraftRecipient[];
+  cc: DraftRecipient[];
+  bcc: DraftRecipient[];
+
+  subject: string;
+  bodyHtml: string;
+  snippet: string;
+
+  hasAttachments: boolean;
+  attachments: DraftAttachment[];
+
+  isRead: boolean;
+  isStarred: boolean;
+  isArchived: boolean;
+  isDeleted: boolean;
+
+  labels: string[];
+  providerLabels: string[];
+
+  isDraft: boolean;
+  draftData: DraftData;
+
+  inboxState: "DRAFT" | "INBOX" | "ARCHIVED" | "DONE" | "SNOOZED";
+
+  searchText: string;
+}
+
+export interface GetDraftResponse {
+  success: boolean;
+  data: DraftEmail;
+}
+
+export interface UpdateDraftParams {
+  id: string;
+
+  to?: { email: string }[];
+  cc?: { email: string }[];
+  bcc?: { email: string }[];
+
+  subject?: string;
+  html?: string;
+  text?: string;
+}
+
+export interface UpdateDraftResponse {
+  success: boolean;
+  message: string;
+}

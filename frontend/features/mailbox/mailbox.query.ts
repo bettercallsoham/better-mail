@@ -20,6 +20,7 @@ import {
   ReplyEmailParams,
   SearchQueryParams,
   SendEmailParams,
+  UpdateDraftParams,
   UpdateInboxStateParams,
   UpdateSavedSearchParams,
   UpsertThreadNoteParams,
@@ -28,25 +29,40 @@ import {
 // ─── Query keys ───────────────────────────────────────────────────────────────
 export const mailboxKeys = {
   all: ["mailboxes"] as const,
+
   connected: () => [...mailboxKeys.all, "connected"] as const,
+
   threads: (email?: string, folder?: string) =>
     ["threads", email, folder] as const,
+
   thread: (threadId: string) =>
     [...mailboxKeys.all, "thread", threadId] as const,
+
   folders: (email?: string) =>
     [...mailboxKeys.all, "folders", { email }] as const,
+
   senderThreads: (senderEmail: string) =>
     [...mailboxKeys.all, "sender", senderEmail] as const,
+
   search: (params: SearchQueryParams) =>
     [...mailboxKeys.all, "search", params] as const,
+
+  suggestions: (params?: { query?: string; limit?: number }) =>
+    [...mailboxKeys.all, "suggestions", params] as const,
+
   recentSearches: () => [...mailboxKeys.all, "recent-searches"] as const,
+
   savedSearches: () => [...mailboxKeys.all, "saved-searches"] as const,
+
   threadNote: (threadId: string) =>
     [...mailboxKeys.all, "thread-note", threadId] as const,
+
   inboxZero: (params?: InboxZeroParams) =>
     [...mailboxKeys.all, "inbox-zero", params] as const,
+
   savedSearch: (id: string) =>
     [...mailboxKeys.all, "saved-search", id] as const,
+  draft: (id: string) => [...mailboxKeys.all, "draft", id] as const,
 };
 
 // ─── Accounts ─────────────────────────────────────────────────────────────────
@@ -238,10 +254,36 @@ export function useUpdateInboxState() {
   });
 }
 
+export function useDraft(id: string) {
+  return useSuspenseQuery({
+    queryKey: mailboxKeys.draft(id),
+    queryFn: () => mailboxService.getDraftById(id),
+    staleTime: 60 * 1000,
+    select: (res) => res.data,
+  });
+}
+
+
+
 export function useCreateDraft() {
   return useMutation({
     mutationFn: (params: CreateDraftParams) =>
       mailboxService.createDraft(params),
+  });
+}
+
+export function useUpdateDraft() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, ...payload }: UpdateDraftParams) =>
+      mailboxService.updateDraft(id, payload),
+
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({
+        queryKey: mailboxKeys.draft(id),
+      });
+    },
   });
 }
 
@@ -291,9 +333,9 @@ export function useEmailAction() {
 export function useExecuteSavedSearch(id: string) {
   return useSuspenseQuery({
     queryKey: mailboxKeys.savedSearch(id),
-    queryFn:  () => mailboxService.executeSavedSearch(id),
+    queryFn: () => mailboxService.executeSavedSearch(id),
     staleTime: 30 * 1000,
-    select:   (data) => data.data,
+    select: (data) => data.data,
   });
 }
 
@@ -316,5 +358,20 @@ export function useDeleteSavedSearch() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearches() });
     },
+  });
+}
+
+export function useEmailSuggestions(query?: string, limit = 10) {
+  return useQuery({
+    queryKey: mailboxKeys.suggestions({ query, limit }),
+
+    queryFn: () => mailboxService.getEmailSuggestions(query, limit),
+
+    enabled: !!query && query.trim().length > 1,
+
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
+
+    select: (data) => data.data.suggestions,
   });
 }

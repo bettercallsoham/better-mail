@@ -9,6 +9,9 @@ import {
   EmailActionResponse,
   ExecuteSavedSearchResponse,
   GetConnectedAccountsResponse,
+  GetDraftResponse,
+  GetEmailsFromSenderResponse,
+  GetEmailSuggestionsResponse,
   GetFoldersResponse,
   GetInboxZeroResponse,
   GetRecentSearchesResponse,
@@ -26,6 +29,8 @@ import {
   SendEmailParams,
   SendEmailResponse,
   ThreadQueryParams,
+  UpdateDraftParams,
+  UpdateDraftResponse,
   UpdateInboxStateParams,
   UpdateSavedSearchParams,
   UpdateSavedSearchResponse,
@@ -174,4 +179,47 @@ export const mailboxService = {
 
   deleteSavedSearch: (id: string) =>
     apiClient(`/mail/saved-searches/${id}`, { method: "DELETE" }),
+
+  // Updated to match your JSON structure and support pagination
+  getEmailsFromSender: (
+    senderEmail: string,
+    params?: { size?: number; cursor?: string },
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params?.size) searchParams.append("size", params.size.toString());
+    if (params?.cursor) searchParams.append("cursor", params.cursor);
+
+    return apiClient<GetEmailsFromSenderResponse>(
+      `/mail/from/${encodeURIComponent(senderEmail)}?${searchParams.toString()}`,
+    );
+  },
+
+  getEmailSuggestions: (query?: string, limit?: number) => {
+    const searchParams = new URLSearchParams();
+
+    if (query) searchParams.append("query", query);
+    if (limit) searchParams.append("limit", limit.toString());
+
+    const qs = searchParams.toString();
+    const url = qs ? `/mail/suggestions?${qs}` : "/mail/suggestions";
+
+    return apiClient<GetEmailSuggestionsResponse>(url);
+  },
+  // ── Drafts ──────────────────────────────────────────────────────────
+
+  getDraftById: (id: string) => {
+    return apiClient<GetDraftResponse>(
+      `/mail/drafts/${encodeURIComponent(id)}`,
+    );
+  },
+
+  updateDraft: (id: string, payload: Omit<UpdateDraftParams, "id">) => {
+    return apiClient<UpdateDraftResponse>(
+      `/mail/drafts/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
 };
