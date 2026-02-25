@@ -14,8 +14,10 @@ interface LayoutSlice {
 interface MailboxSlice {
   selectedEmailAddress: string | null;
   activeFolder: string;
+  searchQuery: string | null;                          // ← new
   setSelectedEmailAddress: (email: string | null) => void;
   setActiveFolder: (folder: string) => void;
+  setSearchQuery: (query: string | null) => void;      // ← new
 }
 
 interface ThreadSlice {
@@ -33,6 +35,7 @@ interface ThreadSlice {
 type UIState = LayoutSlice & MailboxSlice & ThreadSlice;
 
 export const useUIStore = create<UIState>()((set, get) => ({
+  // ── Layout ──
   layoutMode: "velocity",
   sidebarCollapsed: false,
 
@@ -43,8 +46,10 @@ export const useUIStore = create<UIState>()((set, get) => ({
 
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
+  // ── Mailbox ──
   selectedEmailAddress: null,
   activeFolder: "inbox",
+  searchQuery: null,
 
   setSelectedEmailAddress: (email) =>
     set({
@@ -52,6 +57,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
       activeThreadId: null,
       focusedThreadId: null,
       selectedThreadIds: [],
+      searchQuery: null,          // clear search on account switch
     }),
 
   setActiveFolder: (folder) =>
@@ -60,8 +66,17 @@ export const useUIStore = create<UIState>()((set, get) => ({
       activeThreadId: null,
       focusedThreadId: null,
       selectedThreadIds: [],
+      searchQuery: null,          // clear search on folder switch
     }),
 
+  setSearchQuery: (query) =>
+    set({
+      searchQuery: query,
+      activeThreadId: null,       // deselect thread when searching
+      selectedThreadIds: [],
+    }),
+
+  // ── Threads ──
   activeThreadId: null,
   focusedThreadId: null,
   selectedThreadIds: [],
@@ -90,6 +105,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
   clearSelection: () => set({ selectedThreadIds: [] }),
 }));
 
+// ── Scoped selectors ─────────────────────────────────────────────────
+
 export const useLayoutStore = () =>
   useUIStore(
     useShallow((s) => ({
@@ -106,8 +123,10 @@ export const useMailboxStore = () =>
     useShallow((s) => ({
       selectedEmailAddress: s.selectedEmailAddress,
       activeFolder: s.activeFolder,
+      searchQuery: s.searchQuery,
       setSelectedEmailAddress: s.setSelectedEmailAddress,
       setActiveFolder: s.setActiveFolder,
+      setSearchQuery: s.setSearchQuery,
     })),
   );
 

@@ -2,7 +2,7 @@
 
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { useUIStore } from "@/lib/store/ui.store";
-import { ThreadList } from "@/components/dashboard/thread-view/ThreadList";
+import { ThreadList } from "@/components/dashboard/thread-view/threadList/ThreadList";
 import { ThreadDetail } from "@/components/dashboard/thread-view/ThreadDetail";
 import { SenderPane } from "@/components/dashboard/thread-view/SenderPane";
 import { EmailOverlay } from "@/components/dashboard/thread-view/EmailOverlay";
