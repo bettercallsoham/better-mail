@@ -1,14 +1,21 @@
 import { apiClient } from "../../lib/api/client";
 import {
   ConnectResponse,
+  CreateSavedSearchParams,
+  CreateSavedSearchResponse,
   GetConnectedAccountsResponse,
   GetFoldersResponse,
+  GetRecentSearchesResponse,
+  GetSavedSearchesResponse,
   GetSenderThreadsResponse,
   GetThreadDetailResponse,
   GetThreadEmailsResponse,
-  LabelActionParams,
-  ThreadActionParams,
+  GetThreadNoteResponse,
+  SearchEmailsResponse,
+  SearchQueryParams,
   ThreadQueryParams,
+  UpsertThreadNoteParams,
+  UpsertThreadNoteResponse,
 } from "./mailbox.type";
 
 export const mailboxService = {
@@ -41,59 +48,55 @@ export const mailboxService = {
       `/mail/from/${encodeURIComponent(senderEmail)}`,
     ),
 
-  // ── Folders / Labels ──────────────────────────────────────────────────────
   getFolders: (email?: string) => {
     const params = new URLSearchParams();
     if (email) params.append("email", email);
     return apiClient<GetFoldersResponse>(`/mail/folders?${params.toString()}`);
   },
 
-  // ── Thread actions ─────────────────────────────────────────────────────────
-  starThread: ({ threadId, emailAddress }: ThreadActionParams) =>
-    apiClient(`/mail/thread/${threadId}/star`, {
+  searchEmails: (params: SearchQueryParams) => {
+    const searchParams = new URLSearchParams();
+    searchParams.append("query", params.query);
+    if (params.from) searchParams.append("from", params.from);
+    if (params.size) searchParams.append("size", params.size.toString());
+    if (params.page !== undefined && params.page !== null)
+      searchParams.append("page", params.page.toString());
+    if (params.isRead !== undefined)
+      searchParams.append("isRead", String(params.isRead));
+    if (params.isStarred !== undefined)
+      searchParams.append("isStarred", String(params.isStarred));
+    if (params.isArchived !== undefined)
+      searchParams.append("isArchived", String(params.isArchived));
+    if (params.hasAttachments !== undefined)
+      searchParams.append("hasAttachments", String(params.hasAttachments));
+    if (params.filterFrom) searchParams.append("filterFrom", params.filterFrom);
+    if (params.filterTo) searchParams.append("filterTo", params.filterTo);
+    if (params.labels) searchParams.append("labels", params.labels);
+    if (params.dateFrom) searchParams.append("dateFrom", params.dateFrom);
+    if (params.dateTo) searchParams.append("dateTo", params.dateTo);
+    return apiClient<SearchEmailsResponse>(
+      `/mail/search?${searchParams.toString()}`,
+    );
+  },
+
+  getRecentSearches: () =>
+    apiClient<GetRecentSearchesResponse>("/mail/recent-searches"),
+
+  getSavedSearches: () =>
+    apiClient<GetSavedSearchesResponse>("/mail/saved-searches"),
+
+  createSavedSearch: (params: CreateSavedSearchParams) =>
+    apiClient<CreateSavedSearchResponse>("/mail/saved-searches", {
       method: "POST",
-      body: JSON.stringify({ emailAddress }),
+      body: JSON.stringify(params),
     }),
 
-  unstarThread: ({ threadId, emailAddress }: ThreadActionParams) =>
-    apiClient(`/mail/thread/${threadId}/unstar`, {
-      method: "POST",
-      body: JSON.stringify({ emailAddress }),
-    }),
+  getThreadNote: (threadId: string) =>
+    apiClient<GetThreadNoteResponse>(`/mail/threads/${threadId}/note`),
 
-  archiveThread: ({ threadId, emailAddress }: ThreadActionParams) =>
-    apiClient(`/mail/thread/${threadId}/archive`, {
-      method: "POST",
-      body: JSON.stringify({ emailAddress }),
-    }),
-
-  markRead: ({ threadId, emailAddress }: ThreadActionParams) =>
-    apiClient(`/mail/thread/${threadId}/read`, {
-      method: "POST",
-      body: JSON.stringify({ emailAddress }),
-    }),
-
-  markUnread: ({ threadId, emailAddress }: ThreadActionParams) =>
-    apiClient(`/mail/thread/${threadId}/unread`, {
-      method: "POST",
-      body: JSON.stringify({ emailAddress }),
-    }),
-
-  deleteThread: ({ threadId, emailAddress }: ThreadActionParams) =>
-    apiClient(`/mail/thread/${threadId}`, {
-      method: "DELETE",
-      body: JSON.stringify({ emailAddress }),
-    }),
-
-  addLabel: ({ threadId, emailAddress, label }: LabelActionParams) =>
-    apiClient(`/mail/thread/${threadId}/label`, {
-      method: "POST",
-      body: JSON.stringify({ emailAddress, label }),
-    }),
-
-  removeLabel: ({ threadId, emailAddress, label }: LabelActionParams) =>
-    apiClient(`/mail/thread/${threadId}/label`, {
-      method: "DELETE",
-      body: JSON.stringify({ emailAddress, label }),
+  upsertThreadNote: ({ threadId, content }: UpsertThreadNoteParams) =>
+    apiClient<UpsertThreadNoteResponse>(`/mail/threads/${threadId}/note`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
     }),
 };

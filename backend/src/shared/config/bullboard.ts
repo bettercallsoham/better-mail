@@ -12,6 +12,7 @@ import { outlookSyncQueue } from "../queues/sync-outlook.queue";
 import { conversationEmbeddingsQueue, searchHistoryQueue } from "../queues";
 import { embeddingsQueue } from "../queues/generate-embeddings.queue";
 import { conversationQueue } from "../queues/conversation.queue";
+import { emailSubscriptionQueue } from "../queues/email-subscription.queue";
 
 export const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath("/admin/queues");
@@ -27,6 +28,7 @@ export const bullBoard = createBullBoard({
     new BullMQAdapter(embeddingsQueue),
     new BullMQAdapter(conversationQueue),
     new BullMQAdapter(conversationEmbeddingsQueue),
+    new BullMQAdapter(emailSubscriptionQueue),
   ],
   serverAdapter: serverAdapter,
   options: {

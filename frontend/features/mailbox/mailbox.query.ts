@@ -10,14 +10,13 @@ import {
   InfiniteData,
 } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { toast } from "sonner";
 import { mailboxService } from "./mailbox.api";
 import {
+  CreateSavedSearchParams,
   GetThreadEmailsResponse,
-  ThreadActionParams,
-  ThreadEmail,
+  SearchQueryParams,
+  UpsertThreadNoteParams,
 } from "./mailbox.type";
-import { useUIStore } from "@/lib/store/ui.store";
 
 // ─── Query keys ───────────────────────────────────────────────────────────────
 export const mailboxKeys = {
@@ -31,6 +30,12 @@ export const mailboxKeys = {
     [...mailboxKeys.all, "folders", { email }] as const,
   senderThreads: (senderEmail: string) =>
     [...mailboxKeys.all, "sender", senderEmail] as const,
+  search: (params: SearchQueryParams) =>
+    [...mailboxKeys.all, "search", params] as const,
+  recentSearches: () => [...mailboxKeys.all, "recent-searches"] as const,
+  savedSearches: () => [...mailboxKeys.all, "saved-searches"] as const,
+  threadNote: (threadId: string) =>
+    [...mailboxKeys.all, "thread-note", threadId] as const,
 };
 
 // ─── Accounts ─────────────────────────────────────────────────────────────────
@@ -134,140 +139,68 @@ export function useMailboxPrefetch() {
   };
 }
 
-// ─── Optimistic patch helper ──────────────────────────────────────────────────
-function patchThreadInCache(
-  queryClient: QueryClient,
-  threadsKey: readonly unknown[],
-  threadId: string,
-  patch: Partial<ThreadEmail>,
-) {
-  queryClient.setQueryData<InfiniteData<GetThreadEmailsResponse>>(
-    threadsKey,
-    (old) => {
-      if (!old) return old;
-      return {
-        ...old,
-        pages: old.pages.map((page) => ({
-          ...page,
-          data: {
-            ...page.data,
-            threads: page.data.threads.map((t) =>
-              t.threadId === threadId ? { ...t, ...patch } : t,
-            ),
-          },
-        })),
-      };
-    },
-  );
-}
-
-// ─── Toggle star ──────────────────────────────────────────────────────────────
-export function useToggleStar() {
-  const queryClient = useQueryClient();
-  const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const threadsKey = mailboxKeys.threads(selectedEmail ?? undefined);
-
-  return useMutation({
-    mutationFn: (vars: ThreadActionParams & { isStarred: boolean }) =>
-      vars.isStarred
-        ? mailboxService.unstarThread(vars)
-        : mailboxService.starThread(vars),
-
-    onMutate: async (vars) => {
-      await queryClient.cancelQueries({ queryKey: threadsKey });
-      const previous = queryClient.getQueryData(threadsKey);
-      patchThreadInCache(queryClient, threadsKey, vars.threadId, {
-        isStarred: !vars.isStarred,
-      });
-      return { previous };
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(threadsKey, ctx.previous);
-      toast.error("Failed to update star");
-    },
-    onSuccess: (_d, vars) => {
-      toast.success(vars.isStarred ? "Unstarred" : "Starred");
-      queryClient.invalidateQueries({ queryKey: threadsKey });
-    },
+export function useSearchEmails(params: SearchQueryParams) {
+  return useSuspenseInfiniteQuery({
+    queryKey: mailboxKeys.search(params),
+    queryFn: ({ pageParam }) =>
+      mailboxService.searchEmails({ ...params, page: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) =>
+      lastPage.success ? (lastPage.nextPage ?? null) : null,
+    staleTime: 30 * 1000,
   });
 }
 
-// ─── Toggle read ──────────────────────────────────────────────────────────────
-export function useToggleRead() {
-  const queryClient = useQueryClient();
-  const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const threadsKey = mailboxKeys.threads(selectedEmail ?? undefined);
-
-  return useMutation({
-    mutationFn: (vars: ThreadActionParams & { isUnread: boolean }) =>
-      vars.isUnread
-        ? mailboxService.markRead(vars)
-        : mailboxService.markUnread(vars),
-
-    onMutate: async (vars) => {
-      await queryClient.cancelQueries({ queryKey: threadsKey });
-      const previous = queryClient.getQueryData(threadsKey);
-      patchThreadInCache(queryClient, threadsKey, vars.threadId, {
-        isUnread: !vars.isUnread,
-      });
-      return { previous };
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(threadsKey, ctx.previous);
-      toast.error("Failed to update read status");
-    },
-    onSuccess: (_d, vars) => {
-      toast.success(vars.isUnread ? "Marked as read" : "Marked as unread");
-      queryClient.invalidateQueries({ queryKey: threadsKey });
-    },
+export function useRecentSearches() {
+  return useSuspenseQuery({
+    queryKey: mailboxKeys.recentSearches(),
+    queryFn: mailboxService.getRecentSearches,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    select: (data) => data.data,
   });
 }
 
-// ─── Archive ──────────────────────────────────────────────────────────────────
-export function useArchiveThread() {
-  const queryClient = useQueryClient();
-  const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const threadsKey = mailboxKeys.threads(selectedEmail ?? undefined);
+export function useSavedSearches() {
+  return useSuspenseQuery({
+    queryKey: mailboxKeys.savedSearches(),
+    queryFn: mailboxService.getSavedSearches,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    select: (data) => data.data,
+  });
+}
 
+export function useCreateSavedSearch() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: mailboxService.archiveThread,
-    onError: () => toast.error("Failed to archive"),
+    mutationFn: (params: CreateSavedSearchParams) =>
+      mailboxService.createSavedSearch(params),
     onSuccess: () => {
-      toast.success("Archived");
-      queryClient.invalidateQueries({ queryKey: threadsKey });
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearches() });
     },
   });
 }
 
-// ─── Delete ───────────────────────────────────────────────────────────────────
-export function useDeleteThread() {
+export function useThreadNote(threadId: string) {
+  return useSuspenseQuery({
+    queryKey: mailboxKeys.threadNote(threadId),
+    queryFn: () => mailboxService.getThreadNote(threadId),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    select: (data) => data.data,
+  });
+}
+
+export function useUpsertThreadNote() {
   const queryClient = useQueryClient();
-  const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const threadsKey = mailboxKeys.threads(selectedEmail ?? undefined);
-
   return useMutation({
-    mutationFn: mailboxService.deleteThread,
-    onError: () => toast.error("Failed to delete"),
-    onSuccess: () => {
-      toast.success("Deleted");
-      queryClient.invalidateQueries({ queryKey: threadsKey });
+    mutationFn: (params: UpsertThreadNoteParams) =>
+      mailboxService.upsertThreadNote(params),
+    onSuccess: (_, { threadId }) => {
+      queryClient.invalidateQueries({
+        queryKey: mailboxKeys.threadNote(threadId),
+      });
     },
-  });
-}
-
-// ─── Labels ───────────────────────────────────────────────────────────────────
-export function useAddLabel() {
-  return useMutation({
-    mutationFn: mailboxService.addLabel,
-    onSuccess: () => toast.success("Label added"),
-    onError: () => toast.error("Failed to add label"),
-  });
-}
-
-export function useRemoveLabel() {
-  return useMutation({
-    mutationFn: mailboxService.removeLabel,
-    onSuccess: () => toast.success("Label removed"),
-    onError: () => toast.error("Failed to remove label"),
   });
 }

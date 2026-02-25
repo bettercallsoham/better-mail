@@ -6,6 +6,7 @@ import { OutlookApiService } from "../shared/services/outlook/outlook-api.servic
 import { logger } from "../shared/utils/logger";
 import "dotenv/config";
 import { gmailSyncQueue, outlookSyncQueue } from "../shared/queues";
+import { handleMailboxConnectionQueue } from "../shared/queues/handle-mailbox-connection";
 interface MailboxConnectionData {
   accountId: string;
   email: string;
@@ -124,7 +125,7 @@ async function processMailboxConnection(job: Job<MailboxConnectionData>) {
 }
 
 export const handleMailboxConnectionWorker = new Worker<MailboxConnectionData>(
-  "mailbox-connection",
+  handleMailboxConnectionQueue.name,
   processMailboxConnection,
   {
     connection: redis as any,

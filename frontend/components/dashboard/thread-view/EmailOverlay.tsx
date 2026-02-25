@@ -4,29 +4,17 @@ import { Suspense, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import {
-  IconStar,
-  IconStarFilled,
-  IconCircle,
-  IconCircleFilled,
-  IconArchive,
-  IconTrash,
-  IconChevronUp,
   IconChevronDown,
-  IconX,
   IconArrowBackUp,
   IconArrowForwardUp,
   IconSparkles,
 } from "@tabler/icons-react";
 import { useUIStore } from "@/lib/store/ui.store";
 import {
-  useThreadDetail,
-  useToggleStar,
-  useToggleRead,
-  useArchiveThread,
-  useDeleteThread,
+  useThreadDetail
 } from "@/features/mailbox/mailbox.query";
 import { useThreadSummary } from "@/features/ai/ai.query";
-import type { FullEmail, EmailLabel } from "@/features/mailbox/mailbox.type";
+import type { FullEmail } from "@/features/mailbox/mailbox.type";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -47,45 +35,8 @@ function Avatar({ name, email, size = 8 }: { name?: string; email: string; size?
   );
 }
 
-// ─── Small toolbar button ─────────────────────────────────────────────────────
-interface ToolBtnProps {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  active?: boolean;
-  activeClass?: string;
-  className?: string;
-  children: React.ReactNode;
-}
 
-function ToolBtn({
-  label, onClick, disabled, active, activeClass, className, children,
-}: ToolBtnProps) {
-  return (
-    <button
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "w-7 h-7 rounded-lg flex items-center justify-center",
-        "text-gray-400 dark:text-white/30",
-        "hover:bg-black/6 dark:hover:bg-white/8",
-        "hover:text-gray-700 dark:hover:text-white/70",
-        "disabled:opacity-25 disabled:cursor-not-allowed",
-        "transition-all duration-100",
-        active && activeClass,
-        className,
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
-function Divider() {
-  return <span className="w-px h-4 bg-black/8 dark:bg-white/8 mx-0.5 shrink-0" />;
-}
 
 // ─── Fast iframe body — no horizontal scroll, instant resize ──────────────────
 function IframeBody({ html }: { html: string }) {
@@ -143,7 +94,6 @@ function IframeBody({ html }: { html: string }) {
 function EmailCard({ email, defaultOpen }: { email: FullEmail; defaultOpen: boolean }) {
   const date    = format(new Date(email.receivedAt), "MMM d, h:mm a");
   const toNames = email.to.map((r) => r.name || r.email).join(", ");
-  const labels  = email.labels ?? [];
 
   return (
     <details
@@ -252,40 +202,16 @@ function AISummaryBar({ threadId, emailAddress }: { threadId: string; emailAddre
 // ─── Overlay content ──────────────────────────────────────────────────────────
 function OverlayContent({ threadId }: { threadId: string }) {
   const { data }       = useThreadDetail(threadId);
-  const setActive      = useUIStore((s) => s.setActiveThread);
   const selectedEmail  = useUIStore((s) => s.selectedEmailAddress);
-  const threadIds      = useUIStore((s) => s.threadIds);
-
-  const { mutate: toggleStar }    = useToggleStar();
-  const { mutate: toggleRead }    = useToggleRead();
-  const { mutate: archiveThread } = useArchiveThread();
-  const { mutate: deleteThread }  = useDeleteThread();
 
   if (!data?.success || !data.data.emails.length) return null;
 
   const emails       = data.data.emails;
   const firstEmail   = emails[0];
   const emailAddress = selectedEmail ?? firstEmail.emailAddress;
-  const isStarred    = firstEmail.isStarred;
-  const isUnread     = !firstEmail.isRead;
-  const actionVars   = { threadId, emailAddress };
 
-  // Deduplicate labels across all emails in thread
-  const labelMap = new Map<string, EmailLabel>();
-  for (const email of emails) {
-    for (const l of email.labels ?? []) {
-      labelMap.set(l.id, l);
-    }
-  }
-  const allLabels = Array.from(labelMap.values());
+  
 
-  const currentIdx = threadIds.indexOf(threadId);
-  const hasPrev    = currentIdx > 0;
-  const hasNext    = currentIdx < threadIds.length - 1;
-  const goTo       = (idx: number) => {
-    const id = threadIds[idx];
-    if (id) setActive(id);
-  };
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -300,67 +226,11 @@ function OverlayContent({ threadId }: { threadId: string }) {
             <span className="text-[11px] text-gray-400 dark:text-white/30 tabular-nums">
               {emails.length} {emails.length === 1 ? "message" : "messages"}
             </span>
-            {allLabels.length > 0 && (
-              <div className="flex items-center gap-1">
-             
-              </div>
-            )}
+          
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5 shrink-0">
-          <ToolBtn
-            label={isStarred ? "Unstar" : "Star"}
-            onClick={() => toggleStar({ ...actionVars, isStarred })}
-            active={isStarred}
-            activeClass="text-amber-400"
-          >
-            {isStarred
-              ? <IconStarFilled size={15} />
-              : <IconStar size={15} strokeWidth={1.8} />}
-          </ToolBtn>
-
-          <ToolBtn
-            label={isUnread ? "Mark read" : "Mark unread"}
-            onClick={() => toggleRead({ ...actionVars, isUnread })}
-            active={isUnread}
-            activeClass="text-blue-500"
-          >
-            {isUnread
-              ? <IconCircleFilled size={13} />
-              : <IconCircle size={13} strokeWidth={1.8} />}
-          </ToolBtn>
-
-          <ToolBtn
-            label="Archive (e)"
-            onClick={() => { archiveThread(actionVars); setActive(null); }}
-          >
-            <IconArchive size={15} strokeWidth={1.8} />
-          </ToolBtn>
-
-          <ToolBtn
-            label="Delete (#)"
-            onClick={() => { deleteThread(actionVars); setActive(null); }}
-            className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-          >
-            <IconTrash size={15} strokeWidth={1.8} />
-          </ToolBtn>
-
-          <Divider />
-
-          <ToolBtn label="Previous (k)" onClick={() => goTo(currentIdx - 1)} disabled={!hasPrev}>
-            <IconChevronUp size={15} strokeWidth={2.2} />
-          </ToolBtn>
-          <ToolBtn label="Next (j)" onClick={() => goTo(currentIdx + 1)} disabled={!hasNext}>
-            <IconChevronDown size={15} strokeWidth={2.2} />
-          </ToolBtn>
-
-          <Divider />
-
-          <ToolBtn label="Close (Esc)" onClick={() => setActive(null)}>
-            <IconX size={15} strokeWidth={2.2} />
-          </ToolBtn>
-        </div>
+   
       </div>
 
       {/* AI summary */}
