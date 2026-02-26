@@ -3,15 +3,19 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useUIStore } from "@/lib/store/ui.store";
-import {
-  mailboxKeys,
-  useDeleteSavedSearch,
-} from "@/features/mailbox/mailbox.query";
+import { mailboxKeys, useDeleteSavedSearch } from "@/features/mailbox/mailbox.query";
 import { mailboxService } from "@/features/mailbox/mailbox.api";
 import { cn } from "@/lib/utils";
-import { Search, BookmarkCheck, X, Filter } from "lucide-react";
+import {
+  Search, X, BookmarkCheck, Zap, Bell, Tag,
+  UserRound, TriangleAlert, SlidersHorizontal,
+} from "lucide-react";
 import { MailSearchCommand } from "../../MailSearchCommand";
 import type { SearchFilters } from "@/lib/store/ui.store";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
 
 const LABEL_DISPLAY: Record<string, string> = {
   CATEGORY_PERSONAL:   "Personal",
@@ -21,33 +25,59 @@ const LABEL_DISPLAY: Record<string, string> = {
   CATEGORY_FORUMS:     "Forums",
 };
 
-// ── Summarise active filters into a human-readable string ─────────────────────
+const FOLDER_ICON: Record<string, React.ReactNode> = {
+  "label:CATEGORY_PROMOTIONS": <Tag           className="w-3.5 h-3.5" />,
+  "label:CATEGORY_SOCIAL":     <UserRound     className="w-3.5 h-3.5" />,
+  "label:CATEGORY_UPDATES":    <Bell          className="w-3.5 h-3.5" />,
+  "label:CATEGORY_FORUMS":     <TriangleAlert className="w-3.5 h-3.5" />,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 function summariseFilters(q: string | null, f: SearchFilters | null): string {
   const parts: string[] = [];
-  if (q?.trim())             parts.push(`"${q.trim()}"`);  // ignore " " sentinel
-  if (f?.isRead === false)   parts.push("Unread");
-  if (f?.isRead === true)    parts.push("Read");
-  if (f?.isStarred)          parts.push("Starred");
-  if (f?.hasAttachments)     parts.push("Has attachment");
-  if (f?.isArchived)         parts.push("Archived");
-  if (f?.filterFrom)         parts.push(`From: ${f.filterFrom}`);
-  if (f?.filterTo)           parts.push(`To: ${f.filterTo}`);
-  if (f?.labels)             parts.push(`Label: ${f.labels}`);
-  if (f?.dateFrom)           parts.push(`After ${f.dateFrom}`);
-  return parts.join(" · ") || "Filtered";
+  if (q?.trim())               parts.push(`"${q.trim()}"`);
+  if (f?.isRead === false)     parts.push("Unread");
+  if (f?.isRead === true)      parts.push("Read");
+  if (f?.isStarred)            parts.push("Starred");
+  if (f?.hasAttachments)       parts.push("Attachment");
+  if (f?.isArchived)           parts.push("Archived");
+  if (f?.filterFrom)           parts.push(`from:${f.filterFrom}`);
+  if (f?.filterTo)             parts.push(`to:${f.filterTo}`);
+  if (f?.labels)               parts.push(f.labels.replace(/^CATEGORY_/, "").toLowerCase());
+  if (f?.dateFrom)             parts.push(`after:${f.dateFrom}`);
+  return parts.join("  ·  ") || "Filtered";
 }
 
-export function ThreadListToolbar() {
-  const layoutMode      = useUIStore((s) => s.layoutMode);
+function buildFilterTokens(q: string | null, f: SearchFilters | null): string[] {
+  const t: string[] = [];
+  if (q?.trim())               t.push(q.trim());
+  if (f?.isRead === false)     t.push("unread");
+  if (f?.isRead === true)      t.push("read");
+  if (f?.isStarred)            t.push("starred");
+  if (f?.hasAttachments)       t.push("attachment");
+  if (f?.isArchived)           t.push("archived");
+  if (f?.filterFrom)           t.push(`from:${f.filterFrom}`);
+  if (f?.filterTo)             t.push(`to:${f.filterTo}`);
+  if (f?.labels)               t.push(f.labels.replace(/^CATEGORY_/, "").toLowerCase());
+  if (f?.dateFrom)             t.push(`after:${f.dateFrom}`);
+  return t;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared data hook
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useToolbarData() {
   const activeFolder    = useUIStore((s) => s.activeFolder);
   const setActiveFolder = useUIStore((s) => s.setActiveFolder);
   const selectedEmail   = useUIStore((s) => s.selectedEmailAddress);
   const searchQuery     = useUIStore((s) => s.searchQuery);
   const searchFilters   = useUIStore((s) => s.searchFilters);
-  const setSearchQuery  = useUIStore((s) => s.setSearchQuery);
   const clearSearch     = useUIStore((s) => s.clearSearch);
-
-  const [cmdOpen, setCmdOpen] = useState(false);
+  const setSearchQuery  = useUIStore((s) => s.setSearchQuery);
 
   const { data: foldersData } = useQuery({
     queryKey: mailboxKeys.folders(selectedEmail ?? undefined),
@@ -65,8 +95,34 @@ export function ThreadListToolbar() {
 
   const deleteSavedSearch = useDeleteSavedSearch();
 
-  // ⌘K global shortcut — single registration here (MailSearchCommand also listens
-  // but only when open; this one handles the "open" direction)
+  const categoryLabels = useMemo(
+    () =>
+      foldersData?.data?.labels
+        ?.filter((l) => LABEL_DISPLAY[l.label])
+        .map((l) => ({ id: `label:${l.label}`, label: LABEL_DISPLAY[l.label], raw: l.label })) ?? [],
+    [foldersData],
+  );
+
+  const hasSearch  = !!(searchQuery || searchFilters);
+  const activeDesc = hasSearch ? summariseFilters(searchQuery, searchFilters) : null;
+
+  return {
+    activeFolder, setActiveFolder,
+    searchQuery, searchFilters,
+    clearSearch, setSearchQuery,
+    categoryLabels, savedSearches, deleteSavedSearch,
+    hasSearch, activeDesc,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Root
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function ThreadListToolbar() {
+  const layoutMode = useUIStore((s) => s.layoutMode);
+  const [cmdOpen, setCmdOpen] = useState(false);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -78,189 +134,316 @@ export function ThreadListToolbar() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const categoryPills = useMemo(
-    () =>
-      foldersData?.data?.labels
-        ?.filter((l) => LABEL_DISPLAY[l.label])
-        .map((l) => ({ id: `label:${l.label}`, label: LABEL_DISPLAY[l.label] })) ?? [],
-    [foldersData],
-  );
-
   if (layoutMode === "zen") return null;
-
-  // Active if either plain text OR structured filters are set
-  const hasSearch  = !!(searchQuery || searchFilters);
-  const isFlow     = layoutMode === "flow";
-  const activeDesc = hasSearch ? summariseFilters(searchQuery, searchFilters) : null;
 
   return (
     <>
       <MailSearchCommand open={cmdOpen} onOpenChange={setCmdOpen} />
-
-      <div className="shrink-0 flex flex-col border-b border-black/6 dark:border-white/6">
-
-        {/* ── Search trigger ── */}
-        <div className={cn(
-          "flex items-center gap-2",
-          isFlow ? "px-3 pt-2.5 pb-2" : "px-3 h-10",
-        )}>
-          <button
-            onClick={() => setCmdOpen(true)}
-            className={cn(
-              "flex-1 flex items-center gap-2 rounded-xl transition-all duration-150 text-left",
-              isFlow
-                ? "h-8 px-3 bg-black/4 dark:bg-white/5 hover:bg-black/6 dark:hover:bg-white/7"
-                : "h-7 px-2.5 bg-black/4 dark:bg-white/5 hover:bg-black/6 dark:hover:bg-white/7",
-            )}
-          >
-            {/* Show Filter icon when only filters are active (no text) */}
-            {hasSearch && !searchQuery ? (
-              <Filter className={cn(
-                "shrink-0 text-blue-500",
-                isFlow ? "w-3.5 h-3.5" : "w-3 h-3",
-              )} />
-            ) : (
-              <Search className={cn(
-                "shrink-0 text-gray-400 dark:text-white/25",
-                isFlow ? "w-3.5 h-3.5" : "w-3 h-3",
-              )} />
-            )}
-
-            {hasSearch ? (
-              <span className={cn(
-                "flex-1 truncate font-medium text-gray-700 dark:text-white/65",
-                isFlow ? "text-[13px]" : "text-[12px]",
-              )}>
-                {activeDesc}
-              </span>
-            ) : (
-              <span className={cn(
-                "flex-1 text-gray-400 dark:text-white/25",
-                isFlow ? "text-[13px]" : "text-[12px]",
-              )}>
-                Search mail…
-              </span>
-            )}
-
-            <kbd className={cn(
-              "shrink-0 font-mono text-gray-300 dark:text-white/18",
-              isFlow ? "text-[10px]" : "text-[9px]",
-            )}>
-              ⌘K
-            </kbd>
-          </button>
-
-          {hasSearch && (
-            <button
-              onClick={clearSearch}
-              className={cn(
-                "shrink-0 rounded-lg flex items-center justify-center text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/6 transition-all",
-                isFlow ? "w-8 h-8" : "w-7 h-7",
-              )}
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* ── Pills row ── */}
-        <div className={cn(
-          "flex items-center gap-1 overflow-x-auto scrollbar-none",
-          isFlow ? "px-3 pb-2.5" : "px-2 pb-1.5",
-        )}>
-          <PillButton
-            active={!hasSearch && activeFolder === "inbox"}
-            onClick={() => { setActiveFolder("inbox"); clearSearch(); }}
-            flow={isFlow}
-          >
-            Primary
-          </PillButton>
-
-          {categoryPills.map((tab) => (
-            <PillButton
-              key={tab.id}
-              active={!hasSearch && activeFolder === tab.id}
-              onClick={() => { setActiveFolder(tab.id); clearSearch(); }}
-              flow={isFlow}
-              dot
-            >
-              {tab.label}
-            </PillButton>
-          ))}
-
-          {savedSearches && savedSearches.length > 0 && (
-            <>
-              <div className="w-px h-3.5 bg-black/8 dark:bg-white/8 mx-0.5 shrink-0" />
-              {savedSearches.slice(0, 5).map((s) => (
-                <div key={s.id} className="shrink-0 group/pill flex items-center">
-                  <button
-                    onClick={() => setSearchQuery(s.query.searchText, null)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-2.5 h-6 rounded-full text-[11.5px] font-medium transition-all duration-150",
-                      hasSearch && searchQuery === s.query.searchText
-                        ? "bg-blue-500 text-white"
-                        : "bg-black/4 dark:bg-white/6 text-gray-500 dark:text-white/40 hover:bg-black/7 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-white/65",
-                    )}
-                  >
-                    <BookmarkCheck className="w-3 h-3 opacity-70 shrink-0" />
-                    <span className="truncate max-w-[100px]">{s.name}</span>
-                  </button>
-                  <button
-                    onClick={() => deleteSavedSearch.mutate(s.id)}
-                    className="w-4 h-4 rounded-full flex items-center justify-center text-gray-300 dark:text-white/15 hover:text-red-400 transition-all opacity-0 group-hover/pill:opacity-100 -ml-0.5"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-
-        {/* ── Active search/filter bar ── */}
-        {hasSearch && (
-          <div className="flex items-center gap-1.5 px-3 pb-2 -mt-1 flex-wrap">
-            <span className="text-[11px] text-gray-400 dark:text-white/30">
-              {searchQuery?.trim() ? "Results for" : "Filtered by"}
-            </span>
-            <span className="text-[11px] font-medium text-gray-700 dark:text-white/60 truncate max-w-[200px]">
-              {activeDesc}
-            </span>
-            <button
-              onClick={clearSearch}
-              className="text-[11px] text-gray-400 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors underline underline-offset-2"
-            >
-              clear
-            </button>
-          </div>
-        )}
-      </div>
+      {layoutMode === "flow"
+        ? <FlowToolbar    onOpenSearch={() => setCmdOpen(true)} />
+        : <VelocityToolbar onOpenSearch={() => setCmdOpen(true)} />
+      }
     </>
   );
 }
 
-function PillButton({
-  children, active, onClick, flow, dot,
-}: {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-  flow: boolean;
-  dot?: boolean;
-}) {
+// ─────────────────────────────────────────────────────────────────────────────
+// FLOW TOOLBAR
+// Pixel-perfect 0.email replica:
+//   Row 1 — borderless search ghost input (search icon · text · ⌘K)
+//   Row 2 — "Primary" filled pill + icon-only category pills
+//   Row 3 — (contextual) active search summary
+// ─────────────────────────────────────────────────────────────────────────────
+
+function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
+  const {
+    activeFolder, setActiveFolder,
+    searchQuery, clearSearch, setSearchQuery,
+    categoryLabels, savedSearches, deleteSavedSearch,
+    hasSearch, activeDesc,
+  } = useToolbarData();
+
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "shrink-0 flex items-center gap-1.5 rounded-full font-medium transition-all duration-150",
-        flow ? "px-3 h-6 text-[12px]" : "px-2.5 h-6 text-[11.5px]",
-        active
-          ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
-          : "bg-black/4 dark:bg-white/6 text-gray-500 dark:text-white/40 hover:bg-black/7 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-white/65",
+    <div className="shrink-0 flex flex-col select-none">
+
+      {/* Row 1 — Search */}
+      <div className="flex items-center gap-2 px-4 h-[42px]">
+        <button
+          onClick={onOpenSearch}
+          className="flex-1 flex items-center gap-2.5 text-left group min-w-0"
+        >
+          <Search className="w-3.5 h-3.5 text-gray-300 dark:text-white/20 shrink-0 group-hover:text-gray-500 dark:group-hover:text-white/40 transition-colors" />
+          {hasSearch ? (
+            <span className="flex-1 text-[13px] font-medium text-gray-700 dark:text-white/70 truncate">
+              {activeDesc}
+            </span>
+          ) : (
+            <span className="flex-1 text-[13px] text-gray-300 dark:text-white/20">
+              Search
+            </span>
+          )}
+          <kbd className="shrink-0 text-[10px] font-mono text-gray-300 dark:text-white/18 tracking-tight">
+            ⌘K
+          </kbd>
+        </button>
+
+        {hasSearch && (
+          <button
+            onClick={clearSearch}
+            className="w-5 h-5 flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Row 2 — Folder tabs */}
+      <div className="flex items-center gap-1 px-4 pb-3 overflow-x-auto scrollbar-none">
+
+        {/* Primary — big solid filled pill */}
+        <button
+          onClick={() => { setActiveFolder("inbox"); clearSearch(); }}
+          className={cn(
+            "flex items-center gap-1.5 h-[30px] px-3.5 rounded-full text-[13px] font-semibold transition-all duration-150 shrink-0",
+            !hasSearch && activeFolder === "inbox"
+              ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+              : "text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/6",
+          )}
+        >
+          <Zap className="w-3 h-3 opacity-70 shrink-0" />
+          Primary
+        </button>
+
+        {/* Icon-only category pills */}
+        {categoryLabels.map((cat) => {
+          const icon     = FOLDER_ICON[cat.id] ?? <Tag className="w-3.5 h-3.5" />;
+          const isActive = !hasSearch && activeFolder === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => { setActiveFolder(cat.id); clearSearch(); }}
+              title={cat.label}
+              className={cn(
+                "w-[30px] h-[30px] rounded-full flex items-center justify-center transition-all duration-150 shrink-0",
+                isActive
+                  ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                  : "text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/6",
+              )}
+            >
+              {icon}
+            </button>
+          );
+        })}
+
+        {/* Saved searches */}
+        {savedSearches && savedSearches.length > 0 && (
+          <>
+            <div className="w-px h-4 bg-black/8 dark:bg-white/8 mx-1 shrink-0" />
+            {savedSearches.slice(0, 4).map((s) => {
+              const isActive = hasSearch && searchQuery === s.query.searchText;
+              return (
+                <div key={s.id} className="group/ss shrink-0 flex items-center">
+                  <button
+                    onClick={() => setSearchQuery(s.query.searchText, null)}
+                    title={s.name}
+                    className={cn(
+                      "flex items-center gap-1 h-[26px] px-2.5 rounded-full text-[11.5px] font-medium transition-all duration-150",
+                      isActive
+                        ? "bg-blue-500 text-white"
+                        : "bg-black/4 dark:bg-white/5 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
+                    )}
+                  >
+                    <BookmarkCheck className="w-2.5 h-2.5 shrink-0 opacity-70" />
+                    <span className="truncate max-w-[80px]">{s.name}</span>
+                  </button>
+                  <button
+                    onClick={() => deleteSavedSearch.mutate(s.id)}
+                    className="ml-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-gray-300 dark:text-white/15 hover:text-red-400 opacity-0 group-hover/ss:opacity-100 transition-all"
+                  >
+                    <X className="w-2 h-2" />
+                  </button>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+
+      {/* Row 3 — Active search context (contextual) */}
+      {hasSearch && (
+        <div className="flex items-center gap-2 px-4 pb-2.5 -mt-1">
+          <span className="text-[10.5px] text-gray-400 dark:text-white/25 shrink-0">
+            {searchQuery?.trim() ? "Results for" : "Filtered by"}
+          </span>
+          <span className="text-[10.5px] font-medium text-gray-600 dark:text-white/50 truncate flex-1">
+            {activeDesc}
+          </span>
+          <button
+            onClick={clearSearch}
+            className="shrink-0 text-[10.5px] text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/45 underline underline-offset-2 transition-colors"
+          >
+            clear
+          </button>
+        </div>
       )}
-    >
-      {dot && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60 shrink-0" />}
-      {children}
-    </button>
+
+      <div className="h-px bg-black/[0.06] dark:bg-white/[0.06]" />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VELOCITY TOOLBAR
+// Power-user command bar — everything in two compact rows:
+//   Row 1 — folder tabs (underline active) + inline search token chips + filter icon
+//   Row 2 — (only if saved searches exist) compact saved searches strip
+// ─────────────────────────────────────────────────────────────────────────────
+
+function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
+  const {
+    activeFolder, setActiveFolder,
+    searchQuery, searchFilters,
+    clearSearch, setSearchQuery,
+    categoryLabels, savedSearches, deleteSavedSearch,
+    hasSearch,
+  } = useToolbarData();
+
+  const filterTokens = useMemo(
+    () => buildFilterTokens(searchQuery, searchFilters),
+    [searchQuery, searchFilters],
+  );
+
+  const allTabs = useMemo(() => [
+    { id: "inbox", label: "Inbox" },
+    ...categoryLabels.map((c) => ({ id: c.id, label: c.label })),
+  ], [categoryLabels]);
+
+  return (
+    <div className="shrink-0 flex flex-col select-none">
+
+      {/* Row 1 — unified command bar */}
+      <div className="flex items-stretch h-10 border-b border-black/[0.06] dark:border-white/[0.06]">
+
+        {/* Folder tabs — underline style, no pill bg */}
+        <div className="flex items-stretch overflow-x-auto scrollbar-none shrink-0">
+          {allTabs.map((tab) => {
+            const isActive = !hasSearch && activeFolder === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => { setActiveFolder(tab.id); clearSearch(); }}
+                className={cn(
+                  "relative flex items-center px-3.5 h-full text-[12px] font-medium whitespace-nowrap transition-colors duration-100",
+                  isActive
+                    ? "text-gray-900 dark:text-white"
+                    : "text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
+                )}
+              >
+                {tab.label}
+                {isActive && (
+                  <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-gray-900 dark:bg-white" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Separator */}
+        <div className="flex items-center px-1 shrink-0">
+          <div className="w-px h-4 bg-black/8 dark:bg-white/8" />
+        </div>
+
+        {/* Search area — fills remaining space */}
+        <button
+          onClick={onOpenSearch}
+          className="flex-1 flex items-center gap-2 px-2 h-full min-w-0 group text-left"
+        >
+          <Search className="w-3 h-3 text-gray-300 dark:text-white/20 shrink-0 group-hover:text-gray-400 dark:group-hover:text-white/40 transition-colors" />
+
+          {hasSearch ? (
+            <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
+              {filterTokens.slice(0, 3).map((tok, i) => (
+                <span
+                  key={i}
+                  className="shrink-0 px-1.5 py-[2px] rounded text-[10.5px] font-medium bg-gray-100 dark:bg-white/8 text-gray-600 dark:text-white/55"
+                >
+                  {tok}
+                </span>
+              ))}
+              {filterTokens.length > 3 && (
+                <span className="text-[10.5px] text-gray-400 dark:text-white/30 shrink-0">
+                  +{filterTokens.length - 3} more
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="flex-1 text-[12px] text-gray-300 dark:text-white/20">
+              Search mail…
+            </span>
+          )}
+
+          {!hasSearch && (
+            <kbd className="shrink-0 text-[9px] font-mono text-gray-300 dark:text-white/18">
+              ⌘K
+            </kbd>
+          )}
+        </button>
+
+        {/* Right action — clear or filter */}
+        <div className="flex items-center pr-2 shrink-0">
+          {hasSearch ? (
+            <button
+              onClick={clearSearch}
+              title="Clear search"
+              className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/25 hover:text-gray-700 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/6 transition-all"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          ) : (
+            <button
+              onClick={onOpenSearch}
+              title="Filters (⌘K)"
+              className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-600 dark:hover:text-white/55 hover:bg-black/5 dark:hover:bg-white/6 transition-all"
+            >
+              <SlidersHorizontal className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Row 2 — saved searches strip (only if saved searches exist) */}
+      {savedSearches && savedSearches.length > 0 && (
+        <div className="flex items-center gap-1 px-3 h-[26px] border-b border-black/[0.04] dark:border-white/[0.04] overflow-x-auto scrollbar-none">
+          <span className="text-[8.5px] font-bold tracking-[0.12em] uppercase text-gray-300 dark:text-white/18 shrink-0 mr-0.5 select-none">
+            Saved
+          </span>
+          {savedSearches.slice(0, 6).map((s) => {
+            const isActive = hasSearch && searchQuery === s.query.searchText;
+            return (
+              <div key={s.id} className="group/ss shrink-0 flex items-center">
+                <button
+                  onClick={() => setSearchQuery(s.query.searchText, null)}
+                  className={cn(
+                    "flex items-center gap-1 h-[18px] px-2 rounded text-[10px] font-medium transition-all",
+                    isActive
+                      ? "bg-blue-500 text-white"
+                      : "text-gray-400 dark:text-white/30 hover:text-gray-700 dark:hover:text-white/55 hover:bg-black/4 dark:hover:bg-white/5",
+                  )}
+                >
+                  <BookmarkCheck className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                  <span className="truncate max-w-[80px]">{s.name}</span>
+                </button>
+                <button
+                  onClick={() => deleteSavedSearch.mutate(s.id)}
+                  className="w-3 h-3 ml-0.5 flex items-center justify-center text-gray-300 hover:text-red-400 opacity-0 group-hover/ss:opacity-100 transition-all"
+                >
+                  <X className="w-2 h-2" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
