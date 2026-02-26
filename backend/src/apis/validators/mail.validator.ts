@@ -287,7 +287,7 @@ export const validateEmailAction = [
 
 export const validateSearch = [
   query("query")
-    .exists()
+    .optional()
     .withMessage("Search query is required")
     .isString()
     .withMessage("Query must be a string")

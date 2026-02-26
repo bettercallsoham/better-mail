@@ -3,42 +3,45 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useUIStore } from "@/lib/store/ui.store";
-import { mailboxKeys, useDeleteSavedSearch } from "@/features/mailbox/mailbox.query";
+import {
+  mailboxKeys,
+  useDeleteSavedSearch,
+} from "@/features/mailbox/mailbox.query";
 import { mailboxService } from "@/features/mailbox/mailbox.api";
-import { MailSearchCommand } from "./MailSearchCommand";
 import { cn } from "@/lib/utils";
 import { Search, BookmarkCheck, X } from "lucide-react";
+import { MailSearchCommand } from "../../MailSearchCommand";
 
 const LABEL_DISPLAY: Record<string, string> = {
-  CATEGORY_PERSONAL:   "Personal",
+  CATEGORY_PERSONAL: "Personal",
   CATEGORY_PROMOTIONS: "Promotions",
-  CATEGORY_UPDATES:    "Updates",
-  CATEGORY_SOCIAL:     "Social",
-  CATEGORY_FORUMS:     "Forums",
+  CATEGORY_UPDATES: "Updates",
+  CATEGORY_SOCIAL: "Social",
+  CATEGORY_FORUMS: "Forums",
 };
 
 export function ThreadListToolbar() {
-  const layoutMode      = useUIStore((s) => s.layoutMode);
-  const activeFolder    = useUIStore((s) => s.activeFolder);
+  const layoutMode = useUIStore((s) => s.layoutMode);
+  const activeFolder = useUIStore((s) => s.activeFolder);
   const setActiveFolder = useUIStore((s) => s.setActiveFolder);
-  const selectedEmail   = useUIStore((s) => s.selectedEmailAddress);
-  const searchQuery     = useUIStore((s) => s.searchQuery);
-  const setSearchQuery  = useUIStore((s) => s.setSearchQuery);
+  const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
+  const searchQuery = useUIStore((s) => s.searchQuery);
+  const setSearchQuery = useUIStore((s) => s.setSearchQuery);
 
   const [cmdOpen, setCmdOpen] = useState(false);
 
   const { data: foldersData } = useQuery({
     queryKey: mailboxKeys.folders(selectedEmail ?? undefined),
-    queryFn:  () => mailboxService.getFolders(selectedEmail ?? undefined),
+    queryFn: () => mailboxService.getFolders(selectedEmail ?? undefined),
     staleTime: 60 * 1000,
-    gcTime:    5 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 
   const { data: savedSearches } = useQuery({
     queryKey: mailboxKeys.savedSearches(),
-    queryFn:  mailboxService.getSavedSearches,
+    queryFn: mailboxService.getSavedSearches,
     staleTime: 60 * 1000,
-    select:   (d) => d.data,
+    select: (d) => d.data,
   });
 
   const deleteSavedSearch = useDeleteSavedSearch();
@@ -55,29 +58,31 @@ export function ThreadListToolbar() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const categoryPills = foldersData?.data?.labels
-    ?.filter((l) => LABEL_DISPLAY[l.label])
-    .map((l) => ({
-      id:    `label:${l.label}`,
-      label: LABEL_DISPLAY[l.label],
-    })) ?? [];
+  const categoryPills =
+    foldersData?.data?.labels
+      ?.filter((l) => LABEL_DISPLAY[l.label])
+      .map((l) => ({
+        id: `label:${l.label}`,
+        label: LABEL_DISPLAY[l.label],
+      })) ?? [];
 
   if (layoutMode === "zen") return null;
 
   const hasSearch = !!searchQuery;
-  const isFlow    = layoutMode === "flow";
+  const isFlow = layoutMode === "flow";
 
   return (
     <>
       <MailSearchCommand open={cmdOpen} onOpenChange={setCmdOpen} />
 
       <div className="shrink-0 flex flex-col border-b border-black/6 dark:border-white/6">
-
         {/* ── Search trigger ── */}
-        <div className={cn(
-          "flex items-center gap-2",
-          isFlow ? "px-3 pt-2.5 pb-2" : "px-3 h-10",
-        )}>
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            isFlow ? "px-3 pt-2.5 pb-2" : "px-3 h-10",
+          )}
+        >
           <button
             onClick={() => setCmdOpen(true)}
             className={cn(
@@ -87,29 +92,39 @@ export function ThreadListToolbar() {
                 : "h-7 px-2.5 bg-black/4 dark:bg-white/5 hover:bg-black/6 dark:hover:bg-white/7",
             )}
           >
-            <Search className={cn(
-              "shrink-0 text-gray-400 dark:text-white/25",
-              isFlow ? "w-3.5 h-3.5" : "w-3 h-3",
-            )} />
+            <Search
+              className={cn(
+                "shrink-0 text-gray-400 dark:text-white/25",
+                isFlow ? "w-3.5 h-3.5" : "w-3 h-3",
+              )}
+            />
             {hasSearch ? (
-              <span className={cn(
-                "flex-1 truncate font-medium text-gray-700 dark:text-white/65",
-                isFlow ? "text-[13px]" : "text-[12px]",
-              )}>
+              <span
+                className={cn(
+                  "flex-1 truncate font-medium text-gray-700 dark:text-white/65",
+                  isFlow ? "text-[13px]" : "text-[12px]",
+                )}
+              >
                 {searchQuery}
               </span>
             ) : (
-              <span className={cn(
-                "flex-1 text-gray-400 dark:text-white/25",
-                isFlow ? "text-[13px]" : "text-[12px]",
-              )}>
+              <span
+                className={cn(
+                  "flex-1 text-gray-400 dark:text-white/25",
+                  isFlow ? "text-[13px]" : "text-[12px]",
+                )}
+              >
                 Search mail…
               </span>
             )}
-            <kbd className={cn(
-              "shrink-0 font-mono text-gray-300 dark:text-white/18",
-              isFlow ? "text-[10px]" : "text-[9px]",
-            )}>⌘K</kbd>
+            <kbd
+              className={cn(
+                "shrink-0 font-mono text-gray-300 dark:text-white/18",
+                isFlow ? "text-[10px]" : "text-[9px]",
+              )}
+            >
+              ⌘K
+            </kbd>
           </button>
 
           {hasSearch && (
@@ -126,13 +141,18 @@ export function ThreadListToolbar() {
         </div>
 
         {/* ── Pills row ── */}
-        <div className={cn(
-          "flex items-center gap-1 overflow-x-auto scrollbar-none",
-          isFlow ? "px-3 pb-2.5" : "px-2 pb-1.5",
-        )}>
+        <div
+          className={cn(
+            "flex items-center gap-1 overflow-x-auto scrollbar-none",
+            isFlow ? "px-3 pb-2.5" : "px-2 pb-1.5",
+          )}
+        >
           <PillButton
             active={!hasSearch && activeFolder === "inbox"}
-            onClick={() => { setActiveFolder("inbox"); setSearchQuery(null); }}
+            onClick={() => {
+              setActiveFolder("inbox");
+              setSearchQuery(null);
+            }}
             flow={isFlow}
           >
             Primary
@@ -142,7 +162,10 @@ export function ThreadListToolbar() {
             <PillButton
               key={tab.id}
               active={!hasSearch && activeFolder === tab.id}
-              onClick={() => { setActiveFolder(tab.id); setSearchQuery(null); }}
+              onClick={() => {
+                setActiveFolder(tab.id);
+                setSearchQuery(null);
+              }}
               flow={isFlow}
               dot
             >
@@ -154,7 +177,10 @@ export function ThreadListToolbar() {
             <>
               <div className="w-px h-3.5 bg-black/8 dark:bg-white/8 mx-0.5 shrink-0" />
               {savedSearches.slice(0, 5).map((s) => (
-                <div key={s.id} className="shrink-0 group/pill flex items-center">
+                <div
+                  key={s.id}
+                  className="shrink-0 group/pill flex items-center"
+                >
                   <button
                     onClick={() => setSearchQuery(s.query.searchText)}
                     className={cn(
@@ -182,7 +208,9 @@ export function ThreadListToolbar() {
         {/* Active search bar */}
         {hasSearch && (
           <div className="flex items-center gap-1.5 px-3 pb-2 -mt-1">
-            <span className="text-[11px] text-gray-400 dark:text-white/30">Results for</span>
+            <span className="text-[11px] text-gray-400 dark:text-white/30">
+              Results for
+            </span>
             <span className="text-[11px] font-medium text-gray-700 dark:text-white/60 truncate max-w-[180px]">
               &ldquo;{searchQuery}&rdquo;
             </span>
@@ -223,7 +251,9 @@ function PillButton({
           : "bg-black/4 dark:bg-white/6 text-gray-500 dark:text-white/40 hover:bg-black/7 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-white/65",
       )}
     >
-      {dot && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60 shrink-0" />}
+      {dot && (
+        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60 shrink-0" />
+      )}
       {children}
     </button>
   );
