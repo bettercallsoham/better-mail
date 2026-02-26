@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  memo,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   ChevronDown, X, Mail, MailOpen, Star, Paperclip,
@@ -13,7 +20,9 @@ import { mailboxKeys } from "@/features/mailbox/mailbox.query";
 import { mailboxService } from "@/features/mailbox/mailbox.api";
 import type { ActiveFilters } from "./useSearchState";
 
-// ── Label helpers ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 function formatLabelName(raw: string): string {
   return raw
@@ -23,7 +32,9 @@ function formatLabelName(raw: string): string {
     .replace(/^\w/, (c) => c.toUpperCase());
 }
 
-// ── Portal Popover ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Portal Popover
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface PopoverProps {
   open: boolean;
@@ -37,7 +48,8 @@ function PortalPopover({ open, anchorRef, onClose, children, width }: PopoverPro
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
-  useEffect(() => {
+  // useLayoutEffect — reads DOM geometry synchronously before paint, preventing flicker
+  useLayoutEffect(() => {
     if (!open || !anchorRef.current) return;
     const r = anchorRef.current.getBoundingClientRect();
     setPos({ top: r.bottom + 4, left: r.left });
@@ -70,10 +82,15 @@ function PortalPopover({ open, anchorRef, onClose, children, width }: PopoverPro
   );
 }
 
-// ── Status pill — inline toggle ───────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Status pill — inline toggle
+// ─────────────────────────────────────────────────────────────────────────────
 
-function StatusPill({ label, icon, active, onClick }: {
-  label: string; icon: React.ReactNode; active: boolean; onClick: () => void;
+const StatusPill = memo(function StatusPill({ label, icon, active, onClick }: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
     <button
@@ -89,14 +106,19 @@ function StatusPill({ label, icon, active, onClick }: {
       <span>{label}</span>
     </button>
   );
-}
+});
 
-// ── Dropdown chip ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Dropdown chip
+// ─────────────────────────────────────────────────────────────────────────────
 
-function Chip({ label, active, icon, chipRef, onClick, onClear }: {
-  label: string; active: boolean; icon: React.ReactNode;
+const Chip = memo(function Chip({ label, active, icon, chipRef, onClick, onClear }: {
+  label: string;
+  active: boolean;
+  icon: React.ReactNode;
   chipRef: React.RefObject<HTMLButtonElement>;
-  onClick: () => void; onClear?: () => void;
+  onClick: () => void;
+  onClear?: () => void;
 }) {
   return (
     <button
@@ -122,35 +144,19 @@ function Chip({ label, active, icon, chipRef, onClick, onClear }: {
       )}
     </button>
   );
-}
+});
 
-// ── Pop list item ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Contact avatar
+// ─────────────────────────────────────────────────────────────────────────────
 
-function PopItem({ label, active, icon, onClick }: {
-  label: string; active: boolean; icon?: React.ReactNode; onClick: () => void;
+const ContactAvatar = memo(function ContactAvatar({
+  name,
+  email,
+}: {
+  name?: string;
+  email: string;
 }) {
-  return (
-    <button
-      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
-      className={cn(
-        "w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-left transition-colors",
-        active
-          ? "text-gray-900 dark:text-white bg-gray-50 dark:bg-white/6"
-          : "text-gray-600 dark:text-white/50 hover:bg-gray-50 dark:hover:bg-white/4",
-      )}
-    >
-      {icon && (
-        <span className={cn("opacity-40 shrink-0", active && "opacity-80 text-blue-500")}>{icon}</span>
-      )}
-      <span className="flex-1">{label}</span>
-      {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
-    </button>
-  );
-}
-
-// ── Contact avatar ────────────────────────────────────────────────────
-
-function ContactAvatar({ name, email }: { name?: string; email: string }) {
   const hue = email.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   return (
     <div
@@ -160,37 +166,96 @@ function ContactAvatar({ name, email }: { name?: string; email: string }) {
       {(name || email)[0].toUpperCase()}
     </div>
   );
-}
+});
 
-// ── Email popover — controlled, no setState-in-effect ────────────────
-// The key insight: `localVal` is fully internal typed state.
-// Parent `value` prop only initialises it (via useState(value)) — no sync effect needed.
-// When parent clears (value → ""), we remount via `key` prop at the call site.
+// ─────────────────────────────────────────────────────────────────────────────
+// Email chip — shows mini avatar + label when active
+// ─────────────────────────────────────────────────────────────────────────────
 
-function EmailPopover({ initialValue, onChange, placeholder }: {
+const EmailChip = memo(function EmailChip({
+  label,
+  email,
+  chipRef,
+  onClick,
+  onClear,
+}: {
+  label: string;
+  email: string | undefined;
+  chipRef: React.RefObject<HTMLButtonElement>;
+  onClick: () => void;
+  onClear?: () => void;
+}) {
+  const active = !!email;
+  const hue    = email
+    ? email.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360
+    : 0;
+
+  return (
+    <button
+      ref={chipRef}
+      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      className={cn(
+        "flex items-center gap-1 h-[24px] px-1.5 rounded text-[12px] font-medium transition-all shrink-0 select-none",
+        active
+          ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+          : "text-gray-400 dark:text-white/35 hover:text-gray-600 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/6",
+      )}
+    >
+      {active ? (
+        <div
+          className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[8px] font-bold"
+          style={{ background: `hsl(${hue} 45% 65%)`, color: "white" }}
+        >
+          {email![0].toUpperCase()}
+        </div>
+      ) : (
+        <span className="text-[10px] font-bold leading-none opacity-60">@</span>
+      )}
+      <span>{label}</span>
+      <ChevronDown className="w-2.5 h-2.5 opacity-40" />
+      {active && onClear && (
+        <span
+          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onClear(); }}
+          className="ml-0.5 opacity-50 hover:opacity-100 transition-opacity"
+        >
+          <X className="w-2.5 h-2.5" />
+        </span>
+      )}
+    </button>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Email popover — single merged debounce, no sync effect
+// ─────────────────────────────────────────────────────────────────────────────
+
+function EmailPopover({
+  initialValue,
+  onChange,
+  placeholder,
+}: {
   initialValue: string;
   onChange: (v: string | undefined) => void;
   placeholder: string;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [localVal, setLocalVal] = useState(initialValue);
-  const [debouncedVal, setDebouncedVal] = useState(initialValue);
+  const inputRef     = useRef<HTMLInputElement>(null);
+  const [localVal,   setLocalVal]   = useState(initialValue);
+  const [queryVal,   setQueryVal]   = useState(initialValue);
 
-  // Focus on mount — no setState, just a DOM side-effect
+  // Focus on mount — pure DOM side-effect, no setState
   useEffect(() => {
     const id = setTimeout(() => inputRef.current?.focus(), 40);
     return () => clearTimeout(id);
   }, []);
 
-  // Debounce for query — uses setTimeout, fires setState in callback (not directly in effect body)
+  // Single debounce effect — previously was two separate effects
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedVal(localVal), 180);
+    const t = setTimeout(() => setQueryVal(localVal), 180);
     return () => clearTimeout(t);
   }, [localVal]);
 
-  const trimmed = debouncedVal.trim();
+  const trimmed = queryVal.trim();
 
-  // Recent contacts — fires immediately on open (trimmed < 2)
   const { data: recentData } = useQuery({
     queryKey: mailboxKeys.suggestions({ limit: 8 }),
     queryFn:  () => mailboxService.getEmailSuggestions(undefined, 8),
@@ -198,7 +263,6 @@ function EmailPopover({ initialValue, onChange, placeholder }: {
     enabled:  trimmed.length < 2,
   });
 
-  // Typed search
   const { data: searchData } = useQuery({
     queryKey: mailboxKeys.suggestions({ query: trimmed, limit: 8 }),
     queryFn:  () => mailboxService.getEmailSuggestions(trimmed, 8),
@@ -206,20 +270,19 @@ function EmailPopover({ initialValue, onChange, placeholder }: {
     enabled:  trimmed.length >= 2,
   });
 
-  const suggestions =
-    trimmed.length >= 2
-      ? (searchData?.data?.suggestions  ?? [])
-      : (recentData?.data?.suggestions  ?? []);
+  const suggestions = trimmed.length >= 2
+    ? (searchData?.data?.suggestions ?? [])
+    : (recentData?.data?.suggestions ?? []);
 
-  const handleChange = (v: string) => {
+  const handleChange = useCallback((v: string) => {
     setLocalVal(v);
     onChange(v || undefined);
-  };
+  }, [onChange]);
 
-  const commit = (v: string) => {
+  const commit = useCallback((v: string) => {
     setLocalVal(v);
     onChange(v || undefined);
-  };
+  }, [onChange]);
 
   return (
     <div className="flex flex-col" style={{ minWidth: 240, maxHeight: 320 }}>
@@ -254,7 +317,9 @@ function EmailPopover({ initialValue, onChange, placeholder }: {
                     {s.name || s.email}
                   </span>
                   {s.name && (
-                    <span className="text-[10.5px] text-gray-400 dark:text-white/28 truncate">{s.email}</span>
+                    <span className="text-[10.5px] text-gray-400 dark:text-white/28 truncate">
+                      {s.email}
+                    </span>
                   )}
                 </div>
               </button>
@@ -270,9 +335,15 @@ function EmailPopover({ initialValue, onChange, placeholder }: {
   );
 }
 
-// ── Labels popover — beautiful tag-style rows ─────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Labels popover
+// ─────────────────────────────────────────────────────────────────────────────
 
-function LabelsPopover({ active, onSelect, onClose }: {
+function LabelsPopover({
+  active,
+  onSelect,
+  onClose,
+}: {
   active: string | undefined;
   onSelect: (label: string | undefined) => void;
   onClose: () => void;
@@ -287,7 +358,6 @@ function LabelsPopover({ active, onSelect, onClose }: {
 
   return (
     <div style={{ minWidth: 200, maxHeight: 300, overflowY: "auto" }}>
-      {/* Header */}
       <div className="px-3 pt-2.5 pb-1.5">
         <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-400/70 dark:text-white/20 select-none">
           Labels
@@ -316,13 +386,10 @@ function LabelsPopover({ active, onSelect, onClose }: {
                   : "hover:bg-gray-50 dark:hover:bg-white/4",
               )}
             >
-              {/* Tag icon */}
               <Tag className={cn(
                 "w-3 h-3 shrink-0",
                 isActive ? "text-blue-500" : "text-gray-300 dark:text-white/20",
               )} />
-
-              {/* Label name */}
               <span className={cn(
                 "flex-1 text-[12.5px] truncate",
                 isActive
@@ -331,15 +398,11 @@ function LabelsPopover({ active, onSelect, onClose }: {
               )}>
                 {formatLabelName(l.label)}
               </span>
-
-              {/* Count badge */}
               {l.count > 0 && (
                 <span className="text-[10.5px] tabular-nums text-gray-400 dark:text-white/25 shrink-0">
                   {l.count > 999 ? "999+" : l.count}
                 </span>
               )}
-
-              {/* Active check */}
               {isActive && (
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
               )}
@@ -351,21 +414,30 @@ function LabelsPopover({ active, onSelect, onClose }: {
   );
 }
 
-// ── Date popover ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Date popover
+// ─────────────────────────────────────────────────────────────────────────────
 
-function DatePopover({ filters, onChange, onClose }: {
+/** Preset options defined at module level — never re-created */
+const DATE_PRESETS = [
+  { label: "Today",         days: 0  },
+  { label: "Last 7 days",   days: 7  },
+  { label: "Last 30 days",  days: 30 },
+  { label: "Last 3 months", days: 90 },
+] as const;
+
+function DatePopover({
+  filters,
+  onChange,
+  onClose,
+}: {
   filters: ActiveFilters;
   onChange: (f: ActiveFilters) => void;
   onClose: () => void;
 }) {
   return (
     <div className="py-1" style={{ minWidth: 220 }}>
-      {[
-        { label: "Today",         days: 0  },
-        { label: "Last 7 days",   days: 7  },
-        { label: "Last 30 days",  days: 30 },
-        { label: "Last 3 months", days: 90 },
-      ].map((p) => (
+      {DATE_PRESETS.map((p) => (
         <button
           key={p.label}
           onMouseDown={(e) => {
@@ -405,9 +477,9 @@ function DatePopover({ filters, onChange, onClose }: {
   );
 }
 
-// ── Main FilterChips ──────────────────────────────────────────────────
-
-type OpenChip = "from" | "to" | "date" | "label" | null;
+// ─────────────────────────────────────────────────────────────────────────────
+// Status pills config — module-level constant
+// ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS_PILLS = [
   { key: "isRead"         as const, val: false as boolean | undefined, label: "Unread",     icon: <Mail      className="w-2.5 h-2.5" /> },
@@ -417,12 +489,27 @@ const STATUS_PILLS = [
   { key: "isArchived"     as const, val: true  as boolean | undefined, label: "Archived",   icon: <Archive   className="w-2.5 h-2.5" /> },
 ] as const;
 
-export function FilterChips({ filters, onChange }: {
+// ─────────────────────────────────────────────────────────────────────────────
+// Main FilterChips component
+// ─────────────────────────────────────────────────────────────────────────────
+
+type OpenChip = "from" | "to" | "date" | "label" | null;
+
+export function FilterChips({
+  filters,
+  onChange,
+}: {
   filters: ActiveFilters;
   onChange: (f: ActiveFilters) => void;
 }) {
   const [open, setOpen] = useState<OpenChip>(null);
-  const toggle = useCallback((key: OpenChip) => setOpen((p) => (p === key ? null : key)), []);
+
+  // Stable toggle — avoids recreating lambda on every render
+  const toggle = useCallback((key: OpenChip) => {
+    setOpen((p) => (p === key ? null : key));
+  }, []);
+
+  const closeAll = useCallback(() => setOpen(null), []);
 
   const fromRef  = useRef<HTMLButtonElement>(null!);
   const toRef    = useRef<HTMLButtonElement>(null!);
@@ -434,12 +521,12 @@ export function FilterChips({ filters, onChange }: {
     : "Date";
 
   const activeLabelName = filters.labels ? formatLabelName(filters.labels) : null;
-  const filterCount = Object.values(filters).filter((v) => v !== undefined && v !== "").length;
+  const filterCount     = Object.values(filters).filter((v) => v !== undefined && v !== "").length;
 
   return (
     <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-100 dark:border-white/[0.05] overflow-x-auto scrollbar-none">
 
-      {/* ── Inline status pills ── */}
+      {/* Inline status pills */}
       {STATUS_PILLS.map((p) => (
         <StatusPill
           key={p.label}
@@ -455,17 +542,16 @@ export function FilterChips({ filters, onChange }: {
 
       <div className="w-px h-3 bg-gray-200 dark:bg-white/8 mx-0.5 shrink-0" />
 
-      {/* ── From ── */}
-      <Chip
+      {/* From */}
+      <EmailChip
         chipRef={fromRef}
-        label={filters.filterFrom ? `From: ${filters.filterFrom}` : "From"}
-        active={!!filters.filterFrom}
-        icon={<span className="text-[10px] font-bold leading-none">@</span>}
+        label="From"
+        email={filters.filterFrom}
         onClick={() => toggle("from")}
-        onClear={() => { onChange({ ...filters, filterFrom: undefined }); setOpen(null); }}
+        onClear={() => { onChange({ ...filters, filterFrom: undefined }); closeAll(); }}
       />
-      <PortalPopover open={open === "from"} anchorRef={fromRef} onClose={() => setOpen(null)} width={240}>
-        {/* key=open ensures remount on re-open — eliminates need for sync setState effect */}
+      <PortalPopover open={open === "from"} anchorRef={fromRef} onClose={closeAll} width={240}>
+        {/* key forces remount on open — no sync setState effect needed */}
         <EmailPopover
           key={String(open === "from")}
           initialValue={filters.filterFrom ?? ""}
@@ -474,16 +560,15 @@ export function FilterChips({ filters, onChange }: {
         />
       </PortalPopover>
 
-      {/* ── To ── */}
-      <Chip
+      {/* To */}
+      <EmailChip
         chipRef={toRef}
-        label={filters.filterTo ? `To: ${filters.filterTo}` : "To"}
-        active={!!filters.filterTo}
-        icon={<span className="text-[10px] font-bold leading-none">→</span>}
+        label="To"
+        email={filters.filterTo}
         onClick={() => toggle("to")}
-        onClear={() => { onChange({ ...filters, filterTo: undefined }); setOpen(null); }}
+        onClear={() => { onChange({ ...filters, filterTo: undefined }); closeAll(); }}
       />
-      <PortalPopover open={open === "to"} anchorRef={toRef} onClose={() => setOpen(null)} width={240}>
+      <PortalPopover open={open === "to"} anchorRef={toRef} onClose={closeAll} width={240}>
         <EmailPopover
           key={String(open === "to")}
           initialValue={filters.filterTo ?? ""}
@@ -492,7 +577,7 @@ export function FilterChips({ filters, onChange }: {
         />
       </PortalPopover>
 
-      {/* ── Date ── */}
+      {/* Date */}
       <Chip
         chipRef={dateRef}
         label={dateLabel}
@@ -501,11 +586,11 @@ export function FilterChips({ filters, onChange }: {
         onClick={() => toggle("date")}
         onClear={() => onChange({ ...filters, dateFrom: undefined, dateTo: undefined })}
       />
-      <PortalPopover open={open === "date"} anchorRef={dateRef} onClose={() => setOpen(null)}>
-        <DatePopover filters={filters} onChange={onChange} onClose={() => setOpen(null)} />
+      <PortalPopover open={open === "date"} anchorRef={dateRef} onClose={closeAll}>
+        <DatePopover filters={filters} onChange={onChange} onClose={closeAll} />
       </PortalPopover>
 
-      {/* ── Labels ── */}
+      {/* Labels */}
       <Chip
         chipRef={labelRef}
         label={activeLabelName ?? "Labels"}
@@ -514,15 +599,15 @@ export function FilterChips({ filters, onChange }: {
         onClick={() => toggle("label")}
         onClear={() => onChange({ ...filters, labels: undefined })}
       />
-      <PortalPopover open={open === "label"} anchorRef={labelRef} onClose={() => setOpen(null)} width={200}>
+      <PortalPopover open={open === "label"} anchorRef={labelRef} onClose={closeAll} width={200}>
         <LabelsPopover
           active={filters.labels}
           onSelect={(v) => onChange({ ...filters, labels: v })}
-          onClose={() => setOpen(null)}
+          onClose={closeAll}
         />
       </PortalPopover>
 
-      {/* ── Clear all ── */}
+      {/* Clear all */}
       {filterCount > 0 && (
         <>
           <div className="w-px h-3 bg-gray-200 dark:bg-white/8 mx-0.5 shrink-0" />
