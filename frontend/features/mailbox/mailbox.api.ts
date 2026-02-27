@@ -114,10 +114,14 @@ export const mailboxService = {
   getThreadNote: (threadId: string) =>
     apiClient<GetThreadNoteResponse>(`/mail/threads/${threadId}/note`),
 
-  upsertThreadNote: ({ threadId, content }: UpsertThreadNoteParams) =>
+  upsertThreadNote: ({
+    threadId,
+    content,
+    emailAddress,
+  }: UpsertThreadNoteParams) =>
     apiClient<UpsertThreadNoteResponse>(`/mail/threads/${threadId}/note`, {
       method: "PUT",
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, emailAddress }), // ← added emailAddress
     }),
 
   getInboxZero: (params?: InboxZeroParams) => {
@@ -163,7 +167,6 @@ export const mailboxService = {
     }),
 
   emailAction: (params: EmailActionParams) =>
-    
     apiClient<EmailActionResponse>("/mail/email-action", {
       method: "POST",
       body: JSON.stringify(params),

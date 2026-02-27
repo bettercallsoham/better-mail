@@ -43,10 +43,15 @@ export const getThreadEmails = asyncHandler(
     const { email, size, page, folder } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
-    const { emails: emailAddresses, error } = await getUserEmails(userId, email as string | undefined);
+    const { emails: emailAddresses, error } = await getUserEmails(
+      userId,
+      email as string | undefined,
+    );
 
     if (error) {
       return res.status(403).json({ success: false, message: error });
@@ -64,7 +69,12 @@ export const getThreadEmails = asyncHandler(
 
     if (email && typeof email === "string") {
       if (!emailAddresses.includes(email)) {
-        return res.status(403).json({ success: false, message: "Access denied for this email account" });
+        return res
+          .status(403)
+          .json({
+            success: false,
+            message: "Access denied for this email account",
+          });
       }
       allowedEmails = [email];
     }
@@ -73,8 +83,8 @@ export const getThreadEmails = asyncHandler(
 
     const threads = await elasticService.getInboxThreads({
       emailAddresses: allowedEmails,
-      size:   size   ? parseInt(size as string, 10)   : 20,
-      page:   page   ? parseInt(page as string, 10)   : 0,
+      size: size ? parseInt(size as string, 10) : 20,
+      page: page ? parseInt(page as string, 10) : 0,
       folder: (folder as string) ?? "inbox",
     });
 
@@ -528,7 +538,9 @@ export const searchEmails = asyncHandler(
     } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const { emails: emailAddresses, error } = await getUserEmails(
@@ -552,24 +564,26 @@ export const searchEmails = asyncHandler(
       }
     }
 
-    const elasticService  = new ElasticsearchService(elasticClient);
-    const startTime       = Date.now();
+    const elasticService = new ElasticsearchService(elasticClient);
+    const startTime = Date.now();
 
     const result = await elasticService.searchEmails({
       emailAddresses,
-      query:  query as string,
-      size:   size ? parseInt(size as string, 10) : 20,
-      page:   page ? parseInt(page as string, 10) : 0,
+      query: query as string,
+      size: size ? parseInt(size as string, 10) : 20,
+      page: page ? parseInt(page as string, 10) : 0,
       filters: {
-        isRead:         isRead         !== undefined ? isRead         === "true" : undefined,
-        isStarred:      isStarred      !== undefined ? isStarred      === "true" : undefined,
-        isArchived:     isArchived     !== undefined ? isArchived     === "true" : undefined,
-        hasAttachments: hasAttachments !== undefined ? hasAttachments === "true" : undefined,
-        from:           filterFrom as string | undefined,
-        to:             filterTo   as string | undefined,
-        labels:         parsedLabels,
-        dateFrom:       dateFrom   as string | undefined,
-        dateTo:         dateTo     as string | undefined,
+        isRead: isRead !== undefined ? isRead === "true" : undefined,
+        isStarred: isStarred !== undefined ? isStarred === "true" : undefined,
+        isArchived:
+          isArchived !== undefined ? isArchived === "true" : undefined,
+        hasAttachments:
+          hasAttachments !== undefined ? hasAttachments === "true" : undefined,
+        from: filterFrom as string | undefined,
+        to: filterTo as string | undefined,
+        labels: parsedLabels,
+        dateFrom: dateFrom as string | undefined,
+        dateTo: dateTo as string | undefined,
       },
     });
 
@@ -580,29 +594,33 @@ export const searchEmails = asyncHandler(
         userId,
         searchText: query as string,
         filters: {
-          isRead:         isRead         !== undefined ? isRead         === "true" : undefined,
-          isStarred:      isStarred      !== undefined ? isStarred      === "true" : undefined,
-          isArchived:     isArchived     !== undefined ? isArchived     === "true" : undefined,
-          hasAttachments: hasAttachments !== undefined ? hasAttachments === "true" : undefined,
-          from:           filterFrom as string | undefined,
-          to:             filterTo   as string | undefined,
-          labels:         parsedLabels,
-          dateFrom:       dateFrom   as string | undefined,
-          dateTo:         dateTo     as string | undefined,
+          isRead: isRead !== undefined ? isRead === "true" : undefined,
+          isStarred: isStarred !== undefined ? isStarred === "true" : undefined,
+          isArchived:
+            isArchived !== undefined ? isArchived === "true" : undefined,
+          hasAttachments:
+            hasAttachments !== undefined
+              ? hasAttachments === "true"
+              : undefined,
+          from: filterFrom as string | undefined,
+          to: filterTo as string | undefined,
+          labels: parsedLabels,
+          dateFrom: dateFrom as string | undefined,
+          dateTo: dateTo as string | undefined,
         },
-        resultsCount:  result.total,
+        resultsCount: result.total,
         executionTimeMs,
         emailAddresses,
       })
       .catch((err) => logger.error("Failed to queue search history:", err));
 
     return res.json({
-      success:  true,
+      success: true,
       query,
-      total:    result.total,
-      page:     result.page,
+      total: result.total,
+      page: result.page,
       nextPage: result.nextPage,
-      emails:   result.emails,
+      emails: result.emails,
     });
   },
   "searchEmails",
@@ -906,22 +924,31 @@ export const deleteSavedSearch = asyncHandler(
 export const executeSavedSearch = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
-    const { id }         = req.params;
+    const { id } = req.params;
     const { size, page } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     if (!id || Array.isArray(id)) {
-      return res.status(400).json({ success: false, message: "Invalid search ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid search ID" });
     }
 
     const elasticService = new ElasticsearchService(elasticClient);
 
     const savedSearch = await elasticService.getSavedSearchById(id, userId);
     if (!savedSearch) {
-      return res.status(404).json({ success: false, message: "Saved search not found or access denied" });
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "Saved search not found or access denied",
+        });
     }
 
     await elasticService.incrementSearchUsage(id);
@@ -930,26 +957,31 @@ export const executeSavedSearch = asyncHandler(
     if (!emailAddresses?.length) {
       const { emails, error } = await getUserEmails(userId);
       if (error || emails.length === 0) {
-        return res.status(403).json({ success: false, message: error || "No connected email accounts found" });
+        return res
+          .status(403)
+          .json({
+            success: false,
+            message: error || "No connected email accounts found",
+          });
       }
       emailAddresses = emails;
     }
 
     const result = await elasticService.searchEmails({
       emailAddresses,
-      query:   savedSearch.query.searchText,
-      size:    size ? parseInt(size as string, 10) : 20,
-      page:    page ? parseInt(page as string, 10) : 0,
+      query: savedSearch.query.searchText,
+      size: size ? parseInt(size as string, 10) : 20,
+      page: page ? parseInt(page as string, 10) : 0,
       filters: savedSearch.query.filters,
     });
 
     return res.json({
       success: true,
       savedSearch: { id: savedSearch.id, name: savedSearch.name },
-      total:    result.total,
-      page:     result.page,
+      total: result.total,
+      page: result.page,
       nextPage: result.nextPage,
-      emails:   result.emails,
+      emails: result.emails,
     });
   },
   "executeSavedSearch",
@@ -1236,7 +1268,6 @@ export const getEmailById = asyncHandler(
   "getEmailById",
 );
 
-
 export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
   const id = req.params.id as string;
@@ -1434,26 +1465,29 @@ export const upsertThreadNote = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated",
-      });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const emailAddresses = await getUserEmails(userId);
     if (emailAddresses.emails.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No connected email accounts found",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "No connected email accounts found" });
     }
 
     const { threadId } = req.params;
-    const { content } = req.body;
+    const { content, emailAddress: requestedEmail } = req.body;
 
-    // Use first email address for note storage
+    // Use the requested email if it belongs to this user, otherwise fall back
+    const emailAddress =
+      requestedEmail && emailAddresses.emails.includes(requestedEmail)
+        ? requestedEmail
+        : emailAddresses.emails[0];
+
     const note = await threadNoteService.upsertNote(
-      emailAddresses.emails[0],
+      emailAddress,
       threadId as string,
       content,
     );
@@ -1497,16 +1531,9 @@ export const getThreadNote = asyncHandler(
       threadId as string,
     );
 
-    if (!note) {
-      return res.status(404).json({
-        success: false,
-        message: "Note not found",
-      });
-    }
-
     res.status(200).json({
       success: true,
-      data: note,
+      data: note || "",
     });
   },
   "getThreadNote",

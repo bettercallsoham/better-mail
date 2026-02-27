@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import { redis } from "../config/redis";
 
 export interface EmbeddingJobData {
-  emailAddress: string;
+  emailAddress?: string;
   provider: "gmail" | "outlook";
   providerMessageId: string;
 }

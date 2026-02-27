@@ -231,10 +231,10 @@ export interface UpsertThreadNoteResponse {
 }
 
 export interface UpsertThreadNoteParams {
-  threadId: string;
-  content: string;
+  threadId:     string;
+  content:      string;
+  emailAddress: string; 
 }
-
 // ── Inbox Zero ─────────────────────────────────────────────────────────────────
 export interface InboxZeroEmail {
   id: string;

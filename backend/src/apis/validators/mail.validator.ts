@@ -629,6 +629,13 @@ export const validateUpsertThreadNote = [
     .isLength({ max: 10000 })
     .withMessage("Content must not exceed 10,000 characters"),
 
+  body("emailAddress")
+    .optional() 
+    .isString()
+    .withMessage("emailAddress must be a string")
+    .isEmail()
+    .withMessage("emailAddress must be a valid email"),
+
   handleValidationErrors,
 ];
 

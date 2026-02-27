@@ -9,6 +9,7 @@ import { transformGmailToUnified } from "../shared/utils/helpers/gmail-helper";
 import { pusher } from "../shared/config/pusher";
 import { EmailAccount } from "../shared/models";
 import { getUserIdsByEmail } from "../apis/utils/email-helper";
+import { embeddingsQueue } from "../shared/queues/generate-embeddings.queue";
 
 const elasticService = new ElasticsearchService(elasticClient);
 
@@ -53,6 +54,7 @@ async function processGmailWebhook(job: Job<GmailWebhookJobData>) {
   logger.info(
     `Gmail webhook processed: ${email}, indexed ${documents.length} emails, updated historyId to ${historyId}`,
   );
+  
 
   return {
     success: true,

@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   useCallback,
+  useEffect,
   memo,
 } from "react";
 import { format } from "date-fns";
@@ -15,6 +16,7 @@ import {
   IconStar,
   IconStarFilled,
   IconArchive,
+  IconArchiveOff,
   IconTrash,
   IconSparkles,
   IconCopy,
@@ -29,6 +31,9 @@ import {
   IconMessages,
   IconLayoutList,
   IconAlertTriangle,
+  IconNotes,
+  IconMailOpened,
+  IconMail,
 } from "@tabler/icons-react";
 import {
   Tooltip,
@@ -40,6 +45,8 @@ import { useUIStore } from "@/lib/store/ui.store";
 import {
   useThreadDetail,
   useEmailAction,
+  useThreadNote,
+  useUpsertThreadNote,
 } from "@/features/mailbox/mailbox.query";
 import { useThreadSummary } from "@/features/ai/ai.query";
 import type { FullEmail } from "@/features/mailbox/mailbox.type";
@@ -49,12 +56,12 @@ import { Kbd } from "@/components/ui/kbd";
 
 // ─── Label metadata ────────────────────────────────────────────────────────────
 const LABEL_META: Record<string, { icon: React.ReactNode; color: string; name: string }> = {
-  CATEGORY_PERSONAL:   { icon: <IconUser        size={12} />, color: "#6366f1", name: "Personal"   },
-  CATEGORY_PROMOTIONS: { icon: <IconTag         size={12} />, color: "#f59e0b", name: "Promotions" },
-  CATEGORY_UPDATES:    { icon: <IconBell        size={12} />, color: "#3b82f6", name: "Updates"    },
-  CATEGORY_SOCIAL:     { icon: <IconMessages    size={12} />, color: "#10b981", name: "Social"     },
-  CATEGORY_FORUMS:     { icon: <IconLayoutList  size={12} />, color: "#8b5cf6", name: "Forums"     },
-  IMPORTANT:           { icon: <IconAlertTriangle size={12} />, color: "#f59e0b", name: "Important"},
+  CATEGORY_PERSONAL:   { icon: <IconUser         size={12} />, color: "#6366f1", name: "Personal"   },
+  CATEGORY_PROMOTIONS: { icon: <IconTag          size={12} />, color: "#f59e0b", name: "Promotions" },
+  CATEGORY_UPDATES:    { icon: <IconBell         size={12} />, color: "#3b82f6", name: "Updates"    },
+  CATEGORY_SOCIAL:     { icon: <IconMessages     size={12} />, color: "#10b981", name: "Social"     },
+  CATEGORY_FORUMS:     { icon: <IconLayoutList   size={12} />, color: "#8b5cf6", name: "Forums"     },
+  IMPORTANT:           { icon: <IconAlertTriangle size={12} />, color: "#f59e0b", name: "Important" },
 };
 const HIDDEN_LABELS = new Set(["INBOX","UNREAD","SENT","DRAFT","TRASH","SPAM"]);
 
@@ -66,18 +73,19 @@ function Avatar({ name, email, size = 8 }: { name?: string; email: string; size?
   const letters = (parts.length >= 2 ? parts[0][0] + parts[1][0] : src.slice(0, 2)).toUpperCase();
   const szCls   = ({ 6:"w-6 h-6 text-[9px]", 7:"w-7 h-7 text-[10px]", 8:"w-8 h-8 text-[11px]", 9:"w-9 h-9 text-[12px]" } as Record<number,string>)[size] ?? "w-8 h-8 text-[11px]";
   return (
-    <span className={cn("shrink-0 rounded-full flex items-center justify-center font-bold text-white select-none", szCls)}
-      style={{ background: `hsl(${hue} 50% 46%)` }}>
+    <span
+      className={cn("shrink-0 rounded-full flex items-center justify-center font-bold text-white select-none", szCls)}
+      style={{ background: `hsl(${hue} 50% 46%)` }}
+    >
       {letters}
     </span>
   );
 }
 
-// ─── Participant pill — avatar + name, hover shows email + copy ───────────────
+// ─── Participant pill ──────────────────────────────────────────────────────────
 function ParticipantPill({ name, email }: { name?: string; email: string }) {
   const [copied, setCopied] = useState(false);
   const displayName = name || email.split("@")[0];
-
   const copy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(email).then(() => {
@@ -98,14 +106,8 @@ function ParticipantPill({ name, email }: { name?: string; email: string }) {
         </TooltipTrigger>
         <TooltipContent side="bottom" className="flex items-center gap-2 py-1.5 px-2.5">
           <span className="text-[11px]">{email}</span>
-          <button
-            onClick={copy}
-            className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
-          >
-            {copied
-              ? <IconCheck size={12} className="text-emerald-500" />
-              : <IconCopy size={12} />
-            }
+          <button onClick={copy} className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
+            {copied ? <IconCheck size={12} className="text-emerald-500" /> : <IconCopy size={12} />}
           </button>
         </TooltipContent>
       </Tooltip>
@@ -113,7 +115,7 @@ function ParticipantPill({ name, email }: { name?: string; email: string }) {
   );
 }
 
-// ─── Label dot with tooltip ────────────────────────────────────────────────────
+// ─── Label dot ────────────────────────────────────────────────────────────────
 function LabelDot({ label }: { label: string }) {
   const meta = LABEL_META[label];
   if (!meta) return null;
@@ -128,23 +130,22 @@ function LabelDot({ label }: { label: string }) {
             {meta.icon}
           </span>
         </TooltipTrigger>
-        <TooltipContent side="bottom">
-          <span className="text-[11px]">{meta.name}</span>
-        </TooltipContent>
+        <TooltipContent side="bottom"><span className="text-[11px]">{meta.name}</span></TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
 }
 
-// ─── Toolbar icon button with shadcn tooltip ──────────────────────────────────
+// ─── TipBtn ────────────────────────────────────────────────────────────────────
 function TipBtn({
-  onClick, tip, kbd, className, disabled, children,
+  onClick, tip, kbd, className, disabled, active, children,
 }: {
   onClick?: () => void;
   tip: string;
   kbd?: string;
   className?: string;
   disabled?: boolean;
+  active?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -159,6 +160,7 @@ function TipBtn({
               "text-gray-400 dark:text-white/30",
               "hover:text-gray-700 dark:hover:text-white/70 hover:bg-black/[0.05] dark:hover:bg-white/[0.07]",
               "disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent",
+              active && "bg-black/[0.05] dark:bg-white/[0.08] text-gray-700 dark:text-white/70",
               className,
             )}
           >
@@ -174,10 +176,159 @@ function TipBtn({
   );
 }
 
+// ─── Notes dropdown ────────────────────────────────────────────────────────────
+// Floating panel anchored below the Notes button in the toolbar.
+// Uses the same mutation + debounce pattern as SenderPane.
+function NotesDropdown({
+  threadId,
+  emailAddress,
+  onClose,
+}: {
+  threadId:     string;
+  emailAddress: string;
+  onClose:      () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    // Small delay so the button click that opened doesn't immediately close
+    const id = setTimeout(() => document.addEventListener("mousedown", handler), 50);
+    return () => { clearTimeout(id); document.removeEventListener("mousedown", handler); };
+  }, [onClose]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "absolute top-full right-0 mt-1.5 z-50 w-80",
+        "rounded-2xl overflow-hidden",
+        "bg-white dark:bg-[#1c1c1e]",
+        "shadow-[0_8px_32px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)]",
+        "dark:shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.08)]",
+        "animate-in fade-in-0 zoom-in-95 duration-100",
+      )}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.06] dark:border-white/[0.07]">
+        <div className="flex items-center gap-2">
+          <IconNotes size={13} className="text-gray-400 dark:text-white/30" />
+          <span className="text-[12px] font-semibold text-gray-600 dark:text-white/50 tracking-tight">
+            Thread Notes
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-5 h-5 flex items-center justify-center rounded text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors"
+        >
+          <IconX size={12} />
+        </button>
+      </div>
+
+      {/* Editor — suspense-wrapped so it loads independently */}
+      <Suspense fallback={
+        <div className="p-4">
+          <Skeleton className="h-[80px] w-full rounded-xl" />
+        </div>
+      }>
+        <NotesEditorInner threadId={threadId} emailAddress={emailAddress} />
+      </Suspense>
+    </div>
+  );
+}
+
+function NotesEditorInner({ threadId, emailAddress }: { threadId: string; emailAddress: string }) {
+  const { data }            = useThreadNote(threadId);
+  const { mutate }          = useUpsertThreadNote();
+  const [value, setValue]   = useState(data?.notes ?? "");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const debounceRef         = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const textareaRef         = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus on mount
+  useEffect(() => { textareaRef.current?.focus(); }, []);
+
+  // Auto-resize
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [value]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setValue(val);
+    setStatus("saving");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      mutate(
+        { threadId, content: val, emailAddress },
+        {
+          onSuccess: () => { setStatus("saved"); setTimeout(() => setStatus("idle"), 1500); },
+          onError:   () => setStatus("idle"),
+        },
+      );
+    }, 600);
+  }, [threadId, emailAddress, mutate]);
+
+  // Don't let keyboard shortcuts bubble while typing
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    const isModifier = e.metaKey || e.ctrlKey;
+    if (isModifier && !["z","a","c","v","x","b","i","u"].includes(e.key.toLowerCase())) {
+      e.currentTarget.blur();
+    }
+  }, []);
+
+  return (
+    <div className="p-4">
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        placeholder="Write a note about this thread…"
+        rows={4}
+        className={cn(
+          "w-full resize-none rounded-xl px-3.5 py-3",
+          "text-[12.5px] leading-relaxed min-h-[96px]",
+          "bg-gray-50 dark:bg-white/[0.04]",
+          "border border-gray-100 dark:border-white/[0.07]",
+          "text-gray-700 dark:text-white/70",
+          "placeholder:text-gray-300 dark:placeholder:text-white/20",
+          "focus:outline-none focus:ring-1 focus:ring-gray-200 dark:focus:ring-white/10",
+          "transition-colors duration-150 overflow-hidden",
+        )}
+      />
+      {/* Status */}
+      <div className="flex items-center justify-end mt-2 h-4">
+        <span className={cn(
+          "text-[10.5px] transition-opacity duration-300",
+          status === "idle"   ? "opacity-0" : "opacity-100",
+          status === "saving" ? "text-gray-300 dark:text-white/25" : "text-emerald-500",
+        )}>
+          {status === "saving" ? "saving…" : "saved ✓"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Fast iframe ──────────────────────────────────────────────────────────────
 const EmailIframe = memo(function EmailIframe({ html }: { html: string }) {
-  const ref          = useRef<HTMLIFrameElement>(null);
-  const [h, setH]    = useState(0);
+  const ref           = useRef<HTMLIFrameElement>(null);
+  const [h, setH]     = useState(0);
   const [ready, setR] = useState(false);
 
   const srcDoc = `<!DOCTYPE html><html><head>
@@ -236,15 +387,8 @@ const EmailIframe = memo(function EmailIframe({ html }: { html: string }) {
   );
 });
 
-
-
-export function AISummary({
-  threadId,
-  emailAddress,
-}: {
-  threadId: string;
-  emailAddress: string;
-}) {
+// ─── AISummary ─────────────────────────────────────────────────────────────────
+export function AISummary({ threadId, emailAddress }: { threadId: string; emailAddress: string }) {
   const { data, isLoading } = useThreadSummary(threadId, emailAddress);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied]     = useState(false);
@@ -265,49 +409,25 @@ export function AISummary({
 
   return (
     <div className={cn(
-      "mx-4 sm:mx-6 mt-4",
-      // Warm neutral surface — no color, just depth
-      "rounded-xl",
+      "mx-4 sm:mx-6 mt-4 rounded-xl",
       "bg-stone-50 dark:bg-white/[0.03]",
-      // Subtle left accent line — the only color touch
       "border-l-2 border-amber-400/70 dark:border-amber-500/50",
-      // Right + top + bottom: barely-there rule
       "border border-stone-100/80 dark:border-white/[0.06]",
-      "border-l-2", // override left to accent color
     )}>
-
-      {/* ── Header ── */}
       <button
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left"
       >
-        <IconSparkles
-          size={13}
-          className="text-amber-500/80 dark:text-amber-400/70 shrink-0"
-        />
-
+        <IconSparkles size={13} className="text-amber-500/80 dark:text-amber-400/70 shrink-0" />
         <span className="text-[11.5px] font-semibold text-stone-500 dark:text-white/40 select-none shrink-0 tracking-[0.02em]">
           Summary
         </span>
-
-        {/* Collapsed preview */}
         {!expanded && (
-          <p className={cn(
-            "flex-1 min-w-0 text-[12px] leading-snug truncate",
-            isLoading
-              ? "text-transparent"
-              : "text-stone-600 dark:text-white/50",
-          )}>
-            {isLoading
-              ? <Skeleton className="h-2.5 w-full rounded-full max-w-[220px]" />
-              : s?.text
-            }
+          <p className={cn("flex-1 min-w-0 text-[12px] leading-snug truncate", isLoading ? "text-transparent" : "text-stone-600 dark:text-white/50")}>
+            {isLoading ? <Skeleton className="h-2.5 w-full rounded-full max-w-[220px]" /> : s?.text}
           </p>
         )}
-
         {expanded && <span className="flex-1" />}
-
-        {/* Actions */}
         <div className="flex items-center gap-0.5 shrink-0">
           {s?.text && !isLoading && (
             <span
@@ -315,25 +435,18 @@ export function AISummary({
               onClick={copy}
               className="w-6 h-6 flex items-center justify-center rounded-md text-stone-400 dark:text-white/25 hover:text-stone-600 dark:hover:text-white/55 hover:bg-stone-100 dark:hover:bg-white/[0.06] transition-colors"
             >
-              {copied
-                ? <IconCheck size={11} className="text-emerald-500" />
-                : <IconCopy size={11} />
-              }
+              {copied ? <IconCheck size={11} className="text-emerald-500" /> : <IconCopy size={11} />}
             </span>
           )}
           <span className="w-5 h-5 flex items-center justify-center">
             <IconChevronDown
               size={13}
-              className={cn(
-                "text-stone-400 dark:text-white/25 transition-transform duration-200",
-                expanded && "rotate-180",
-              )}
+              className={cn("text-stone-400 dark:text-white/25 transition-transform duration-200", expanded && "rotate-180")}
             />
           </span>
         </div>
       </button>
 
-      {/* ── Collapsed action pill ── */}
       {!expanded && !isLoading && hasAction && (
         <div className="px-3.5 pb-2.5 -mt-0.5">
           <div className="flex items-center gap-1.5 w-fit max-w-full">
@@ -345,10 +458,8 @@ export function AISummary({
         </div>
       )}
 
-      {/* ── Expanded body ── */}
       {expanded && (
         <div className="px-3.5 pb-3.5 pt-0 space-y-3 border-t border-stone-100 dark:border-white/[0.05]">
-
           {isLoading ? (
             <div className="space-y-1.5 pt-3">
               {[100, 88, 72].map((w, i) => (
@@ -357,38 +468,24 @@ export function AISummary({
             </div>
           ) : (
             <>
-              {/* Full summary */}
-              <p className="text-[13px] text-stone-600 dark:text-white/55 leading-relaxed pt-3">
-                {s!.text}
-              </p>
-
-              {/* Key highlights */}
+              <p className="text-[13px] text-stone-600 dark:text-white/55 leading-relaxed pt-3">{s!.text}</p>
               {hasKeyPoints && (
                 <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold tracking-[0.1em] uppercase text-stone-400 dark:text-white/25 select-none">
-                    Highlights
-                  </p>
+                  <p className="text-[10px] font-bold tracking-[0.1em] uppercase text-stone-400 dark:text-white/25 select-none">Highlights</p>
                   <ul className="space-y-1">
-                    {String(s!.keyPoints)
-                      .split("\n")
-                      .filter(Boolean)
-                      .map((pt, i) => (
-                        <li key={i} className="flex items-start gap-2 text-[12.5px] text-stone-500 dark:text-white/40 leading-snug">
-                          <span className="mt-[6px] w-1 h-1 rounded-full bg-amber-400/60 dark:bg-amber-500/50 shrink-0" />
-                          {pt}
-                        </li>
-                      ))}
+                    {String(s!.keyPoints).split("\n").filter(Boolean).map((pt, i) => (
+                      <li key={i} className="flex items-start gap-2 text-[12.5px] text-stone-500 dark:text-white/40 leading-snug">
+                        <span className="mt-[6px] w-1 h-1 rounded-full bg-amber-400/60 dark:bg-amber-500/50 shrink-0" />
+                        {pt}
+                      </li>
+                    ))}
                   </ul>
                 </div>
               )}
-
-              {/* Action item */}
               {hasAction && (
                 <div className="flex items-start gap-2 pt-0.5">
                   <IconBolt size={12} className="text-amber-500 shrink-0 mt-[3px]" />
-                  <p className="text-[12.5px] text-amber-700/90 dark:text-amber-400/80 leading-snug font-medium">
-                    {String(s!.actionItems)}
-                  </p>
+                  <p className="text-[12.5px] text-amber-700/90 dark:text-amber-400/80 leading-snug font-medium">{String(s!.actionItems)}</p>
                 </div>
               )}
             </>
@@ -398,7 +495,8 @@ export function AISummary({
     </div>
   );
 }
-// ─── Collapsed message row (Gmail-style) ──────────────────────────────────────
+
+// ─── Collapsed row ─────────────────────────────────────────────────────────────
 function CollapsedRow({ email, onClick }: { email: FullEmail; onClick: () => void }) {
   const date = format(new Date(email.receivedAt), "MMM d, h:mm a");
   return (
@@ -416,13 +514,9 @@ function CollapsedRow({ email, onClick }: { email: FullEmail; onClick: () => voi
   );
 }
 
-// ─── Open email card ──────────────────────────────────────────────────────────
+// ─── Open email card ───────────────────────────────────────────────────────────
 function OpenEmailCard({
-  email,
-  onCollapse,
-  onReply,
-  onForward,
-  onStar,
+  email, onCollapse, onReply, onForward, onStar,
 }: {
   email: FullEmail;
   onCollapse: () => void;
@@ -435,22 +529,17 @@ function OpenEmailCard({
 
   return (
     <div className="rounded-2xl bg-white dark:bg-white/[0.04] shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_8px_rgba(0,0,0,0.03)] dark:shadow-none">
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <button onClick={onCollapse} className="flex items-center gap-3 flex-1 min-w-0 text-left group">
+        <button onClick={onCollapse} className="flex items-center gap-3 flex-1 min-w-0 text-left">
           <Avatar name={email.from.name} email={email.from.email} size={8} />
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-gray-900 dark:text-white truncate leading-snug">
               {email.from.name || email.from.email}
             </p>
-            <p className="text-[11.5px] text-gray-400 dark:text-white/28 truncate mt-px">
-              To: {toNames}
-            </p>
+            <p className="text-[11.5px] text-gray-400 dark:text-white/28 truncate mt-px">To: {toNames}</p>
           </div>
         </button>
-
         <div className="flex items-center gap-1 shrink-0">
-          {/* Per-email star */}
           <button
             onClick={onStar}
             className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-black/[0.05] dark:hover:bg-white/[0.07] transition-all"
@@ -460,27 +549,18 @@ function OpenEmailCard({
               : <IconStar size={15} className="text-gray-300 dark:text-white/20 hover:text-amber-400 transition-colors" />
             }
           </button>
-          <span className="text-[11px] tabular-nums text-gray-400 dark:text-white/28 ml-1">
-            {date}
-          </span>
-          <button onClick={onCollapse} className="ml-1 w-6 h-6 flex items-center justify-center rounded text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors">
+          <span className="text-[11px] tabular-nums text-gray-400 dark:text-white/28 ml-1">{date}</span>
+          <button onClick={onCollapse} className="ml-1 w-6 h-6 flex items-center justify-center rounded text-gray-300 dark:text-white/20 hover:text-gray-500 transition-colors">
             <IconChevronDown size={13} className="rotate-180" />
           </button>
         </div>
       </div>
-
-      {/* Body */}
       <div className="border-t border-black/[0.04] dark:border-white/[0.05]">
-        {email.bodyHtml ? (
-          <EmailIframe html={email.bodyHtml} />
-        ) : (
-          <p className="px-6 py-5 text-[14px] text-gray-700 dark:text-white/60 leading-relaxed whitespace-pre-wrap">
-            {email.bodyText ?? email.snippet}
-          </p>
-        )}
+        {email.bodyHtml
+          ? <EmailIframe html={email.bodyHtml} />
+          : <p className="px-6 py-5 text-[14px] text-gray-700 dark:text-white/60 leading-relaxed whitespace-pre-wrap">{email.bodyText ?? email.snippet}</p>
+        }
       </div>
-
-      {/* Actions */}
       <div className="flex items-center gap-2 px-4 py-3 border-t border-black/[0.04] dark:border-white/[0.05]">
         <button
           onClick={onReply}
@@ -499,13 +579,9 @@ function OpenEmailCard({
   );
 }
 
-// ─── Email card — manages open/collapsed state ─────────────────────────────────
+// ─── Email card ────────────────────────────────────────────────────────────────
 function EmailCard({
-  email,
-  defaultOpen,
-  onReply,
-  onForward,
-  onStar,
+  email, defaultOpen, onReply, onForward, onStar,
 }: {
   email: FullEmail;
   defaultOpen: boolean;
@@ -514,9 +590,7 @@ function EmailCard({
   onStar: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  if (!open) {
-    return <CollapsedRow email={email} onClick={() => setOpen(true)} />;
-  }
+  if (!open) return <CollapsedRow email={email} onClick={() => setOpen(true)} />;
   return (
     <OpenEmailCard
       email={email}
@@ -528,7 +602,7 @@ function EmailCard({
   );
 }
 
-// ─── Thread content ────────────────────────────────────────────────────────────
+// ─── Thread detail content ─────────────────────────────────────────────────────
 function ThreadDetailContent({ threadId }: { threadId: string }) {
   const { data }        = useThreadDetail(threadId);
   const setActiveThread = useUIStore(s => s.setActiveThread);
@@ -536,12 +610,18 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
   const threadIds       = useUIStore(s => s.threadIds as string[] ?? []);
   const emailAction     = useEmailAction();
 
+  // Notes dropdown state
+  const [notesOpen, setNotesOpen] = useState(false);
+  const notesAnchorRef = useRef<HTMLDivElement>(null);
+
   if (!data.success || !data.data.emails.length) return <ThreadDetailEmpty />;
 
-  const emails    = data.data.emails;
-  const subject   = emails[0].subject || "(no subject)";
-  const emailAddr = selectedEmail ?? emails[0].emailAddress;
+  const emails     = data.data.emails;
+  const subject    = emails[0].subject || "(no subject)";
+  const emailAddr  = selectedEmail ?? emails[0].emailAddress;
   const anyStarred = emails.some(e => e.isStarred);
+  const isArchived = emails[0].isArchived;
+  const isRead     = !emails.some(e => e.isUnread);
   const allLabels  = [...new Set(emails.flatMap(e => (e.labels ?? []).filter(l => !HIDDEN_LABELS.has(l))))];
 
   const dateRange = emails.length > 1
@@ -552,27 +632,34 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
   const prevId = currentIdx > 0 ? threadIds[currentIdx - 1] : null;
   const nextId = currentIdx < threadIds.length - 1 ? threadIds[currentIdx + 1] : null;
 
-  // Unique participants
   const seen = new Set<string>();
   const participants = emails.filter(e => {
     if (seen.has(e.from.email)) return false;
     seen.add(e.from.email); return true;
   });
 
-  const act = (email: FullEmail, action: string) =>
+  // Unified action helper — matches the shape useEmailAction expects
+  const act = useCallback((email: FullEmail, action: string) =>
     emailAction.mutate({
       from:       email.from.email,
       provider:   (email.provider ?? "GOOGLE") as "GOOGLE" | "OUTLOOK",
       messageIds: [email.id],
       action:     action as any,
-    });
+    }), [emailAction]);
+
+  // Thread-level actions (operate on first email = whole thread)
+  const handleStar    = useCallback(() => act(emails[0], anyStarred ? "unstar" : "star"),       [emails, anyStarred, act]);
+  const handleArchive = useCallback(() => act(emails[0], isArchived ? "unarchive" : "archive"), [emails, isArchived, act]);
+  const handleDelete  = useCallback(() => act(emails[0], "delete"),                             [emails, act]);
+  const handleRead    = useCallback(() => act(emails[0], isRead ? "markUnread" : "markRead"),   [emails, isRead, act]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50/50 dark:bg-[#0f0f0f]">
 
       {/* ── Top bar ── */}
       <div className="shrink-0 flex items-center px-4 pt-3.5 pb-2 gap-1">
-        {/* Left */}
+
+        {/* Left: close + prev/next */}
         <div className="flex items-center gap-0.5">
           <TipBtn onClick={() => setActiveThread(null)} tip="Close" kbd="Esc">
             <IconX size={15} />
@@ -596,30 +683,72 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
 
         <div className="flex-1" />
 
-        {/* Right */}
+        {/* Right: actions */}
         <div className="flex items-center gap-0.5">
+
+          {/* Mark read/unread */}
           <TipBtn
-            tip={anyStarred ? "Unstar thread" : "Star thread"} kbd="S"
-            onClick={() => act(emails[0], anyStarred ? "unstar" : "star")}
+            tip={isRead ? "Mark unread" : "Mark read"} kbd="U"
+            onClick={handleRead}
+          >
+            {isRead
+              ? <IconMailOpened size={16} />
+              : <IconMail size={16} />
+            }
+          </TipBtn>
+
+          {/* Star */}
+          <TipBtn
+            tip={anyStarred ? "Unstar" : "Star"} kbd="S"
+            onClick={handleStar}
+            className={anyStarred ? "text-amber-400 hover:text-amber-500" : undefined}
           >
             {anyStarred
               ? <IconStarFilled size={16} className="text-amber-400" />
               : <IconStar size={16} />
             }
           </TipBtn>
+
+          {/* Archive / Unarchive */}
           <TipBtn
-            tip="Archive" kbd="E"
-            onClick={() => act(emails[0], "archive")}
+            tip={isArchived ? "Move to inbox" : "Archive"} kbd="E"
+            onClick={handleArchive}
           >
-            <IconArchive size={16} />
+            {isArchived
+              ? <IconArchiveOff size={16} />
+              : <IconArchive size={16} />
+            }
           </TipBtn>
+
+          {/* Delete */}
           <TipBtn
             tip="Delete" kbd="#"
             className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
-            onClick={() => act(emails[0], "delete")}
+            onClick={handleDelete}
           >
             <IconTrash size={16} />
           </TipBtn>
+
+          <div className="w-px h-4 bg-black/[0.07] dark:bg-white/[0.08] mx-0.5" />
+
+          {/* Notes — anchored dropdown */}
+          <div ref={notesAnchorRef} className="relative">
+            <TipBtn
+              tip="Notes" kbd="N"
+              active={notesOpen}
+              onClick={() => setNotesOpen(v => !v)}
+            >
+              <IconNotes size={16} />
+            </TipBtn>
+
+            {notesOpen && (
+              <NotesDropdown
+                threadId={threadId}
+                emailAddress={emailAddr}
+                onClose={() => setNotesOpen(false)}
+              />
+            )}
+          </div>
         </div>
       </div>
 
@@ -628,19 +757,12 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
         <h2 className="text-[17px] font-bold text-gray-950 dark:text-white leading-tight tracking-[-0.025em]">
           {subject}
         </h2>
-
-        {/* One-line meta: date · count · labels · participants */}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
-          {/* Date + count */}
-          <span className="text-[11.5px] text-gray-400 dark:text-white/30 tabular-nums shrink-0">
-            {dateRange}
-          </span>
+          <span className="text-[11.5px] text-gray-400 dark:text-white/30 tabular-nums shrink-0">{dateRange}</span>
           <span className="text-gray-200 dark:text-white/15 text-[10px]">·</span>
           <span className="text-[11.5px] text-gray-400 dark:text-white/30 shrink-0">
             {emails.length} {emails.length === 1 ? "message" : "messages"}
           </span>
-
-          {/* Label dots */}
           {allLabels.length > 0 && (
             <>
               <span className="text-gray-200 dark:text-white/15 text-[10px]">·</span>
@@ -649,8 +771,6 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
               </div>
             </>
           )}
-
-          {/* Participant pills */}
           {participants.length > 0 && (
             <>
               <span className="text-gray-200 dark:text-white/15 text-[10px]">·</span>
@@ -669,31 +789,26 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
 
       {/* ── Scrollable ── */}
       <div className="flex-1 overflow-y-auto overscroll-contain">
-
-        {/* AI Summary */}
         <Suspense fallback={null}>
           <AISummary threadId={threadId} emailAddress={emailAddr} />
         </Suspense>
 
-        {/* Email list — Gmail collapse pattern */}
         <div className="px-6 py-4 space-y-1.5">
           {emails.map((email, i) => (
             <EmailCard
               key={email.id}
               email={email}
               defaultOpen={i === emails.length - 1}
-              onReply={() => {/* TODO: open compose in reply mode */}}
-              onForward={() => {/* TODO: open compose in forward mode */}}
+              onReply={() => {/* TODO: open compose reply */}}
+              onForward={() => {/* TODO: open compose forward */}}
               onStar={() => act(email, email.isStarred ? "unstar" : "star")}
             />
           ))}
         </div>
-
-        {/* Spacer for floating bar */}
         <div className="h-24" />
       </div>
 
-      {/* ── Floating Reply / Forward ── */}
+      {/* ── Floating reply/forward bar ── */}
       <div className="absolute bottom-0 inset-x-0 pointer-events-none pb-4 px-6">
         <div className={cn(
           "pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-2xl",
@@ -713,7 +828,6 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
           </button>
         </div>
       </div>
-
     </div>
   );
 }
@@ -737,7 +851,7 @@ function ThreadDetailSkeleton({ className }: { className?: string }) {
     <div className={cn("flex flex-col h-full bg-gray-50/50 dark:bg-[#0f0f0f] p-6 gap-4", className)}>
       <div className="flex items-center justify-between">
         <div className="flex gap-1">{[1,2,3].map(i => <Skeleton key={i} className="w-8 h-8 rounded-lg" />)}</div>
-        <div className="flex gap-1">{[1,2,3].map(i => <Skeleton key={i} className="w-8 h-8 rounded-lg" />)}</div>
+        <div className="flex gap-1">{[1,2,3,4,5].map(i => <Skeleton key={i} className="w-8 h-8 rounded-lg" />)}</div>
       </div>
       <div className="space-y-2">
         <Skeleton className="h-6 w-3/4 rounded-lg" />
