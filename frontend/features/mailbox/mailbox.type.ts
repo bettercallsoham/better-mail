@@ -66,6 +66,7 @@ export interface FullEmail {
   emailAddress: string;
   provider: "gmail" | "outlook";
   subject: string;
+  isArchived:string;
   bodyHtml: string;
   bodyText?: string;
   snippet: string;
