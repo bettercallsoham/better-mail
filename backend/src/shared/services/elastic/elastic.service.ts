@@ -712,10 +712,11 @@ async searchEmails(params: {
           threadId: source.threadId,
           lastEmailId: hit._id,
           subject: source.subject,
-          snippet: source.snippet,
           receivedAt: source.receivedAt,
+          emailAddress:source.emailAddress,
           from: source.from,
           to: source.to,
+          provider:source.provider,
           isUnread: states.some((s) => s._source?.isRead === false),
           isStarred: states.some((s) => s._source?.isStarred === true),
           labels: [
@@ -742,7 +743,7 @@ async searchEmails(params: {
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
-      size: 100, // Get all emails in thread (max 100)
+      size: 100,
       query: {
         bool: {
           filter: [
@@ -752,7 +753,7 @@ async searchEmails(params: {
           ],
         },
       },
-      sort: [{ receivedAt: "asc" }], // Chronological order for thread view
+      sort: [{ receivedAt: "asc" }],
     });
 
     return {

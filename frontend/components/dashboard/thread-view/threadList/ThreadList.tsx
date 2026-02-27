@@ -8,27 +8,23 @@ import {
   useSearchEmails,
 } from "@/features/mailbox/mailbox.query";
 import { useThreadNavigation } from "@/hooks/keyboard/useThreadNavigation";
+import { useThreadActions } from "@/hooks/keyboard/useThreadActions";
 import { ThreadRow } from "../ThreadRow";
 import { ThreadListToolbar } from "./ThreadListToolbar";
 import { ClientOnly } from "@/components/ClientOnly";
 import { Skeleton } from "@/components/ui/skeleton";
 import { groupByDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
-// ✅ Import shared utils — no more duplication
-import type { SearchEmail } from "@/features/mailbox/mailbox.type";
+import type { SearchEmail, ThreadEmail } from "@/features/mailbox/mailbox.type";
 import type { SearchFilters } from "@/lib/store/ui.store";
 import { stripMark } from "../../MailSearchCommand/ResultsList";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared infinite-scroll hook — extracted from both list components
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── Infinite scroll ──────────────────────────────────────────────────────────
 function useInfiniteScroll(
   onIntersect: () => void,
   enabled: boolean,
 ): (node: HTMLDivElement | null) => void {
   const observerRef = useRef<IntersectionObserver | null>(null);
-
   return useCallback(
     (node: HTMLDivElement | null) => {
       observerRef.current?.disconnect();
@@ -39,18 +35,13 @@ function useInfiniteScroll(
       );
       observerRef.current.observe(node);
     },
-    // onIntersect identity matters — callers should wrap in useCallback
     [onIntersect, enabled],
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Root
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── Root ─────────────────────────────────────────────────────────────────────
 export function ThreadList({ className }: { className?: string }) {
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-
   return (
     <div className={cn("flex flex-col h-full", className)}>
       <ThreadListToolbar />
@@ -63,10 +54,7 @@ export function ThreadList({ className }: { className?: string }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inner — branches on searchQuery
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── Inner ────────────────────────────────────────────────────────────────────
 function ThreadListInner({ email }: { email?: string }) {
   const searchQuery   = useUIStore((s) => s.searchQuery);
   const searchFilters = useUIStore((s) => s.searchFilters);
@@ -82,14 +70,9 @@ function ThreadListInner({ email }: { email?: string }) {
   return <ThreadListContent email={email} />;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Search Results
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── Search results ───────────────────────────────────────────────────────────
 function SearchResultsList({
-  query,
-  filters,
-  email,
+  query, filters, email,
 }: {
   query: string;
   filters: SearchFilters | null;
@@ -130,42 +113,34 @@ function SearchResultsList({
           {data.pages[0].total} result{data.pages[0].total !== 1 ? "s" : ""}
         </span>
       </div>
-
-      {allEmails.map((email) => (
+      {allEmails.map((e) => (
         <SearchResultRow
-          key={email.id}
-          email={email}
-          isActive={email.threadId === activeThreadId}
-          onSelect={() => setActiveThread(email.threadId)}
+          key={e.id}
+          email={e}
+          isActive={e.threadId === activeThreadId}
+          onSelect={() => setActiveThread(e.threadId)}
         />
       ))}
-
       <div ref={sentinelRef} className="h-4" />
       {isFetchingNextPage && <LoadingSpinner />}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Search result row — memoized, reuses shared utils
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── Search row ───────────────────────────────────────────────────────────────
 const SearchResultRow = memo(function SearchResultRow({
-  email,
-  isActive,
-  onSelect,
+  email, isActive, onSelect,
 }: {
   email: SearchEmail;
   isActive: boolean;
   onSelect: () => void;
 }) {
-  const date     = new Date(email.receivedAt);
-  const isToday  = new Date().toDateString() === date.toDateString();
-  const dateStr  = isToday
+  const date    = new Date(email.receivedAt);
+  const isToday = new Date().toDateString() === date.toDateString();
+  const dateStr = isToday
     ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : date.toLocaleDateString([], { month: "short", day: "numeric" });
 
-  // ✅ Use shared applyHighlight from ResultsList — no duplication
   const highlightedSubject = email.subject.replace(
     /<mark>(.*?)<\/mark>/g,
     '<mark class="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 not-italic font-semibold rounded-[2px] px-px">$1</mark>',
@@ -187,7 +162,6 @@ const SearchResultRow = memo(function SearchResultRow({
           : <span className="w-1.5 h-1.5 block" />
         }
       </div>
-
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
           <span className={cn(
@@ -200,7 +174,6 @@ const SearchResultRow = memo(function SearchResultRow({
           </span>
           <span className="text-[11px] text-gray-400 dark:text-white/25 shrink-0">{dateStr}</span>
         </div>
-
         <p
           className={cn(
             "text-[12.5px] truncate mb-0.5",
@@ -210,7 +183,6 @@ const SearchResultRow = memo(function SearchResultRow({
           )}
           dangerouslySetInnerHTML={{ __html: highlightedSubject }}
         />
-
         <p className="text-[11.5px] text-gray-400 dark:text-white/30 truncate">
           {stripMark(email.snippet)}
         </p>
@@ -219,11 +191,50 @@ const SearchResultRow = memo(function SearchResultRow({
   );
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Normal thread list
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── ThreadRow wrapper — owns actions + registers with focusedActionsRef ──────
+// Extracted so hooks aren't called conditionally inside a map
+function ThreadRowWithActions({
+  thread,
+  isActive,
+  isFocused,
+  isFlow,
+  emailAddress,
+  onSelect,
+  onHover,
+  focusedActionsRef,
+}: {
+  thread:            ThreadEmail;
+  isActive:          boolean;
+  isFocused:         boolean;
+  isFlow:            boolean;
+  emailAddress:      string;
+  onSelect:          () => void;
+  onHover:           () => void;
+  focusedActionsRef: React.MutableRefObject<ReturnType<typeof useThreadActions> | null>;
+}) {
+  const actions = useThreadActions(thread, emailAddress); // ✅ logged-in user's address
 
-function ThreadListContent({ email }: { email?: string }) {
+  // When this row is hovered/focused, register its actions so keyboard shortcuts work
+  const handleHover = useCallback(() => {
+    focusedActionsRef.current = actions;
+    onHover();
+  }, [actions, focusedActionsRef, onHover]);
+
+  return (
+    <ThreadRow
+      thread={thread}
+      mode={isFlow ? "flow" : "velocity"}
+      isActive={isActive}
+      isFocused={isFocused}
+      actions={actions}
+      onSelect={onSelect}
+      onHover={handleHover}
+    />
+  );
+}
+
+// ─── Normal thread list ───────────────────────────────────────────────────────
+function ThreadListContent({ email: emailAddress }: { email?: string }) {
   const activeThreadId   = useUIStore((s) => s.activeThreadId);
   const focusedThreadId  = useUIStore((s) => s.focusedThreadId);
   const layoutMode       = useUIStore((s) => s.layoutMode);
@@ -233,23 +244,25 @@ function ThreadListContent({ email }: { email?: string }) {
   const activeFolder     = useUIStore((s) => s.activeFolder);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useThreadEmails(email, activeFolder);
+    useThreadEmails(emailAddress, activeFolder);
 
   const { prefetchThread } = useMailboxPrefetch();
 
-  // ✅ Stable string key — avoids infinite loop from new array refs
+  // Ref that always holds the focused row's action callbacks
+  // useThreadNavigation reads this to fire S/U/E without any extra prop drilling
+  const focusedActionsRef = useRef<ReturnType<typeof useThreadActions> | null>(null);
+
   const threadIdsKey = data.threadIds.join(",");
   useEffect(() => {
     setThreadIds(data.threadIds);
   }, [threadIdsKey, setThreadIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useThreadNavigation(data.threadIds);
+  useThreadNavigation(data.threadIds, focusedActionsRef);
 
   const loadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // ✅ Shared infinite scroll hook — no duplicated IntersectionObserver setup
   const sentinelRef = useInfiniteScroll(loadMore, hasNextPage && !isFetchingNextPage);
 
   if (!data.threads.length) return <ThreadListEmpty />;
@@ -268,12 +281,14 @@ function ThreadListContent({ email }: { email?: string }) {
           </div>
 
           {items.map((thread) => (
-            <ThreadRow
+            <ThreadRowWithActions
               key={thread.threadId}
               thread={thread}
-              mode={isFlow ? "flow" : "velocity"}
               isActive={thread.threadId === activeThreadId}
               isFocused={thread.threadId === focusedThreadId}
+              isFlow={isFlow}
+              emailAddress={emailAddress ?? ""}  // ✅ logged-in user's address
+              focusedActionsRef={focusedActionsRef}
               onSelect={() => setActiveThread(thread.threadId)}
               onHover={() => {
                 setFocusedThread(thread.threadId);
@@ -290,10 +305,7 @@ function ThreadListContent({ email }: { email?: string }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared loading spinner
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── Spinner ──────────────────────────────────────────────────────────────────
 function LoadingSpinner() {
   return (
     <div className="flex justify-center py-3">
@@ -302,18 +314,12 @@ function LoadingSpinner() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Skeletons & Empty
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 function ThreadListSkeleton() {
   return (
     <div className="flex-1 overflow-hidden">
       {Array.from({ length: 12 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-3 px-4 h-12 border-b border-black/4 dark:border-white/4"
-        >
+        <div key={i} className="flex items-center gap-3 px-4 h-12 border-b border-black/4 dark:border-white/4">
           <Skeleton className="w-1.5 h-1.5 rounded-full" />
           <Skeleton className="w-32 h-3 rounded" />
           <Skeleton className="flex-1 h-3 rounded" />
@@ -324,6 +330,7 @@ function ThreadListSkeleton() {
   );
 }
 
+// ─── Empty ────────────────────────────────────────────────────────────────────
 function ThreadListEmpty() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center px-6">
