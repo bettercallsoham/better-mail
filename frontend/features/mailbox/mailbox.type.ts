@@ -14,10 +14,12 @@ export interface GetConnectedAccountsResponse {
 export interface ThreadEmail {
   threadId: string;
   lastEmailId: string;
-  lastMessageId:string;
+  lastMessageId: string;
   subject: string;
   snippet: string;
   receivedAt: string;
+  isArchived: boolean;
+  isDraft: boolean;
   provider: "gmail" | "outlook";
   emailAddress: string;
   from: { email: string; name?: string };

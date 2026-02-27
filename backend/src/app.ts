@@ -41,7 +41,7 @@ export function createApp() {
 
   app.use(express.static(path.join(__dirname, "../public")));
   const limiter = rateLimit({
-    windowMs: 1 * 60 * 1000,
+    windowMs: 2 * 60 * 1000,
     limit: 120,
     standardHeaders: true,
     legacyHeaders: false,

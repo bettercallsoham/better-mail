@@ -276,7 +276,7 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
       switch (e.key.toLowerCase()) {
         case "s": e.preventDefault(); actions.star();     break;
         case "u": e.preventDefault(); actions.markRead(); break;
-        case "e": e.preventDefault(); actions.archive();  break;
+        case "e": e.preventDefault(); actions.archiveToggle();  break;
       }
     };
     window.addEventListener("keydown", handler);

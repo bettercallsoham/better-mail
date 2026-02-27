@@ -42,7 +42,6 @@ type RawThreadCache = {
   pageParams: unknown[];
 };
 
-
 // ─── Query keys ───────────────────────────────────────────────────────────────
 export const mailboxKeys = {
   all: ["mailboxes"] as const,
@@ -334,7 +333,6 @@ export function useReplyEmail() {
   });
 }
 
-
 export function useEmailAction() {
   const queryClient = useQueryClient();
 
@@ -342,28 +340,35 @@ export function useEmailAction() {
     mutationFn: (params: EmailActionParams) =>
       mailboxService.emailAction(params),
 
-    onMutate: (params) => {
-    
+    onMutate: async (params) => {
+      await queryClient.cancelQueries({ queryKey: ["threads"], exact: false });
+
       const applyToThread = (thread: ThreadEmail): ThreadEmail | null => {
         if (!params.messageIds.includes(thread.lastMessageId)) return thread;
         switch (params.action) {
-          case "star":        return { ...thread, isStarred: true  };
-          case "unstar":      return { ...thread, isStarred: false };
-          case "mark_read":   return { ...thread, isUnread:  false };
-          case "mark_unread": return { ...thread, isUnread:  true  };
+          case "star":
+            return { ...thread, isStarred: true };
+          case "unstar":
+            return { ...thread, isStarred: false };
+          case "mark_read":
+            return { ...thread, isUnread: false };
+          case "mark_unread":
+            return { ...thread, isUnread: true };
           case "archive":
-          case "delete":      return null; // signal removal
-          default:            return thread;
+          case "delete":
+            return null;
+          case "unarchive":
+            return { ...thread, isArchived: false }; // ✅ was missing
+          default:
+            return thread;
         }
       };
 
-      // Snapshot raw cache before patching (for rollback)
       const prevThreads = queryClient.getQueriesData<RawThreadCache>({
         queryKey: ["threads"],
         exact: false,
       });
 
-      // Patch immediately — no await
       queryClient.setQueriesData<RawThreadCache>(
         { queryKey: ["threads"], exact: false },
         (old) => {
@@ -383,9 +388,6 @@ export function useEmailAction() {
         },
       );
 
-   
-      queryClient.cancelQueries({ queryKey: ["threads"], exact: false });
-
       return { prevThreads };
     },
 
@@ -396,13 +398,13 @@ export function useEmailAction() {
       );
 
       const labels: Record<EmailActionType, string> = {
-        star:        "star",
-        unstar:      "unstar",
-        mark_read:   "mark as read",
+        star: "star",
+        unstar: "unstar",
+        mark_read: "mark as read",
         mark_unread: "mark as unread",
-        archive:     "archive",
-        unarchive:   "unarchive",
-        delete:      "delete",
+        archive: "archive",
+        unarchive: "unarchive",
+        delete: "delete",
       };
 
       toast.error(`Failed to ${labels[params.action]}`, {

@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { Star, Archive, MailOpen, Mail } from "lucide-react";
+import { Star, ArchiveRestore, MailOpen, Mail, Archive } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ThreadEmail } from "@/features/mailbox/mailbox.type";
 import { formatThreadDate } from "@/lib/date";
@@ -69,7 +69,7 @@ function LabelDot({ label }: { label: string }) {
         pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5
         px-1.5 py-0.5 rounded-md text-[10px] font-medium whitespace-nowrap
         bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900
-        opacity-0 group-hover/tip:opacity-100 transition-opacity duration-100 z-50
+        opacity-0 group-hover/tip:opacity-100 transition-opacity duration-75 z-50
       ">
         {meta.name}
       </span>
@@ -77,8 +77,9 @@ function LabelDot({ label }: { label: string }) {
   );
 }
 
-// ─── Action buttons ───────────────────────────────────────────────────────────
-function ActionButtons({
+// ─── Shared action buttons ────────────────────────────────────────────────────
+// Used by both modes — size prop controls icon/button dimensions
+function ActionTray({
   thread,
   onStar,
   onMarkRead,
@@ -92,38 +93,30 @@ function ActionButtons({
   size?:      "default" | "sm";
 }) {
   const btnCls = cn(
-    "flex items-center justify-center rounded-md transition-all duration-100",
+    "flex items-center justify-center rounded-md transition-colors duration-75",
     "text-gray-400 dark:text-white/25",
     "hover:text-gray-700 dark:hover:text-white/70",
-    "hover:bg-black/[0.06] dark:hover:bg-white/[0.08]",
+    "hover:bg-black/[0.07] dark:hover:bg-white/[0.09]",
     size === "sm" ? "w-6 h-6" : "w-7 h-7",
   );
   const iconSz = size === "sm" ? 13 : 14;
 
+  const isArchived = thread.isArchived;
+
   return (
-    <TooltipProvider delayDuration={600}>
-      <div
-        className={cn(
-          "flex items-center gap-0.5 shrink-0",
-          "opacity-0 group-hover:opacity-100 transition-opacity duration-100",
-          thread.isStarred && "opacity-100",
-        )}
-      >
+    <TooltipProvider delayDuration={500}>
+      <div className="flex items-center gap-px shrink-0">
         {/* Star */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={onStar}
-              className={cn(btnCls, thread.isStarred && "!opacity-100 !text-amber-400")}
+              className={cn(btnCls, thread.isStarred && "text-amber-400 hover:text-amber-500")}
               aria-label={thread.isStarred ? "Unstar" : "Star"}
             >
               <Star
                 size={iconSz}
-                className={cn(
-                  thread.isStarred
-                    ? "fill-amber-400 text-amber-400"
-                    : "text-gray-400 dark:text-white/30",
-                )}
+                className={cn(thread.isStarred ? "fill-amber-400 text-amber-400" : "")}
               />
             </button>
           </TooltipTrigger>
@@ -138,11 +131,7 @@ function ActionButtons({
         {/* Mark read/unread */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              onClick={onMarkRead}
-              className={btnCls}
-              aria-label={thread.isUnread ? "Mark read" : "Mark unread"}
-            >
+            <button onClick={onMarkRead} className={btnCls} aria-label={thread.isUnread ? "Mark read" : "Mark unread"}>
               {thread.isUnread ? <MailOpen size={iconSz} /> : <Mail size={iconSz} />}
             </button>
           </TooltipTrigger>
@@ -152,19 +141,18 @@ function ActionButtons({
           </TooltipContent>
         </Tooltip>
 
-        {/* Archive */}
+        {/* Archive / Unarchive */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              onClick={onArchive}
-              className={btnCls}
-              aria-label="Archive"
-            >
-              <Archive size={iconSz} />
+            <button onClick={onArchive} className={btnCls} aria-label={isArchived ? "Unarchive" : "Archive"}>
+              {isArchived
+                ? <ArchiveRestore size={iconSz} />
+                : <Archive size={iconSz} />
+              }
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="flex items-center gap-1.5 py-1 px-2">
-            <span className="text-[11px]">Archive</span>
+            <span className="text-[11px]">{isArchived ? "Unarchive" : "Archive"}</span>
             <Kbd className="text-[9px]">E</Kbd>
           </TooltipContent>
         </Tooltip>
@@ -173,103 +161,14 @@ function ActionButtons({
   );
 }
 
-// ─── Row meta (labels + buttons + date) ───────────────────────────────────────
-function RowMeta({
-  thread, onStar, onMarkRead, onArchive, size,
-}: {
-  thread:     ThreadEmail;
-  onStar:     (e: React.MouseEvent) => void;
-  onMarkRead: (e: React.MouseEvent) => void;
-  onArchive:  (e: React.MouseEvent) => void;
-  size?:      "default" | "sm";
-}) {
-  const labels = visibleLabels(thread.labels ?? []);
-  return (
-    <div className="flex items-center gap-1.5 shrink-0">
-      {labels.length > 0 && (
-        <div className="flex items-center gap-0.5 group-hover:opacity-0 transition-opacity duration-100">
-          {labels.slice(0, 3).map((l) => <LabelDot key={l} label={l} />)}
-        </div>
-      )}
-      <ActionButtons
-        thread={thread}
-        onStar={onStar}
-        onMarkRead={onMarkRead}
-        onArchive={onArchive}
-        size={size}
-      />
-      <span className={cn(
-        "text-[11px] tabular-nums whitespace-nowrap group-hover:opacity-0 transition-opacity duration-100",
-        thread.isUnread
-          ? "text-gray-600 dark:text-white/55"
-          : "text-gray-400 dark:text-white/28",
-      )}>
-        {formatThreadDate(thread.receivedAt)}
-      </span>
-    </div>
-  );
-}
-
-// ─── Flow Row ─────────────────────────────────────────────────────────────────
-function FlowRow({ thread, isActive, isFocused, actions, onSelect, onHover }: Omit<ThreadRowProps, "mode">) {
-  const { star, markRead, archive } = actions;
-  const hue      = senderHue(thread.from.email);
-  const initials = senderInitials(thread.from.name, thread.from.email);
-  const sender   = thread.from.name || thread.from.email;
-  const isUnread = thread.isUnread;
-  const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
-
-  return (
-    <div
-      role="button" tabIndex={0}
-      onClick={onSelect} onMouseEnter={onHover} onFocus={onHover}
-      onKeyDown={(e) => e.key === "Enter" && onSelect()}
-      className={cn(
-        "group relative flex items-center gap-3",
-        "mx-2 my-px px-3 py-2.5 rounded-xl",
-        "cursor-pointer select-none transition-colors duration-100",
-        isFocused && !isActive && "bg-black/[0.04] dark:bg-zinc-700/50",
-        !isFocused && !isActive && "hover:bg-black/[0.03] dark:hover:bg-zinc-800/60",
-        isActive && "bg-black/[0.06] dark:bg-zinc-700/25 dark:ring-1 dark:ring-white/[0.08]",
-      )}
-    >
-      <span
-        className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-medium text-white"
-        style={{ background: `hsl(${hue} 50% 46%)` }}
-      >
-        {initials}
-      </span>
-      <div className="flex-1 min-w-0 flex flex-col gap-[3px]">
-        <div className="flex items-center gap-2">
-          <p className={cn(
-            "flex-1 min-w-0 truncate leading-none",
-            isUnread
-              ? "text-[13.5px] font-semibold text-gray-950 dark:text-white"
-              : "text-[13.5px] font-normal text-gray-500 dark:text-white/50",
-          )}>
-            {sender}
-          </p>
-          <RowMeta thread={thread} onStar={stop(star)} onMarkRead={stop(markRead)} onArchive={stop(archive)} size="default" />
-        </div>
-        <p className={cn(
-          "truncate leading-none",
-          isUnread
-            ? "text-[12.5px] font-medium text-gray-600 dark:text-white/65"
-            : "text-[12.5px] font-normal text-gray-400 dark:text-white/32",
-        )}>
-          {thread.subject || "(no subject)"}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ─── Velocity Row ─────────────────────────────────────────────────────────────
+// Right side: date fades out, tray fades in — zero layout shift
+// Star is always visible when starred
 function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }: Omit<ThreadRowProps, "mode">) {
-  const { star, markRead, archive } = actions;
+  const { star, markRead, archiveToggle } = actions;
   const sender   = thread.from.name || thread.from.email;
   const isUnread = thread.isUnread;
-  const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
+  const stop     = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
 
   return (
     <div
@@ -277,7 +176,7 @@ function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }
       onClick={onSelect} onMouseEnter={onHover} onFocus={onHover}
       onKeyDown={(e) => e.key === "Enter" && onSelect()}
       className={cn(
-        "group relative flex items-center gap-3 px-4 h-13",
+        "group relative flex items-center gap-3 px-4 h-[52px]",
         "cursor-pointer select-none overflow-hidden",
         "border-b border-black/[0.04] dark:border-white/[0.04]",
         "transition-colors duration-75",
@@ -290,9 +189,12 @@ function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }
         ],
       )}
     >
+      {/* Unread dot */}
       <div className="w-2 shrink-0 flex justify-center">
         {isUnread && <span className="block w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400" />}
       </div>
+
+      {/* Sender */}
       <span className={cn(
         "shrink-0 w-36 truncate text-[13px] tracking-[-0.01em]",
         isUnread
@@ -301,6 +203,8 @@ function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }
       )}>
         {sender}
       </span>
+
+      {/* Subject — flex-1 so it fills remaining space */}
       <span className={cn(
         "flex-1 min-w-0 truncate text-[13px] tracking-[-0.01em]",
         isUnread
@@ -309,7 +213,144 @@ function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }
       )}>
         {thread.subject || "(no subject)"}
       </span>
-      <RowMeta thread={thread} onStar={stop(star)} onMarkRead={stop(markRead)} onArchive={stop(archive)} size="sm" />
+
+      {/* ── Right zone — date + tray overlay ──────────────────────────────── */}
+      <div className="relative flex items-center justify-end shrink-0 w-[120px]">
+
+        {/* Date — fades out on hover OR keyboard focus */}
+        <span className={cn(
+          "absolute right-0 text-[11px] tabular-nums whitespace-nowrap",
+          "transition-opacity duration-100",
+          isUnread
+            ? "text-gray-600 dark:text-white/55"
+            : "text-gray-400 dark:text-white/28",
+          (isFocused || undefined) && "opacity-0",
+          !isFocused && "group-hover:opacity-0",
+        )}>
+          {thread.isStarred && (
+            <Star size={10} className="inline-block fill-amber-400 text-amber-400 mr-1 mb-px" />
+          )}
+          {formatThreadDate(thread.receivedAt)}
+        </span>
+
+        {/* Tray — fades in on hover OR keyboard focus */}
+        <div className={cn(
+          "absolute right-0 transition-opacity duration-100",
+          isFocused ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+        )}>
+          <ActionTray
+            thread={thread}
+            onStar={stop(star)}
+            onMarkRead={stop(markRead)}
+            onArchive={stop(archiveToggle)}
+            size="sm"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Flow Row ─────────────────────────────────────────────────────────────────
+// Two-line card layout. On hover, label dots fade out and tray fades in
+// beside the date (date stays dimmed for context)
+function FlowRow({ thread, isActive, isFocused, actions, onSelect, onHover }: Omit<ThreadRowProps, "mode">) {
+  const { star, markRead, archiveToggle } = actions;
+  const hue      = senderHue(thread.from.email);
+  const initials = senderInitials(thread.from.name, thread.from.email);
+  const sender   = thread.from.name || thread.from.email;
+  const isUnread = thread.isUnread;
+  const labels   = visibleLabels(thread.labels ?? []);
+  const stop     = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
+
+  return (
+    <div
+      role="button" tabIndex={0}
+      onClick={onSelect} onMouseEnter={onHover} onFocus={onHover}
+      onKeyDown={(e) => e.key === "Enter" && onSelect()}
+      className={cn(
+        "group relative flex items-center gap-3",
+        "mx-2 my-px px-3 py-2.5 rounded-xl",
+        "cursor-pointer select-none transition-colors duration-75",
+        isFocused && !isActive && "bg-black/[0.04] dark:bg-zinc-700/50",
+        !isFocused && !isActive && "hover:bg-black/[0.03] dark:hover:bg-zinc-800/60",
+        isActive && "bg-black/[0.06] dark:bg-zinc-700/25 dark:ring-1 dark:ring-white/[0.08]",
+      )}
+    >
+      {/* Avatar */}
+      <span
+        className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-medium text-white"
+        style={{ background: `hsl(${hue} 50% 46%)` }}
+      >
+        {initials}
+      </span>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0 flex flex-col gap-[3px]">
+
+        {/* Row 1: sender + right zone */}
+        <div className="flex items-center gap-2">
+          <p className={cn(
+            "flex-1 min-w-0 truncate leading-none",
+            isUnread
+              ? "text-[13.5px] font-semibold text-gray-950 dark:text-white"
+              : "text-[13.5px] font-normal text-gray-500 dark:text-white/50",
+          )}>
+            {sender}
+          </p>
+
+          {/* ── Right zone ───────────────────────────────────────────────── */}
+          <div className="relative flex items-center justify-end shrink-0 h-5">
+
+            {/* Label dots + date (normal state) */}
+            <div className={cn(
+              "flex items-center gap-1.5 transition-opacity duration-100",
+              isFocused ? "opacity-0" : "group-hover:opacity-0",
+            )}>
+              {labels.length > 0 && (
+                <div className="flex items-center gap-0.5">
+                  {labels.slice(0, 3).map((l) => <LabelDot key={l} label={l} />)}
+                </div>
+              )}
+              {thread.isStarred && (
+                <Star size={10} className="fill-amber-400 text-amber-400 shrink-0" />
+              )}
+              <span className={cn(
+                "text-[11px] tabular-nums whitespace-nowrap",
+                isUnread
+                  ? "text-gray-600 dark:text-white/55"
+                  : "text-gray-400 dark:text-white/28",
+              )}>
+                {formatThreadDate(thread.receivedAt)}
+              </span>
+            </div>
+
+            {/* Tray — fades in on hover OR keyboard focus */}
+            <div className={cn(
+              "absolute right-0 transition-opacity duration-100",
+              isFocused ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+            )}>
+              <ActionTray
+                thread={thread}
+                onStar={stop(star)}
+                onMarkRead={stop(markRead)}
+                onArchive={stop(archiveToggle)}
+                size="sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: subject */}
+        <p className={cn(
+          "truncate leading-none",
+          isUnread
+            ? "text-[12.5px] font-medium text-gray-600 dark:text-white/65"
+            : "text-[12.5px] font-normal text-gray-400 dark:text-white/32",
+        )}>
+          {thread.subject || "(no subject)"}
+        </p>
+      </div>
     </div>
   );
 }
