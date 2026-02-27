@@ -14,6 +14,7 @@ export interface GetConnectedAccountsResponse {
 export interface ThreadEmail {
   threadId: string;
   lastEmailId: string;
+  lastMessageId:string;
   subject: string;
   snippet: string;
   receivedAt: string;
