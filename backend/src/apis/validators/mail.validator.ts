@@ -256,17 +256,17 @@ export const validateEmailAction = [
     .exists()
     .withMessage("provider is required")
     .isIn(["GOOGLE", "OUTLOOK"])
-    .withMessage("provider must be either 'GOOGLE' or 'OUTLOOK'"),
+    .withMessage("provider must be GOOGLE or OUTLOOK"),
 
   body("messageIds")
     .exists()
     .withMessage("messageIds is required")
     .isArray({ min: 1 })
-    .withMessage("messageIds must be a non-empty array")
-    .custom((value) => {
-      return value.every((id: string) => typeof id === "string");
-    })
-    .withMessage("messageIds must be an array of strings"),
+    .withMessage("messageIds must be a non-empty array"),
+
+  body("messageIds.*")
+    .isString()
+    .withMessage("each messageId must be a string"),
 
   body("action")
     .exists()
@@ -280,20 +280,16 @@ export const validateEmailAction = [
       "unarchive",
       "delete",
     ])
-    .withMessage("Invalid action type"),
+    .withMessage("Invalid action"),
 
   handleValidationErrors,
 ];
-
 export const validateSearch = [
   query("query")
     .optional()
-    .withMessage("Search query is required")
-    .isString()
-    .withMessage("Query must be a string")
-    .isLength({ min: 1 })
-    .withMessage("Query cannot be empty")
-    .trim(),
+    .toArray()
+    .isArray()
+    .withMessage("query must be a string or array of strings"),
 
   query("from")
     .optional()
@@ -333,18 +329,21 @@ export const validateSearch = [
 
   query("filterFrom")
     .optional()
-    .isString()
-    .withMessage("filterFrom must be a string"),
+    .toArray()
+    .isArray()
+    .withMessage("filterFrom must be a string or array of emails"),
 
   query("filterTo")
     .optional()
-    .isString()
-    .withMessage("filterTo must be a string"),
+    .toArray()
+    .isArray()
+    .withMessage("filterTo must be a string or array of emails"),
 
   query("labels")
     .optional()
-    .isString()
-    .withMessage("Labels must be a JSON string or single label"),
+    .toArray()
+    .isArray()
+    .withMessage("labels must be a string or array of strings"),
 
   query("dateFrom")
     .optional()

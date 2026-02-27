@@ -212,7 +212,7 @@ function ThreadRowWithActions({
   onHover:           () => void;
   focusedActionsRef: React.MutableRefObject<ReturnType<typeof useThreadActions> | null>;
 }) {
-  const actions = useThreadActions(thread, emailAddress); // ✅ logged-in user's address
+  const actions = useThreadActions(thread); 
 
   // When this row is hovered/focused, register its actions so keyboard shortcuts work
   const handleHover = useCallback(() => {

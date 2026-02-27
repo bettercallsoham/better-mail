@@ -461,8 +461,8 @@ async searchEmails(params: {
     isStarred?:      boolean;
     isArchived?:     boolean;
     hasAttachments?: boolean;
-    from?:           string;
-    to?:             string;
+    from?:           string[];   
+    to?:             string[];   
     labels?:         string[];
     dateFrom?:       string;
     dateTo?:         string;
@@ -476,25 +476,36 @@ async searchEmails(params: {
     { term:  { isDeleted: false } },
   ];
 
-  if (filters.isRead         !== undefined) mustFilters.push({ term: { isRead:          filters.isRead } });
-  if (filters.isStarred      !== undefined) mustFilters.push({ term: { isStarred:       filters.isStarred } });
-  if (filters.isArchived     !== undefined) mustFilters.push({ term: { isArchived:      filters.isArchived } });
-  if (filters.hasAttachments !== undefined) mustFilters.push({ term: { hasAttachments:  filters.hasAttachments } });
+  if (filters.isRead         !== undefined) mustFilters.push({ term: { isRead:         filters.isRead } });
+  if (filters.isStarred      !== undefined) mustFilters.push({ term: { isStarred:      filters.isStarred } });
+  if (filters.isArchived     !== undefined) mustFilters.push({ term: { isArchived:     filters.isArchived } });
+  if (filters.hasAttachments !== undefined) mustFilters.push({ term: { hasAttachments: filters.hasAttachments } });
 
-  if (filters.from) {
-    mustFilters.push({ term: { "from.email": filters.from.toLowerCase() } });
-  }
-  if (filters.to) {
+  if (filters.from?.length) {
     mustFilters.push({
-      nested: {
-        path: "to",
-        query: { term: { "to.email": filters.to.toLowerCase() } },
+      terms: { "from.email": filters.from.map((e) => e.toLowerCase()) },
+    });
+  }
+
+  if (filters.to?.length) {
+    mustFilters.push({
+      bool: {
+        should: filters.to.map((email) => ({
+          nested: {
+            path: "to",
+            query: { term: { "to.email": email.toLowerCase() } },
+          },
+        })),
+        minimum_should_match: 1,
       },
     });
   }
+
+ 
   if (filters.labels?.length) {
     mustFilters.push({ terms: { labels: filters.labels } });
   }
+
   if (filters.dateFrom || filters.dateTo) {
     mustFilters.push({
       range: {
@@ -512,13 +523,11 @@ async searchEmails(params: {
     ? {
         bool: {
           should: [
-            // Exact phrase on subject gets highest boost
             {
               match_phrase: {
                 subject: { query: trimmed, boost: 4 },
               },
             },
-            // Multi-field relevance
             {
               multi_match: {
                 query:     trimmed,
@@ -529,7 +538,6 @@ async searchEmails(params: {
                 boost:     2,
               },
             },
-            // Phrase prefix for partial typing (autocomplete)
             {
               multi_match: {
                 query:  trimmed,
@@ -562,14 +570,14 @@ async searchEmails(params: {
     },
 
     sort: [
-      { _score:      { order: "desc" } },
-      { receivedAt:  { order: "desc" } },
+      { _score:     { order: "desc" } },
+      { receivedAt: { order: "desc" } },
     ],
 
     highlight: {
       fields: {
         subject: {
-          number_of_fragments: 0, 
+          number_of_fragments: 0,
           pre_tags:  ["<mark>"],
           post_tags: ["</mark>"],
         },
@@ -588,32 +596,22 @@ async searchEmails(params: {
   return {
     emails: hits.map((hit) => {
       const src = hit._source as UnifiedEmailDocument;
-
       return {
-        // Identifiers
-        id:         hit._id,
-        threadId:   src.threadId,
-        score:      hit._score ?? 0,
-
-        // Display
-        subject:    hit.highlight?.subject?.[0] ?? src.subject,  
-        snippet:    hit.highlight?.snippet?.[0] ?? src.snippet,  
-        receivedAt: src.receivedAt,
-
-        // Sender
-        from:       src.from,
-        to:         src.to,
-
-        // State
+        id:             hit._id,
+        threadId:       src.threadId,
+        score:          hit._score ?? 0,
+        subject:        hit.highlight?.subject?.[0] ?? src.subject,
+        snippet:        hit.highlight?.snippet?.[0] ?? src.snippet,
+        receivedAt:     src.receivedAt,
+        from:           src.from,
+        to:             src.to,
         isRead:         src.isRead,
         isStarred:      src.isStarred,
         isArchived:     src.isArchived,
         hasAttachments: src.hasAttachments,
         labels:         src.labels,
-
-        // Account
-        emailAddress: src.emailAddress,
-        provider:     src.provider,
+        emailAddress:   src.emailAddress,
+        provider:       src.provider,
       };
     }),
 

@@ -9,8 +9,8 @@ export interface SearchHistoryData {
     isStarred?: boolean;
     isArchived?: boolean;
     hasAttachments?: boolean;
-    from?: string;
-    to?: string;
+    from?: string[];
+    to?: string[];
     labels?: string[];
     dateFrom?: string;
     dateTo?: string;
@@ -31,11 +31,11 @@ export const searchHistoryQueue = new Queue<SearchHistoryData>(
         delay: 5000,
       },
       removeOnComplete: {
-        age: 3600, // 1 hour
+        age: 3600, 
         count: 100,
       },
       removeOnFail: {
-        age: 24 * 3600, // 1 day
+        age: 24 * 3600, 
       },
     },
   },
