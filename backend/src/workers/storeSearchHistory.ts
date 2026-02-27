@@ -20,6 +20,7 @@ async function processSearchHistory(job: Job<SearchHistoryData>) {
   logger.info(`Storing search history for user: ${userId}`);
 
   try {
+    // Generate random ID - we want to keep ALL searches for analytics
     const id = `${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     await elasticService.addSearchHistory({

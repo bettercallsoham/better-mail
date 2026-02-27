@@ -543,44 +543,34 @@ export const searchEmails = asyncHandler(
       });
     }
 
-   
-    const parseStringArray = (val: unknown): string[] | undefined => {
-      if (!val || typeof val !== "string") return undefined;
-      const trimmed = val.trim();
-      if (trimmed.startsWith("[")) {
-        try {
-          const parsed = JSON.parse(trimmed);
-          if (Array.isArray(parsed)) return parsed.map((s) => String(s).trim()).filter(Boolean);
-        } catch {}
+    let parsedLabels: string[] | undefined;
+    if (labels && typeof labels === "string") {
+      try {
+        parsedLabels = JSON.parse(labels);
+      } catch {
+        parsedLabels = [labels];
       }
-      return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
-    };
-
-    const parsedLabels     = parseStringArray(labels);
-    const parsedFilterFrom = parseStringArray(filterFrom);
-    const parsedFilterTo   = parseStringArray(filterTo);
-
-    const filters = {
-      isRead:         isRead         !== undefined ? isRead         === "true" : undefined,
-      isStarred:      isStarred      !== undefined ? isStarred      === "true" : undefined,
-      isArchived:     isArchived     !== undefined ? isArchived     === "true" : undefined,
-      hasAttachments: hasAttachments !== undefined ? hasAttachments === "true" : undefined,
-      from:           parsedFilterFrom,
-      to:             parsedFilterTo,
-      labels:         parsedLabels,
-      dateFrom:       dateFrom as string | undefined,
-      dateTo:         dateTo   as string | undefined,
-    };
+    }
 
     const elasticService  = new ElasticsearchService(elasticClient);
     const startTime       = Date.now();
 
     const result = await elasticService.searchEmails({
       emailAddresses,
-      query:  (query as string) ?? "",
+      query:  query as string,
       size:   size ? parseInt(size as string, 10) : 20,
       page:   page ? parseInt(page as string, 10) : 0,
-      filters,
+      filters: {
+        isRead:         isRead         !== undefined ? isRead         === "true" : undefined,
+        isStarred:      isStarred      !== undefined ? isStarred      === "true" : undefined,
+        isArchived:     isArchived     !== undefined ? isArchived     === "true" : undefined,
+        hasAttachments: hasAttachments !== undefined ? hasAttachments === "true" : undefined,
+        from:           filterFrom as string | undefined,
+        to:             filterTo   as string | undefined,
+        labels:         parsedLabels,
+        dateFrom:       dateFrom   as string | undefined,
+        dateTo:         dateTo     as string | undefined,
+      },
     });
 
     const executionTimeMs = Date.now() - startTime;
@@ -588,8 +578,18 @@ export const searchEmails = asyncHandler(
     searchHistoryQueue
       .add("store-search", {
         userId,
-        searchText:    query as string,
-        filters,
+        searchText: query as string,
+        filters: {
+          isRead:         isRead         !== undefined ? isRead         === "true" : undefined,
+          isStarred:      isStarred      !== undefined ? isStarred      === "true" : undefined,
+          isArchived:     isArchived     !== undefined ? isArchived     === "true" : undefined,
+          hasAttachments: hasAttachments !== undefined ? hasAttachments === "true" : undefined,
+          from:           filterFrom as string | undefined,
+          to:             filterTo   as string | undefined,
+          labels:         parsedLabels,
+          dateFrom:       dateFrom   as string | undefined,
+          dateTo:         dateTo     as string | undefined,
+        },
         resultsCount:  result.total,
         executionTimeMs,
         emailAddresses,

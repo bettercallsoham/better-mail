@@ -106,8 +106,8 @@ export interface SavedSearchFilters {
   isStarred?: boolean;
   isArchived?: boolean;
   hasAttachments?: boolean;
-  from?: string[];
-  to?: string[];
+  from?: string;
+  to?: string;
   labels?: string[];
   dateFrom?: string;
   dateTo?: string;
