@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, memo } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  memo,
+} from "react";
 import { useUIStore } from "@/lib/store/ui.store";
 import {
   useThreadEmails,
@@ -9,6 +16,7 @@ import {
 } from "@/features/mailbox/mailbox.query";
 import { useThreadNavigation } from "@/hooks/keyboard/useThreadNavigation";
 import { useThreadActions } from "@/hooks/keyboard/useThreadActions";
+import type { ThreadActions } from "@/hooks/keyboard/useThreadActions";
 import { ThreadRow } from "../ThreadRow";
 import { ThreadListToolbar } from "./ThreadListToolbar";
 import { ClientOnly } from "@/components/ClientOnly";
@@ -151,9 +159,7 @@ const SearchResultRow = memo(function SearchResultRow({
       onClick={onSelect}
       className={cn(
         "w-full flex items-start gap-3 px-4 py-3 border-b border-black/4 dark:border-white/3 text-left transition-colors",
-        isActive
-          ? "bg-black/4 dark:bg-white/5"
-          : "hover:bg-black/2 dark:hover:bg-white/2",
+        isActive ? "bg-black/4 dark:bg-white/5" : "hover:bg-black/2 dark:hover:bg-white/2",
       )}
     >
       <div className="mt-1.5 shrink-0">
@@ -191,47 +197,44 @@ const SearchResultRow = memo(function SearchResultRow({
   );
 });
 
-// ─── ThreadRow wrapper — owns actions + registers with focusedActionsRef ──────
-// Extracted so hooks aren't called conditionally inside a map
-function ThreadRowWithActions({
+// ─── Thread row with actions ──────────────────────────────────────────────────
+const ThreadRowWithActions = memo(function ThreadRowWithActions({
   thread,
   isActive,
   isFocused,
   isFlow,
-  emailAddress,
+  focusedActionsRef,
   onSelect,
   onHover,
-  focusedActionsRef,
 }: {
   thread:            ThreadEmail;
   isActive:          boolean;
   isFocused:         boolean;
   isFlow:            boolean;
-  emailAddress:      string;
+  focusedActionsRef: React.MutableRefObject<ThreadActions | null>;
   onSelect:          () => void;
   onHover:           () => void;
-  focusedActionsRef: React.MutableRefObject<ReturnType<typeof useThreadActions> | null>;
 }) {
-  const actions = useThreadActions(thread); 
+  const actions = useThreadActions(thread);
 
-  // When this row is hovered/focused, register its actions so keyboard shortcuts work
-  const handleHover = useCallback(() => {
-    focusedActionsRef.current = actions;
-    onHover();
-  }, [actions, focusedActionsRef, onHover]);
+  // Keep ref current so the list-level keyboard handler always has
+  // fresh callbacks without re-registering the listener
+  useLayoutEffect(() => {
+    if (isFocused) focusedActionsRef.current = actions;
+  });
 
   return (
     <ThreadRow
       thread={thread}
-      mode={isFlow ? "flow" : "velocity"}
       isActive={isActive}
       isFocused={isFocused}
+      mode={isFlow ? "flow" : "velocity"}
       actions={actions}
       onSelect={onSelect}
-      onHover={handleHover}
+      onHover={onHover}
     />
   );
-}
+});
 
 // ─── Normal thread list ───────────────────────────────────────────────────────
 function ThreadListContent({ email: emailAddress }: { email?: string }) {
@@ -248,9 +251,7 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
 
   const { prefetchThread } = useMailboxPrefetch();
 
-  // Ref that always holds the focused row's action callbacks
-  // useThreadNavigation reads this to fire S/U/E without any extra prop drilling
-  const focusedActionsRef = useRef<ReturnType<typeof useThreadActions> | null>(null);
+  const focusedActionsRef = useRef<ThreadActions | null>(null);
 
   const threadIdsKey = data.threadIds.join(",");
   useEffect(() => {
@@ -258,6 +259,29 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
   }, [threadIdsKey, setThreadIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useThreadNavigation(data.threadIds, focusedActionsRef);
+
+  // ── Single S/U/E handler — reads ref at call time, never stale ───────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) return;
+
+      const actions = focusedActionsRef.current;
+      if (!actions) return;
+
+      switch (e.key.toLowerCase()) {
+        case "s": e.preventDefault(); actions.star();     break;
+        case "u": e.preventDefault(); actions.markRead(); break;
+        case "e": e.preventDefault(); actions.archive();  break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
@@ -287,7 +311,6 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
               isActive={thread.threadId === activeThreadId}
               isFocused={thread.threadId === focusedThreadId}
               isFlow={isFlow}
-              emailAddress={emailAddress ?? ""}  // ✅ logged-in user's address
               focusedActionsRef={focusedActionsRef}
               onSelect={() => setActiveThread(thread.threadId)}
               onHover={() => {

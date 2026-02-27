@@ -2,37 +2,49 @@
 
 import { useCallback } from "react";
 import { useEmailAction } from "@/features/mailbox/mailbox.query";
-import type {
-  EmailActionType,
-  ThreadEmail,
-} from "@/features/mailbox/mailbox.type";
+import type { ThreadEmail } from "@/features/mailbox/mailbox.type";
 
-const toProvider = (p: "gmail" | "outlook"): "GOOGLE" | "OUTLOOK" =>
+const toProvider = (p: ThreadEmail["provider"]): "GOOGLE" | "OUTLOOK" =>
   p === "outlook" ? "OUTLOOK" : "GOOGLE";
 
-export function useThreadActions(thread: ThreadEmail) {
+export type ThreadActions = {
+  star:     () => void;
+  markRead: () => void;
+  archive:  () => void;
+};
+
+export function useThreadActions(thread: ThreadEmail): ThreadActions {
   const { mutate } = useEmailAction();
 
-  const run = useCallback(
-    (action: EmailActionType) =>
-      mutate({
-        from: thread.emailAddress,
-        provider: toProvider(thread.provider),
-        messageIds: [thread.lastMessageId],
-        action,
-      }),
-    [mutate, thread.emailAddress, thread.lastMessageId, thread.provider],
+  const star = useCallback(() =>
+    mutate({
+      from:       thread.emailAddress,
+      provider:   toProvider(thread.provider),
+      messageIds: [thread.lastMessageId],
+      action:     thread.isStarred ? "unstar" : "star",
+    }),
+    [mutate, thread.emailAddress, thread.lastMessageId, thread.provider, thread.isStarred],
   );
 
-  const star = useCallback(
-    () => run(thread.isStarred ? "unstar" : "star"),
-    [run, thread.isStarred],
+  const markRead = useCallback(() =>
+    mutate({
+      from:       thread.emailAddress,
+      provider:   toProvider(thread.provider),
+      messageIds: [thread.lastMessageId],
+      action:     thread.isUnread ? "mark_read" : "mark_unread",
+    }),
+    [mutate, thread.emailAddress, thread.lastMessageId, thread.provider, thread.isUnread],
   );
-  const markRead = useCallback(
-    () => run(thread.isUnread ? "mark_read" : "mark_unread"),
-    [run, thread.isUnread],
+
+  const archive = useCallback(() =>
+    mutate({
+      from:       thread.emailAddress,
+      provider:   toProvider(thread.provider),
+      messageIds: [thread.lastMessageId],
+      action:     "archive",
+    }),
+    [mutate, thread.emailAddress, thread.lastMessageId, thread.provider],
   );
-  const archive = useCallback(() => run("archive"), [run]);
 
   return { star, markRead, archive };
 }

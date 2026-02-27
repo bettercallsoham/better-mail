@@ -7,6 +7,7 @@ import { useSearchState } from "./useSearchState";
 import { SectionHead, RecentRow, ThreadRow, EmptyState, Spinner } from "./ResultsList";
 import { PreviewPane } from "./PreviewPane";
 import { FilterChips } from "./FilterChips";
+import { Kbd } from "@/components/ui/kbd";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Module-level constants — never re-created
@@ -226,9 +227,9 @@ export function MailSearchCommand({ open, onOpenChange }: Props) {
                     </p>
                     <p className="text-[11px] text-gray-300 dark:text-white/18">
                       Or press{" "}
-                      <kbd className="px-1 py-px rounded bg-gray-100 dark:bg-white/6 font-mono text-[10px]">
+                      <Kbd className="px-1 py-px rounded bg-gray-100 dark:bg-white/6 font-mono text-[10px]">
                         ↵
-                      </kbd>{" "}
+                      </Kbd>{" "}
                       to search anyway
                     </p>
                   </div>
@@ -258,9 +259,9 @@ export function MailSearchCommand({ open, onOpenChange }: Props) {
                         )}
                       </div>
                       {i === 0 && (
-                        <kbd className="shrink-0 px-1.5 py-px rounded bg-gray-100 dark:bg-white/6 font-mono text-[10px] text-gray-400 dark:text-white/25">
+                        <Kbd className="shrink-0 px-1.5 py-px rounded bg-gray-100 dark:bg-white/6 font-mono text-[10px] text-gray-400 dark:text-white/25">
                           tab
-                        </kbd>
+                        </Kbd>
                       )}
                     </button>
                   ))
@@ -299,9 +300,9 @@ export function MailSearchCommand({ open, onOpenChange }: Props) {
                         className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-gray-400 dark:text-white/30 hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors rounded-md mx-1 text-left"
                         style={{ width: "calc(100% - 8px)" }}
                       >
-                        <kbd className="text-[10px] px-1 py-px rounded bg-gray-100 dark:bg-white/6 font-mono text-gray-400 dark:text-white/25">
+                        <Kbd className="text-[10px] px-1 py-px rounded bg-gray-100 dark:bg-white/6 font-mono text-gray-400 dark:text-white/25">
                           ↵
-                        </kbd>
+                        </Kbd>
                         See all {s.total} results
                       </button>
                     )}
@@ -380,9 +381,9 @@ export function MailSearchCommand({ open, onOpenChange }: Props) {
                 key={key}
                 className="flex items-center gap-1 text-[11px] text-gray-300 dark:text-white/20 select-none"
               >
-                <kbd className="px-1.5 py-px rounded bg-gray-100 dark:bg-white/6 font-mono text-[10px] text-gray-400 dark:text-white/28">
+                <Kbd className="px-1.5 py-px rounded bg-gray-100 dark:bg-white/6 font-mono text-[10px] text-gray-400 dark:text-white/28">
                   {key}
-                </kbd>
+                </Kbd>
                 {label}
               </span>
             ))}

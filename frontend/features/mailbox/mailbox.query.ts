@@ -15,16 +15,33 @@ import {
   CreateDraftParams,
   CreateSavedSearchParams,
   EmailActionParams,
+  EmailActionType,
   GetThreadEmailsResponse,
   InboxZeroParams,
   ReplyEmailParams,
   SearchQueryParams,
   SendEmailParams,
+  ThreadEmail,
   UpdateDraftParams,
   UpdateInboxStateParams,
   UpdateSavedSearchParams,
   UpsertThreadNoteParams,
 } from "./mailbox.type";
+import { toast } from "sonner";
+
+type RawThreadPage = {
+  success: boolean;
+  data: {
+    threads: ThreadEmail[];
+    nextPage: number | null;
+  };
+};
+
+type RawThreadCache = {
+  pages: RawThreadPage[];
+  pageParams: unknown[];
+};
+
 
 // ─── Query keys ───────────────────────────────────────────────────────────────
 export const mailboxKeys = {
@@ -263,8 +280,6 @@ export function useDraft(id: string) {
   });
 }
 
-
-
 export function useCreateDraft() {
   return useMutation({
     mutationFn: (params: CreateDraftParams) =>
@@ -319,14 +334,86 @@ export function useReplyEmail() {
   });
 }
 
+
 export function useEmailAction() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (params: EmailActionParams) =>
       mailboxService.emailAction(params),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: mailboxKeys.threads() });
-      queryClient.invalidateQueries({ queryKey: mailboxKeys.inboxZero() });
+
+    onMutate: (params) => {
+    
+      const applyToThread = (thread: ThreadEmail): ThreadEmail | null => {
+        if (!params.messageIds.includes(thread.lastMessageId)) return thread;
+        switch (params.action) {
+          case "star":        return { ...thread, isStarred: true  };
+          case "unstar":      return { ...thread, isStarred: false };
+          case "mark_read":   return { ...thread, isUnread:  false };
+          case "mark_unread": return { ...thread, isUnread:  true  };
+          case "archive":
+          case "delete":      return null; // signal removal
+          default:            return thread;
+        }
+      };
+
+      // Snapshot raw cache before patching (for rollback)
+      const prevThreads = queryClient.getQueriesData<RawThreadCache>({
+        queryKey: ["threads"],
+        exact: false,
+      });
+
+      // Patch immediately — no await
+      queryClient.setQueriesData<RawThreadCache>(
+        { queryKey: ["threads"], exact: false },
+        (old) => {
+          if (!old?.pages) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              data: {
+                ...page.data,
+                threads: page.data.threads
+                  .map(applyToThread)
+                  .filter((t): t is ThreadEmail => t !== null),
+              },
+            })),
+          };
+        },
+      );
+
+   
+      queryClient.cancelQueries({ queryKey: ["threads"], exact: false });
+
+      return { prevThreads };
+    },
+
+    onError: (_err, params, context) => {
+      // Roll back optimistic patch
+      context?.prevThreads?.forEach(([key, data]) =>
+        queryClient.setQueryData(key, data),
+      );
+
+      const labels: Record<EmailActionType, string> = {
+        star:        "star",
+        unstar:      "unstar",
+        mark_read:   "mark as read",
+        mark_unread: "mark as unread",
+        archive:     "archive",
+        unarchive:   "unarchive",
+        delete:      "delete",
+      };
+
+      toast.error(`Failed to ${labels[params.action]}`, {
+        description: "Changes reverted. Please try again.",
+        duration: 4000,
+      });
+    },
+
+    onSettled: () => {
+      // Resync from server after mutation settles
+      queryClient.invalidateQueries({ queryKey: ["threads"], exact: false });
     },
   });
 }

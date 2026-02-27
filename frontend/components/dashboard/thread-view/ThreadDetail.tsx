@@ -45,6 +45,7 @@ import { useThreadSummary } from "@/features/ai/ai.query";
 import type { FullEmail } from "@/features/mailbox/mailbox.type";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Kbd } from "@/components/ui/kbd";
 
 // ─── Label metadata ────────────────────────────────────────────────────────────
 const LABEL_META: Record<string, { icon: React.ReactNode; color: string; name: string }> = {
@@ -166,7 +167,7 @@ function TipBtn({
         </TooltipTrigger>
         <TooltipContent side="bottom" className="flex items-center gap-1.5">
           <span className="text-[11px]">{tip}</span>
-          {kbd && <kbd className="text-[9px] font-mono bg-white/10 px-1 py-px rounded">{kbd}</kbd>}
+          {kbd && <Kbd className="text-[9px] font-mono bg-white/10 px-1 py-px rounded">{kbd}</Kbd>}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

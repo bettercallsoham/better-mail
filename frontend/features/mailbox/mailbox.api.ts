@@ -163,6 +163,7 @@ export const mailboxService = {
     }),
 
   emailAction: (params: EmailActionParams) =>
+    
     apiClient<EmailActionResponse>("/mail/email-action", {
       method: "POST",
       body: JSON.stringify(params),

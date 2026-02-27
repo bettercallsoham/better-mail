@@ -6,13 +6,20 @@ import { cn } from "@/lib/utils";
 import type { ThreadEmail } from "@/features/mailbox/mailbox.type";
 import { formatThreadDate } from "@/lib/date";
 import type { useThreadActions } from "@/hooks/keyboard/useThreadActions";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Kbd } from "@/components/ui/kbd";
 
 interface ThreadRowProps {
   thread:    ThreadEmail;
   isActive:  boolean;
   isFocused: boolean;
   mode:      "velocity" | "flow";
-  actions:   ReturnType<typeof useThreadActions>; // ✅ comes from parent, not called internally
+  actions:   ReturnType<typeof useThreadActions>;
   onSelect:  () => void;
   onHover:   () => void;
 }
@@ -70,73 +77,113 @@ function LabelDot({ label }: { label: string }) {
   );
 }
 
-// ─── Hover action buttons ─────────────────────────────────────────────────────
-function HoverActions({
+// ─── Action buttons ───────────────────────────────────────────────────────────
+function ActionButtons({
   thread,
   onStar,
   onMarkRead,
   onArchive,
-  variant = "flow",
+  size = "default",
 }: {
   thread:     ThreadEmail;
   onStar:     (e: React.MouseEvent) => void;
   onMarkRead: (e: React.MouseEvent) => void;
   onArchive:  (e: React.MouseEvent) => void;
-  variant?:   "flow" | "velocity";
+  size?:      "default" | "sm";
 }) {
   const btnCls = cn(
     "flex items-center justify-center rounded-md transition-all duration-100",
     "text-gray-400 dark:text-white/25",
     "hover:text-gray-700 dark:hover:text-white/70",
-    "hover:bg-black/6 dark:hover:bg-white/8",
-    variant === "velocity" ? "w-6 h-6" : "w-7 h-7",
+    "hover:bg-black/[0.06] dark:hover:bg-white/[0.08]",
+    size === "sm" ? "w-6 h-6" : "w-7 h-7",
   );
-  const iconSz = variant === "velocity" ? 13 : 14;
+  const iconSz = size === "sm" ? 13 : 14;
 
   return (
-    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-100">
-      <button
-        title={thread.isStarred ? "Unstar (S)" : "Star (S)"}
-        onClick={onStar}
-        className={cn(btnCls, thread.isStarred && "!opacity-100")}
+    <TooltipProvider delayDuration={600}>
+      <div
+        className={cn(
+          "flex items-center gap-0.5 shrink-0",
+          "opacity-0 group-hover:opacity-100 transition-opacity duration-100",
+          thread.isStarred && "opacity-100",
+        )}
       >
-        <Star
-          size={iconSz}
-          className={cn(
-            thread.isStarred
-              ? "fill-amber-400 text-amber-400"
-              : "text-gray-400 dark:text-white/30",
-          )}
-        />
-      </button>
+        {/* Star */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onStar}
+              className={cn(btnCls, thread.isStarred && "!opacity-100 !text-amber-400")}
+              aria-label={thread.isStarred ? "Unstar" : "Star"}
+            >
+              <Star
+                size={iconSz}
+                className={cn(
+                  thread.isStarred
+                    ? "fill-amber-400 text-amber-400"
+                    : "text-gray-400 dark:text-white/30",
+                )}
+              />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="flex items-center gap-1.5 py-1 px-2">
+            <span className="text-[11px]">{thread.isStarred ? "Unstar" : "Star"}</span>
+            <Kbd className="text-[9px]">S</Kbd>
+          </TooltipContent>
+        </Tooltip>
 
-      <button
-        title={thread.isUnread ? "Mark read (U)" : "Mark unread (U)"}
-        onClick={onMarkRead}
-        className={btnCls}
-      >
-        {thread.isUnread ? <MailOpen size={iconSz} /> : <Mail size={iconSz} />}
-      </button>
+        <div className="h-3 w-px bg-gray-200 dark:bg-white/10 mx-0.5" />
 
-      <button title="Archive (E)" onClick={onArchive} className={btnCls}>
-        <Archive size={iconSz} />
-      </button>
-    </div>
+        {/* Mark read/unread */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onMarkRead}
+              className={btnCls}
+              aria-label={thread.isUnread ? "Mark read" : "Mark unread"}
+            >
+              {thread.isUnread ? <MailOpen size={iconSz} /> : <Mail size={iconSz} />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="flex items-center gap-1.5 py-1 px-2">
+            <span className="text-[11px]">{thread.isUnread ? "Mark read" : "Mark unread"}</span>
+            <Kbd className="text-[9px]">U</Kbd>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Archive */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onArchive}
+              className={btnCls}
+              aria-label="Archive"
+            >
+              <Archive size={iconSz} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="flex items-center gap-1.5 py-1 px-2">
+            <span className="text-[11px]">Archive</span>
+            <Kbd className="text-[9px]">E</Kbd>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
   );
 }
 
-// ─── Row meta (labels + actions + date) ──────────────────────────────────────
+// ─── Row meta (labels + buttons + date) ───────────────────────────────────────
 function RowMeta({
-  thread, onStar, onMarkRead, onArchive, variant,
+  thread, onStar, onMarkRead, onArchive, size,
 }: {
   thread:     ThreadEmail;
   onStar:     (e: React.MouseEvent) => void;
   onMarkRead: (e: React.MouseEvent) => void;
   onArchive:  (e: React.MouseEvent) => void;
-  variant:    "flow" | "velocity";
+  size?:      "default" | "sm";
 }) {
   const labels = visibleLabels(thread.labels ?? []);
-
   return (
     <div className="flex items-center gap-1.5 shrink-0">
       {labels.length > 0 && (
@@ -144,12 +191,12 @@ function RowMeta({
           {labels.slice(0, 3).map((l) => <LabelDot key={l} label={l} />)}
         </div>
       )}
-      <HoverActions
+      <ActionButtons
         thread={thread}
         onStar={onStar}
         onMarkRead={onMarkRead}
         onArchive={onArchive}
-        variant={variant}
+        size={size}
       />
       <span className={cn(
         "text-[11px] tabular-nums whitespace-nowrap group-hover:opacity-0 transition-opacity duration-100",
@@ -165,12 +212,11 @@ function RowMeta({
 
 // ─── Flow Row ─────────────────────────────────────────────────────────────────
 function FlowRow({ thread, isActive, isFocused, actions, onSelect, onHover }: Omit<ThreadRowProps, "mode">) {
-  const { star, markRead, archive } = actions; // ✅ from props, not hook
-  const sender   = thread.from.name || thread.from.email;
+  const { star, markRead, archive } = actions;
   const hue      = senderHue(thread.from.email);
   const initials = senderInitials(thread.from.name, thread.from.email);
+  const sender   = thread.from.name || thread.from.email;
   const isUnread = thread.isUnread;
-
   const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
 
   return (
@@ -180,11 +226,11 @@ function FlowRow({ thread, isActive, isFocused, actions, onSelect, onHover }: Om
       onKeyDown={(e) => e.key === "Enter" && onSelect()}
       className={cn(
         "group relative flex items-center gap-3",
-        "mx-2 my-px px-3 py-2.75 rounded-xl",
+        "mx-2 my-px px-3 py-2.5 rounded-xl",
         "cursor-pointer select-none transition-colors duration-100",
-        isFocused && !isActive && "bg-black/4 dark:bg-zinc-700/50",
-        !isFocused && !isActive && "hover:bg-black/3 dark:hover:bg-zinc-800/60",
-        isActive && "bg-black/6 dark:bg-zinc-700/25 dark:ring-1 dark:ring-white/8",
+        isFocused && !isActive && "bg-black/[0.04] dark:bg-zinc-700/50",
+        !isFocused && !isActive && "hover:bg-black/[0.03] dark:hover:bg-zinc-800/60",
+        isActive && "bg-black/[0.06] dark:bg-zinc-700/25 dark:ring-1 dark:ring-white/[0.08]",
       )}
     >
       <span
@@ -193,7 +239,6 @@ function FlowRow({ thread, isActive, isFocused, actions, onSelect, onHover }: Om
       >
         {initials}
       </span>
-
       <div className="flex-1 min-w-0 flex flex-col gap-[3px]">
         <div className="flex items-center gap-2">
           <p className={cn(
@@ -204,7 +249,7 @@ function FlowRow({ thread, isActive, isFocused, actions, onSelect, onHover }: Om
           )}>
             {sender}
           </p>
-          <RowMeta thread={thread} onStar={stop(star)} onMarkRead={stop(markRead)} onArchive={stop(archive)} variant="flow" />
+          <RowMeta thread={thread} onStar={stop(star)} onMarkRead={stop(markRead)} onArchive={stop(archive)} size="default" />
         </div>
         <p className={cn(
           "truncate leading-none",
@@ -221,10 +266,9 @@ function FlowRow({ thread, isActive, isFocused, actions, onSelect, onHover }: Om
 
 // ─── Velocity Row ─────────────────────────────────────────────────────────────
 function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }: Omit<ThreadRowProps, "mode">) {
-  const { star, markRead, archive } = actions; // ✅ from props, not hook
+  const { star, markRead, archive } = actions;
   const sender   = thread.from.name || thread.from.email;
   const isUnread = thread.isUnread;
-
   const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
 
   return (
@@ -235,12 +279,12 @@ function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }
       className={cn(
         "group relative flex items-center gap-3 px-4 h-13",
         "cursor-pointer select-none overflow-hidden",
-        "border-b border-black/4 dark:border-white/4",
+        "border-b border-black/[0.04] dark:border-white/[0.04]",
         "transition-colors duration-75",
-        isFocused && !isActive && "bg-black/2.5 dark:bg-zinc-700/50",
-        !isFocused && !isActive && "hover:bg-black/2 dark:hover:bg-zinc-800/60",
+        isFocused && !isActive && "bg-black/[0.025] dark:bg-zinc-700/50",
+        !isFocused && !isActive && "hover:bg-black/[0.02] dark:hover:bg-zinc-800/60",
         isActive && [
-          "bg-blue-50/80 dark:bg-zinc-700/25 dark:ring-inset dark:ring-1 dark:ring-white/8",
+          "bg-blue-50/80 dark:bg-zinc-700/25 dark:ring-inset dark:ring-1 dark:ring-white/[0.08]",
           "before:absolute before:inset-y-0 before:left-0 before:w-0.5",
           "before:bg-blue-500 dark:before:bg-white/70 before:rounded-r-full",
         ],
@@ -249,7 +293,6 @@ function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }
       <div className="w-2 shrink-0 flex justify-center">
         {isUnread && <span className="block w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400" />}
       </div>
-
       <span className={cn(
         "shrink-0 w-36 truncate text-[13px] tracking-[-0.01em]",
         isUnread
@@ -258,7 +301,6 @@ function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }
       )}>
         {sender}
       </span>
-
       <span className={cn(
         "flex-1 min-w-0 truncate text-[13px] tracking-[-0.01em]",
         isUnread
@@ -267,8 +309,7 @@ function VelocityRow({ thread, isActive, isFocused, actions, onSelect, onHover }
       )}>
         {thread.subject || "(no subject)"}
       </span>
-
-      <RowMeta thread={thread} onStar={stop(star)} onMarkRead={stop(markRead)} onArchive={stop(archive)} variant="velocity" />
+      <RowMeta thread={thread} onStar={stop(star)} onMarkRead={stop(markRead)} onArchive={stop(archive)} size="sm" />
     </div>
   );
 }
