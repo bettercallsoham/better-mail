@@ -26,7 +26,6 @@ import type { FullEmail } from "@/features/mailbox/mailbox.type";
 import { cn } from "@/lib/utils";
 
 import { TipBtn }        from "./components/TipBtn";
-import { AISummary }     from "./components/AISummary";
 import { EmailCard }     from "./components/EmailCard";
 import { QuickReply }    from "./components/QuickReply";
 import { ThreadMeta }    from "./components/ThreadMeta";
@@ -117,19 +116,7 @@ function SheetContent({ threadId }: { threadId: string }) {
             <IconChevronRight size={15} />
           </TipBtn>
           <div className="w-px h-4 bg-black/[0.07] dark:bg-white/[0.07] mx-0.5" />
-          <TipBtn
-            tip={anyStarred ? "Unstar" : "Star"} kbd="S"
-            onClick={handleStar}
-            className={anyStarred ? "text-amber-400 hover:text-amber-500" : undefined}
-          >
-            {anyStarred
-              ? <IconStarFilled size={15} className="text-amber-400" />
-              : <IconStar size={15} />
-            }
-          </TipBtn>
-          <TipBtn tip={isArchived ? "Move to inbox" : "Archive"} kbd="E" onClick={handleArchive}>
-            {isArchived ? <IconArchiveOff size={15} /> : <IconArchive size={15} />}
-          </TipBtn>
+     
           <TipBtn
             tip="Delete" kbd="#"
             className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
@@ -140,15 +127,6 @@ function SheetContent({ threadId }: { threadId: string }) {
         </div>
       </div>
 
-      {/* ── AI summary bar ── */}
-      <Suspense fallback={null}>
-        <AISummary threadId={threadId} emailAddress={emailAddr} variant="bar" />
-      </Suspense>
-
-      {/* ── Meta (participants, date, labels) ── */}
-      <div className="shrink-0 px-5 py-2.5 border-b border-black/[0.04] dark:border-white/[0.05]">
-        <ThreadMeta emails={emails} dateRange={dateRange} />
-      </div>
 
       {/* ── Email cards ── */}
       <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-2">

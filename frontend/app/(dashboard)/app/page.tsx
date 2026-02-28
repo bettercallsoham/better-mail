@@ -1,15 +1,24 @@
 "use client";
 
 import { useUIStore } from "@/lib/store/ui.store";
-import { ThreadList } from "@/components/dashboard/thread-view/threadList/ThreadList";
-import { ThreadDetail } from "@/components/dashboard/thread-view/ThreadDetail";
-import { SenderPane } from "@/components/dashboard/thread-view/SenderPane";
-import { EmailOverlay } from "@/components/dashboard/thread-view/EmailOverlay";
+import { ThreadList }      from "@/components/dashboard/thread-view/threadList/ThreadList";
+import { ThreadDetail }    from "@/components/dashboard/thread-view/ThreadDetail";
+import { SenderPane }      from "@/components/dashboard/thread-view/SenderPane";
+import { ThreadSideSheet } from "@/components/dashboard/thread-view/ThreadSheet"
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mobile detection hook
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MIN_SPLIT: Record<string, number> = { velocity: 45, flow: 32 };
+const MAX_SPLIT: Record<string, number> = { velocity: 75, flow: 60 };
+/** Fallback default — store already seeds these but used as clamp reference */
+const DEFAULT_SPLIT: Record<string, number> = { velocity: 62, flow: 42 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mobile detection
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useIsMobile(breakpoint = 768) {
@@ -25,35 +34,31 @@ function useIsMobile(breakpoint = 768) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mobile layout — full-screen ThreadList, slide-in detail overlay
+// Mobile layout
 // ─────────────────────────────────────────────────────────────────────────────
 
 function MobileLayout() {
-  const layoutMode     = useUIStore((s) => s.layoutMode);
-  const activeThreadId = useUIStore((s) => s.activeThreadId);
+  const layoutMode      = useUIStore((s) => s.layoutMode);
+  const activeThreadId  = useUIStore((s) => s.activeThreadId);
   const setActiveThread = useUIStore((s) => s.setActiveThread);
   const showDetail      = !!activeThreadId;
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Thread list — always mounted, slides left when detail opens */}
-      <div
-        className={cn(
-          "absolute inset-0 transition-transform duration-300 ease-in-out",
-          showDetail ? "-translate-x-full" : "translate-x-0",
-        )}
-      >
+      {/* Thread list — slides left when detail opens */}
+      <div className={cn(
+        "absolute inset-0 transition-transform duration-300 ease-in-out",
+        showDetail ? "-translate-x-full" : "translate-x-0",
+      )}>
         <ThreadList className="h-full" />
       </div>
 
       {/* Detail pane — slides in from right */}
-      <div
-        className={cn(
-          "absolute inset-0 bg-white dark:bg-neutral-950",
-          "transition-transform duration-300 ease-in-out",
-          showDetail ? "translate-x-0" : "translate-x-full",
-        )}
-      >
+      <div className={cn(
+        "absolute inset-0 bg-white dark:bg-neutral-950",
+        "transition-transform duration-300 ease-in-out",
+        showDetail ? "translate-x-0" : "translate-x-full",
+      )}>
         {/* Back button */}
         <div className="flex items-center gap-2 px-4 h-11 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
           <button
@@ -75,46 +80,31 @@ function MobileLayout() {
         </div>
       </div>
 
-      <EmailOverlay />
+      {/* Side sheet handles velocity + zen on mobile too */}
+      <ThreadSideSheet />
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Desktop layout — resizable panels (manual, no library pixel-value bugs)
+// Desktop layout
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY_PREFIX = "mail-panel-split-";
-const DEFAULT_SPLIT: Record<string, number> = {
-  velocity: 62,  // percent for thread list
-  flow:     42,
-};
-const MIN_SPLIT:  Record<string, number> = { velocity: 45, flow: 32 };
-const MAX_SPLIT:  Record<string, number> = { velocity: 75, flow: 60 };
-
-function readSplit(mode: string): number {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY_PREFIX + mode);
-    if (v) return Math.max(MIN_SPLIT[mode] ?? 40, Math.min(MAX_SPLIT[mode] ?? 70, Number(v)));
-  } catch {}
-  return DEFAULT_SPLIT[mode] ?? 50;
-}
-
 function DesktopLayout() {
-  const layoutMode     = useUIStore((s) => s.layoutMode);
-  const activeThreadId = useUIStore((s) => s.activeThreadId);
+  const layoutMode  = useUIStore((s) => s.layoutMode);
+  // ── Persisted split — read from store (hydrated from localStorage) ─────────
+  const storedSplit = useUIStore((s) => s.splitPct);
+  const setSplitPct = useUIStore((s) => s.setSplitPct);
 
-  const [splitPct, setSplitPct] = useState(() => readSplit(layoutMode));
+  // Clamp whatever is in the store into valid range for this mode
+  const rawPct  = storedSplit[layoutMode] ?? DEFAULT_SPLIT[layoutMode] ?? 50;
+  const splitPct = Math.max(
+    MIN_SPLIT[layoutMode] ?? 40,
+    Math.min(MAX_SPLIT[layoutMode] ?? 70, rawPct),
+  );
+
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging     = useRef(false);
-
-  // Reset split when mode changes
-  useEffect(() => { setSplitPct(readSplit(layoutMode)); }, [layoutMode]);
-
-  // Save split on change
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY_PREFIX + layoutMode, String(splitPct)); } catch {}
-  }, [splitPct, layoutMode]);
 
   const startDrag = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -126,24 +116,26 @@ function DesktopLayout() {
       const pct  = ((ev.clientX - rect.left) / rect.width) * 100;
       const min  = MIN_SPLIT[layoutMode] ?? 40;
       const max  = MAX_SPLIT[layoutMode] ?? 70;
-      setSplitPct(Math.max(min, Math.min(max, pct)));
+      // Write directly to store — persisted automatically via zustand/persist
+      setSplitPct(layoutMode, Math.max(min, Math.min(max, pct)));
     };
 
     const onUp = () => {
       dragging.current = false;
       window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup",  onUp);
+      window.removeEventListener("mouseup",   onUp);
     };
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup",   onUp);
   };
 
+  // ── Zen mode — list only, side sheet opens over it ───────────────────────
   if (layoutMode === "zen") {
     return (
       <>
         <ThreadList className="h-full" />
-        <EmailOverlay />
+        <ThreadSideSheet />
       </>
     );
   }
@@ -151,7 +143,10 @@ function DesktopLayout() {
   return (
     <div ref={containerRef} className="flex h-full w-full overflow-hidden">
       {/* Left — thread list */}
-      <div className="h-full overflow-hidden flex-shrink-0" style={{ width: `${splitPct}%` }}>
+      <div
+        className="h-full overflow-hidden flex-shrink-0"
+        style={{ width: `${splitPct}%` }}
+      >
         <ThreadList className="h-full" />
       </div>
 
@@ -161,6 +156,7 @@ function DesktopLayout() {
         className={cn(
           "relative w-px bg-black/[0.06] dark:bg-white/[0.06] flex-shrink-0 cursor-col-resize",
           "hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors duration-150",
+          // Widen the hit area without affecting layout
           "after:absolute after:inset-y-0 after:-left-1.5 after:-right-1.5 after:content-['']",
         )}
       />
@@ -173,18 +169,23 @@ function DesktopLayout() {
         }
       </div>
 
-      <EmailOverlay />
+      {/*
+        ThreadSideSheet — renders as a portal so it's outside this flex container.
+        In velocity mode it slides in from the right edge of the viewport,
+        sitting on top of the SenderPane area.
+      */}
+      <ThreadSideSheet />
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Root — switches between mobile and desktop layouts
+// Root
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AppPage() {
   const isMobile = useIsMobile(768);
-  // Avoid layout flash on first render — render nothing until breakpoint is known
+  // Avoid layout flash before breakpoint is known
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;

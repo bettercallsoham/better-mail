@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 
 export type LayoutMode = "velocity" | "flow" | "zen";
@@ -16,38 +17,47 @@ export interface SearchFilters {
 }
 
 interface LayoutSlice {
-  layoutMode: LayoutMode;
+  layoutMode:       LayoutMode;
   sidebarCollapsed: boolean;
-  setLayoutMode: (mode: LayoutMode) => void;
-  toggleSidebar: () => void;
+  /** Per-mode panel split percentage (thread list width %) */
+  splitPct: Record<string, number>;
+  setLayoutMode:       (mode: LayoutMode) => void;
+  toggleSidebar:       () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setSplitPct:         (mode: string, pct: number) => void;
 }
 
 interface MailboxSlice {
   selectedEmailAddress: string | null;
-  activeFolder: string;
-  searchQuery: string | null;
-  searchFilters: SearchFilters | null;
+  activeFolder:         string;
+  searchQuery:          string | null;
+  searchFilters:        SearchFilters | null;
   setSelectedEmailAddress: (email: string | null) => void;
-  setActiveFolder: (folder: string) => void;
-  setSearchQuery: (query: string | null, filters?: SearchFilters | null) => void;
-  clearSearch: () => void;
+  setActiveFolder:         (folder: string) => void;
+  setSearchQuery:          (query: string | null, filters?: SearchFilters | null) => void;
+  clearSearch:             () => void;
 }
 
 interface ThreadSlice {
-  activeThreadId: string | null;
-  focusedThreadId: string | null;
+  activeThreadId:    string | null;
+  focusedThreadId:   string | null;
   selectedThreadIds: string[];
-  threadIds: string[];
-  setActiveThread: (id: string | null) => void;
-  setFocusedThread: (id: string | null) => void;
-  setThreadIds: (ids: string[]) => void;
+  threadIds:         string[];
+  setActiveThread:       (id: string | null) => void;
+  setFocusedThread:      (id: string | null) => void;
+  setThreadIds:          (ids: string[]) => void;
   toggleThreadSelection: (id: string) => void;
-  clearSelection: () => void;
+  clearSelection:        () => void;
 }
 
 type UIState = LayoutSlice & MailboxSlice & ThreadSlice;
 
+// ─── Default split percentages ─────────────────────────────────────────────────
+const DEFAULT_SPLIT: Record<string, number> = {
+  velocity: 62,
+  flow:     42,
+  zen:      100,
+};
 
 const FOLDER_RESET = {
   activeThreadId:    null,
@@ -62,87 +72,119 @@ const SEARCH_RESET = {
   searchFilters: null,
 } as const;
 
+// ─── Keys to persist across sessions ──────────────────────────────────────────
+// Thread state is intentionally NOT persisted — fresh inbox on every load.
+const PERSISTED_KEYS: (keyof UIState)[] = [
+  "layoutMode",
+  "sidebarCollapsed",
+  "splitPct",
+  "selectedEmailAddress",
+  "activeFolder",
+];
 
-export const useUIStore = create<UIState>()((set, get) => ({
-  layoutMode:       "velocity",
-  sidebarCollapsed: false,
+export const useUIStore = create<UIState>()(
+  persist(
+    (set, get) => ({
+      // ── Layout ──────────────────────────────────────────────────────────────
+      layoutMode:       "velocity",
+      sidebarCollapsed: false,
+      splitPct:         { ...DEFAULT_SPLIT },
 
-  setLayoutMode: (mode) =>
-    set({ layoutMode: mode, activeThreadId: null, focusedThreadId: null }),
+      setLayoutMode: (mode) =>
+        set({ layoutMode: mode, activeThreadId: null, focusedThreadId: null }),
 
-  toggleSidebar: () =>
-    set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      toggleSidebar: () =>
+        set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
-  setSidebarCollapsed: (collapsed) =>
-    set({ sidebarCollapsed: collapsed }),
+      setSidebarCollapsed: (collapsed) =>
+        set({ sidebarCollapsed: collapsed }),
 
-  selectedEmailAddress: null,
-  activeFolder:         "inbox",
-  searchQuery:          null,
-  searchFilters:        null,
+      setSplitPct: (mode, pct) =>
+        set((s) => ({ splitPct: { ...s.splitPct, [mode]: pct } })),
 
-  setSelectedEmailAddress: (email) =>
-    set({ selectedEmailAddress: email, ...FOLDER_RESET }),
+      // ── Mailbox ─────────────────────────────────────────────────────────────
+      selectedEmailAddress: null,
+      activeFolder:         "inbox",
+      searchQuery:          null,
+      searchFilters:        null,
 
-  setActiveFolder: (folder) =>
-    set({ activeFolder: folder, ...FOLDER_RESET }),
+      setSelectedEmailAddress: (email) =>
+        set({ selectedEmailAddress: email, ...FOLDER_RESET }),
 
-  setSearchQuery: (query, filters = null) =>
-    set({
-      searchQuery:       query,
-      searchFilters:     filters,
+      setActiveFolder: (folder) =>
+        set({ activeFolder: folder, ...FOLDER_RESET }),
+
+      setSearchQuery: (query, filters = null) =>
+        set({
+          searchQuery:       query,
+          searchFilters:     filters,
+          activeThreadId:    null,
+          selectedThreadIds: [],
+        }),
+
+      clearSearch: () => set(SEARCH_RESET),
+
+      // ── Thread ──────────────────────────────────────────────────────────────
       activeThreadId:    null,
+      focusedThreadId:   null,
       selectedThreadIds: [],
+      threadIds:         [],
+
+      setActiveThread: (id) =>
+        set({
+          activeThreadId:    id,
+          focusedThreadId:   id ?? get().focusedThreadId,
+          selectedThreadIds: id ? [id] : [],
+        }),
+
+      setFocusedThread:  (id)  => set({ focusedThreadId: id }),
+      setThreadIds:      (ids) => set({ threadIds: ids }),
+
+      toggleThreadSelection: (id) => {
+        const cur = get().selectedThreadIds;
+        set({
+          selectedThreadIds: cur.includes(id)
+            ? cur.filter((t) => t !== id)
+            : [...cur, id],
+        });
+      },
+
+      clearSelection: () => set({ selectedThreadIds: [] }),
     }),
+    {
+      name:    "bettermail-ui",
+      storage: createJSONStorage(() => localStorage),
+      // Only persist the keys that should survive a refresh
+      partialize: (state) =>
+        Object.fromEntries(
+          PERSISTED_KEYS.map((k) => [k, state[k]]),
+        ) as Partial<UIState>,
+    },
+  ),
+);
 
-  clearSearch: () => set(SEARCH_RESET),
-
-  activeThreadId:    null,
-  focusedThreadId:   null,
-  selectedThreadIds: [],
-  threadIds:         [],
-
-  setActiveThread: (id) =>
-    set({
-      activeThreadId:    id,
-      focusedThreadId:   id ?? get().focusedThreadId,
-      selectedThreadIds: id ? [id] : [],
-    }),
-
-  setFocusedThread:  (id)  => set({ focusedThreadId: id }),
-  setThreadIds:      (ids) => set({ threadIds: ids }),
-
-  toggleThreadSelection: (id) => {
-    const cur = get().selectedThreadIds;
-    set({
-      selectedThreadIds: cur.includes(id)
-        ? cur.filter((t) => t !== id)
-        : [...cur, id],
-    });
-  },
-
-  clearSelection: () => set({ selectedThreadIds: [] }),
-}));
-
+// ─── Scoped selectors (prevent over-rendering) ─────────────────────────────────
 export const useLayoutStore = () =>
   useUIStore(useShallow((s) => ({
     layoutMode:          s.layoutMode,
     sidebarCollapsed:    s.sidebarCollapsed,
+    splitPct:            s.splitPct,
     setLayoutMode:       s.setLayoutMode,
     toggleSidebar:       s.toggleSidebar,
     setSidebarCollapsed: s.setSidebarCollapsed,
+    setSplitPct:         s.setSplitPct,
   })));
 
 export const useMailboxStore = () =>
   useUIStore(useShallow((s) => ({
-    selectedEmailAddress: s.selectedEmailAddress,
-    activeFolder:         s.activeFolder,
-    searchQuery:          s.searchQuery,
-    searchFilters:        s.searchFilters,
+    selectedEmailAddress:    s.selectedEmailAddress,
+    activeFolder:            s.activeFolder,
+    searchQuery:             s.searchQuery,
+    searchFilters:           s.searchFilters,
     setSelectedEmailAddress: s.setSelectedEmailAddress,
-    setActiveFolder:      s.setActiveFolder,
-    setSearchQuery:       s.setSearchQuery,
-    clearSearch:          s.clearSearch,
+    setActiveFolder:         s.setActiveFolder,
+    setSearchQuery:          s.setSearchQuery,
+    clearSearch:             s.clearSearch,
   })));
 
 export const useThreadStore = () =>
