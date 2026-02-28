@@ -630,7 +630,7 @@ export const validateUpsertThreadNote = [
     .withMessage("Content must not exceed 10,000 characters"),
 
   body("emailAddress")
-    .optional() 
+    .optional()
     .isString()
     .withMessage("emailAddress must be a string")
     .isEmail()
@@ -647,6 +647,14 @@ export const validateGetThreadNote = [
     .withMessage("threadId must be a string")
     .notEmpty()
     .withMessage("threadId cannot be empty"),
+
+  param("emailAddress")
+    .exists()
+    .withMessage("emailAddress is required")
+    .isEmail()
+    .withMessage("emailAddress must be a an email")
+    .notEmpty()
+    .withMessage("emailAddress cannot be empty"),
 
   handleValidationErrors,
 ];

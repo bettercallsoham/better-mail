@@ -69,12 +69,10 @@ export const getThreadEmails = asyncHandler(
 
     if (email && typeof email === "string") {
       if (!emailAddresses.includes(email)) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message: "Access denied for this email account",
-          });
+        return res.status(403).json({
+          success: false,
+          message: "Access denied for this email account",
+        });
       }
       allowedEmails = [email];
     }
@@ -943,12 +941,10 @@ export const executeSavedSearch = asyncHandler(
 
     const savedSearch = await elasticService.getSavedSearchById(id, userId);
     if (!savedSearch) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Saved search not found or access denied",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Saved search not found or access denied",
+      });
     }
 
     await elasticService.incrementSearchUsage(id);
@@ -957,12 +953,10 @@ export const executeSavedSearch = asyncHandler(
     if (!emailAddresses?.length) {
       const { emails, error } = await getUserEmails(userId);
       if (error || emails.length === 0) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message: error || "No connected email accounts found",
-          });
+        return res.status(403).json({
+          success: false,
+          message: error || "No connected email accounts found",
+        });
       }
       emailAddresses = emails;
     }
@@ -1480,7 +1474,6 @@ export const upsertThreadNote = asyncHandler(
     const { threadId } = req.params;
     const { content, emailAddress: requestedEmail } = req.body;
 
-    // Use the requested email if it belongs to this user, otherwise fall back
     const emailAddress =
       requestedEmail && emailAddresses.emails.includes(requestedEmail)
         ? requestedEmail
@@ -1516,24 +1509,48 @@ export const getThreadNote = asyncHandler(
       });
     }
 
+    const threadIdParam = req.params.threadId;
+    const emailAddressParam = req.params.emailAddress;
+
+    // Ensure threadId is a single string
+    const threadId =
+      typeof threadIdParam === "string" ? threadIdParam : undefined;
+
+    if (!threadId) {
+      return res.status(400).json({
+        success: false,
+        message: "Thread ID is required",
+      });
+    }
+
     const emailAddresses = await getUserEmails(userId);
-    if (emailAddresses.emails.length === 0) {
+
+    if (!emailAddresses.emails.length) {
       return res.status(400).json({
         success: false,
         message: "No connected email accounts found",
       });
     }
 
-    const { threadId } = req.params;
+    // Ensure emailAddress is a single string
+    const emailAddress =
+      typeof emailAddressParam === "string"
+        ? emailAddressParam
+        : undefined;
+
+    const emailToUse =
+      emailAddress && emailAddresses.emails.includes(emailAddress)
+        ? emailAddress
+        : emailAddresses.emails[0];
 
     const note = await threadNoteService.getNote(
-      emailAddresses.emails[0],
-      threadId as string,
+      emailToUse,
+      threadId
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      data: note || "",
+      data: note,
     });
   },
   "getThreadNote",

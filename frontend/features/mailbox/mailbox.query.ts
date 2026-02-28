@@ -353,16 +353,28 @@ export function useThreadNote(threadId: string) {
 
 export function useUpsertThreadNote() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (params: UpsertThreadNoteParams) =>
       mailboxService.upsertThreadNote(params),
-    onSuccess: (_, { threadId }) => {
-      queryClient.invalidateQueries({
-        queryKey: mailboxKeys.threadNote(threadId),
+
+    onSuccess: (response, { threadId }) => {
+   
+      queryClient.setQueryData(mailboxKeys.threadNote(threadId), {
+        success: true,
+        data:    response.data,
+      });
+    },
+
+    onError: () => {
+      toast.error("Failed to save note", {
+        description: "Please try again.",
+        duration: 4000,
       });
     },
   });
 }
+
 
 export function useInboxZero(params?: InboxZeroParams) {
   return useSuspenseInfiniteQuery({

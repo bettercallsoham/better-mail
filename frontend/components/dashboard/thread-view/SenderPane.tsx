@@ -340,11 +340,27 @@ function Notes({ threadId, emailAddress }: { threadId: string; emailAddress: str
   );
 }
 
-function NotesFetcher({ threadId, emailAddress }: { threadId: string; emailAddress: string }) {
+
+// Drop-in replacements for NotesFetcher + NotesEditor in SenderPane.tsx
+//
+// Secondary bug fixed: NotesEditor used useState(initialValue) which only
+// reads initialValue once on mount. If the cache updated (e.g. from the
+// old invalidateQueries race), the prop would change but the textarea wouldn't.
+// Fixed by tracking whether we've ever initialized with a useRef guard so
+// the textarea never gets stomped after the user has started typing.
+
+function NotesFetcher({
+  threadId,
+  emailAddress,
+}: {
+  threadId:     string;
+  emailAddress: string;
+}) {
   const { data } = useThreadNote(threadId);
+
   return (
     <NotesEditor
-      key={threadId}
+      key={threadId}              // remount cleanly on thread switch
       threadId={threadId}
       initialValue={data?.notes ?? ""}
       emailAddress={emailAddress}
@@ -367,6 +383,19 @@ function NotesEditor({
   const debounceRef         = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef         = useRef<HTMLTextAreaElement>(null);
 
+  // Guard: only accept an external initialValue update if the user hasn't
+  // typed anything yet. Once they've typed, their local state is the source
+  // of truth — the cache writing back should never overwrite it.
+  const hasTyped = useRef(false);
+
+  useEffect(() => {
+    if (!hasTyped.current) {
+      // Still in read-only / just-loaded state — safe to sync from cache
+      setValue(initialValue);
+    }
+  }, [initialValue]);
+
+  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -374,41 +403,63 @@ function NotesEditor({
     el.style.height = `${el.scrollHeight}px`;
   }, [value]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setValue(val);
-    setStatus("saving");
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      mutate(
-        { threadId, content: val, emailAddress },
-        {
-          onSuccess: () => { setStatus("saved"); setTimeout(() => setStatus("idle"), 1500); },
-          onError:   () => setStatus("idle"),
-        },
-      );
-    }, 600);
-  }, [threadId, emailAddress, mutate]);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const val = e.target.value;
+      hasTyped.current = true;
+      setValue(val);
+      setStatus("saving");
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const isModifier = e.metaKey || e.ctrlKey;
-    if (isModifier && !["z", "a", "c", "v", "x", "b", "i", "u"].includes(e.key.toLowerCase())) {
-      e.currentTarget.blur();
-    }
-  }, []);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        mutate(
+          { threadId, content: val, emailAddress },
+          {
+            onSuccess: () => {
+              setStatus("saved");
+              setTimeout(() => setStatus("idle"), 1500);
+            },
+            onError: () => setStatus("idle"),
+          },
+        );
+      }, 600);
+    },
+    [threadId, emailAddress, mutate],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      const isModifier = e.metaKey || e.ctrlKey;
+      if (
+        isModifier &&
+        !["z", "a", "c", "v", "x", "b", "i", "u"].includes(e.key.toLowerCase())
+      ) {
+        e.currentTarget.blur();
+      }
+    },
+    [],
+  );
 
   return (
     <div className="px-5 py-4">
       <div className="flex items-center justify-between mb-2.5">
-        <SectionHeader icon={<IconNotes size={10} strokeWidth={2} />} label="Notes" />
-        <span className={cn(
-          "text-[10px] transition-opacity duration-300",
-          status === "idle" ? "opacity-0" : "opacity-100",
-          status === "saving" ? "text-gray-300 dark:text-white/25" : "text-emerald-500",
-        )}>
+        <SectionHeader
+          icon={<IconNotes size={10} strokeWidth={2} />}
+          label="Notes"
+        />
+        <span
+          className={cn(
+            "text-[10px] transition-opacity duration-300",
+            status === "idle" ? "opacity-0" : "opacity-100",
+            status === "saving"
+              ? "text-gray-300 dark:text-white/25"
+              : "text-emerald-500",
+          )}
+        >
           {status === "saving" ? "saving…" : "saved ✓"}
         </span>
       </div>
+
       <textarea
         ref={textareaRef}
         value={value}
@@ -430,7 +481,6 @@ function NotesEditor({
     </div>
   );
 }
-
 // ─── Pane content ─────────────────────────────────────────────────────────────
 function PaneContent({
   threadId,
