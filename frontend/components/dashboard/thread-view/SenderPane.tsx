@@ -24,11 +24,11 @@ import { cn } from "@/lib/utils";
 const HIDDEN_LABELS = new Set(["INBOX", "UNREAD", "SENT", "DRAFT", "TRASH", "SPAM"]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+// UPDATED: avatarHue kept but used at 25% saturation everywhere (was 50%)
 const avatarHue = (s: string) =>
   s.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
 
-const labelHue = (l: string) =>
-  l.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+// REMOVED: labelHue() — replaced by fixed LABEL_COLORS palette below
 
 function initials(name?: string, email?: string): string {
   const src = name?.trim() || email?.trim() || "?";
@@ -52,6 +52,17 @@ function normalizeLabel(label: string): string {
 function visibleLabels(labels: string[]): string[] {
   return labels.filter((l) => !HIDDEN_LABELS.has(l.toUpperCase()));
 }
+
+// ─── Fixed label color palette ────────────────────────────────────────────────
+// UPDATED: replaces random labelHue() — consistent, semantic, Notion-style
+const LABEL_COLORS: Record<string, { bg: string; text: string }> = {
+  CATEGORY_PERSONAL:   { bg: "rgba(99,102,241,0.08)",  text: "#4f46e5" },
+  CATEGORY_PROMOTIONS: { bg: "rgba(120,113,108,0.09)", text: "#78716c" },
+  CATEGORY_UPDATES:    { bg: "rgba(100,116,139,0.08)", text: "#475569" },
+  CATEGORY_SOCIAL:     { bg: "rgba(16,185,129,0.08)",  text: "#059669" },
+  CATEGORY_FORUMS:     { bg: "rgba(139,92,246,0.08)",  text: "#7c3aed" },
+  IMPORTANT:           { bg: "rgba(217,119,6,0.08)",   text: "#b45309" },
+};
 
 // ─── Section header ───────────────────────────────────────────────────────────
 function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
@@ -82,7 +93,8 @@ function AccountPill({ emailAddress }: { emailAddress: string }) {
     <div className="group flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/[0.06] w-fit max-w-full">
       <span
         className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold text-white shrink-0"
-        style={{ background: `hsl(${hue} 50% 46%)` }}
+        // UPDATED: 25% saturation (was 50%)
+        style={{ background: `hsl(${hue} 25% 52%)` }}
       >
         {emailAddress[0]?.toUpperCase()}
       </span>
@@ -102,14 +114,13 @@ function AccountPill({ emailAddress }: { emailAddress: string }) {
   );
 }
 
-// ─── Participant pill — like reference image ──────────────────────────────────
+// ─── Participant pill ─────────────────────────────────────────────────────────
 function ParticipantPill({ name, email }: { name?: string; email: string }) {
   const [open, setOpen]     = useState(false);
   const [copied, setCopied] = useState(false);
   const hue = avatarHue(email);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -140,17 +151,16 @@ function ParticipantPill({ name, email }: { name?: string; email: string }) {
             : "bg-black/[0.04] dark:bg-white/[0.06] border-black/[0.06] dark:border-white/[0.08] text-gray-600 dark:text-white/55 hover:bg-black/[0.06] dark:hover:bg-white/[0.09]",
         )}
       >
-        {/* Avatar circle — same style as reference */}
+        {/* UPDATED: avatar at 25% saturation */}
         <span
           className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-          style={{ background: `hsl(${hue} 45% 44%)` }}
+          style={{ background: `hsl(${hue} 25% 50%)` }}
         >
           {initials(name, email)}
         </span>
         {firstName(name, email)}
       </button>
 
-      {/* Email popover */}
       {open && (
         <div className={cn(
           "absolute top-full left-0 mt-1.5 z-50",
@@ -177,16 +187,15 @@ function ParticipantPill({ name, email }: { name?: string; email: string }) {
 }
 
 // ─── Label pill ───────────────────────────────────────────────────────────────
+// UPDATED: uses fixed LABEL_COLORS palette instead of random hue per label
 function LabelPill({ label }: { label: string }) {
-  const hue  = labelHue(label);
   const name = normalizeLabel(label);
+  const colors = LABEL_COLORS[label.toUpperCase()] ?? { bg: "rgba(0,0,0,0.06)", text: "#71717a" };
+
   return (
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-medium select-none"
-      style={{
-        backgroundColor: `hsl(${hue} 55% 48% / 0.1)`,
-        color: `hsl(${hue} 45% 40%)`,
-      }}
+      style={{ backgroundColor: colors.bg, color: colors.text }}
     >
       <IconTag size={9} strokeWidth={2.5} />
       {name}
@@ -195,6 +204,7 @@ function LabelPill({ label }: { label: string }) {
 }
 
 // ─── Summary (collapsible) ────────────────────────────────────────────────────
+// UPDATED: removed amber action card — uses neutral surface to match overall tone
 function Summary({ threadId, emailAddress }: { threadId: string; emailAddress: string }) {
   const { data, isLoading } = useThreadSummary(threadId, emailAddress);
   const [expanded, setExpanded] = useState(false);
@@ -214,7 +224,6 @@ function Summary({ threadId, emailAddress }: { threadId: string; emailAddress: s
 
   return (
     <div className="border-b border-black/[0.05] dark:border-white/[0.05]">
-      {/* Header — always clickable to toggle */}
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-black/[0.015] dark:hover:bg-white/[0.02] transition-colors duration-75"
@@ -243,7 +252,6 @@ function Summary({ threadId, emailAddress }: { threadId: string; emailAddress: s
         </div>
       </button>
 
-      {/* Collapsed: 2-line preview only */}
       {!expanded && (
         <div className="px-5 pb-3 -mt-0.5">
           {isLoading ? (
@@ -252,7 +260,7 @@ function Summary({ threadId, emailAddress }: { threadId: string; emailAddress: s
               <Skeleton className="h-2.5 w-3/4 rounded" />
             </div>
           ) : s?.text ? (
-            <p className="text-[12px] text-gray-500 dark:text-white/40 leading-relaxed line-clamp-2">
+            <p className="text-[12px] text-gray-500 dark:text-white/40 leading-relaxed line-clamp-2 tracking-[-0.005em]">
               {s.text}
             </p>
           ) : (
@@ -261,7 +269,6 @@ function Summary({ threadId, emailAddress }: { threadId: string; emailAddress: s
         </div>
       )}
 
-      {/* Expanded: full content */}
       {expanded && (
         <div className="px-5 pb-4 space-y-3">
           {isLoading ? (
@@ -272,7 +279,7 @@ function Summary({ threadId, emailAddress }: { threadId: string; emailAddress: s
             </div>
           ) : s?.text ? (
             <>
-              <p className="text-[12px] text-gray-600 dark:text-white/55 leading-relaxed">
+              <p className="text-[12px] text-gray-600 dark:text-white/55 leading-relaxed tracking-[-0.005em]">
                 {s.text}
               </p>
               {hasKeyPoints && (
@@ -291,15 +298,16 @@ function Summary({ threadId, emailAddress }: { threadId: string; emailAddress: s
                 </div>
               )}
               {hasAction && (
-                <div className="flex items-start gap-3 p-3 rounded-xl border border-amber-100 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5">
-                  <div className="p-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 shrink-0">
-                    <IconBolt size={12} className="text-amber-600 dark:text-amber-400" />
+                // UPDATED: neutral action card (was amber) — monochrome = premium
+                <div className="flex items-start gap-2.5 p-3 rounded-xl border border-black/[0.05] dark:border-white/[0.06] bg-black/[0.02] dark:bg-white/[0.02]">
+                  <div className="p-1 rounded-lg bg-black/[0.05] dark:bg-white/[0.07] shrink-0">
+                    <IconBolt size={12} className="text-gray-500 dark:text-white/40" />
                   </div>
                   <div>
-                    <p className="text-[9.5px] font-bold tracking-[0.08em] uppercase text-amber-600/60 dark:text-amber-400/50 mb-0.5">
-                      Recommended Action
+                    <p className="text-[9.5px] font-bold tracking-[0.08em] uppercase text-gray-300 dark:text-white/25 mb-0.5">
+                      Action
                     </p>
-                    <p className="text-[11.5px] text-amber-900 dark:text-amber-200/80 leading-snug">
+                    <p className="text-[11.5px] text-gray-600 dark:text-white/55 leading-snug">
                       {String(s.actionItems)}
                     </p>
                   </div>
@@ -333,7 +341,6 @@ function Notes({ threadId, emailAddress }: { threadId: string; emailAddress: str
 }
 
 function NotesFetcher({ threadId, emailAddress }: { threadId: string; emailAddress: string }) {
-  // Suspense boundary above handles loading — data is ready when this renders
   const { data } = useThreadNote(threadId);
   return (
     <NotesEditor
@@ -360,7 +367,6 @@ function NotesEditor({
   const debounceRef         = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef         = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -384,14 +390,10 @@ function NotesEditor({
     }, 600);
   }, [threadId, emailAddress, mutate]);
 
-  // Prevent ctrl+k (and other global shortcuts) from being swallowed ONLY
-  // when the textarea doesn't need the key itself
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const isModifier = e.metaKey || e.ctrlKey;
-    // Let global shortcuts pass through — don't stopPropagation/preventDefault
-    // for cmd/ctrl combos that aren't text-editing shortcuts
     if (isModifier && !["z", "a", "c", "v", "x", "b", "i", "u"].includes(e.key.toLowerCase())) {
-      e.currentTarget.blur(); // release focus so the global handler can fire
+      e.currentTarget.blur();
     }
   }, []);
 
@@ -448,7 +450,6 @@ function PaneContent({
   const hue         = avatarHue(senderEmail);
   const emailAddr   = selectedEmail ?? first?.emailAddress ?? senderEmail;
 
-  // Date range + count
   const firstDate = first ? format(new Date(first.receivedAt), "MMM d") : null;
   const lastDate  = emails.length > 1
     ? format(new Date(emails[emails.length - 1].receivedAt), "MMM d")
@@ -457,7 +458,6 @@ function PaneContent({
     ? `${firstDate} – ${lastDate}`
     : firstDate;
 
-  // Unique participants
   const seen = new Set<string>();
   const participants: { name?: string; email: string }[] = [];
   for (const e of emails) {
@@ -478,8 +478,9 @@ function PaneContent({
         {/* Avatar + name + email */}
         <div className="flex items-center gap-3">
           <span
-            className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-semibold text-white shrink-0 select-none"
-            style={{ background: `hsl(${hue} 50% 46%)` }}
+            className="w-11 h-11 rounded-full flex items-center justify-center text-[12px] font-semibold text-white shrink-0 select-none tracking-[0.02em]"
+            // UPDATED: 25% saturation (was 50%) — muted, Notion-style
+            style={{ background: `hsl(${hue} 25% 52%)` }}
           >
             {initials(senderName, senderEmail)}
           </span>
@@ -502,7 +503,7 @@ function PaneContent({
           </p>
         )}
 
-        {/* Labels */}
+        {/* Labels — UPDATED: fixed semantic colors via LabelPill */}
         {labels.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {labels.map((l) => <LabelPill key={l} label={l} />)}
@@ -512,7 +513,7 @@ function PaneContent({
         {/* Account pill */}
         {emailAddr && <AccountPill emailAddress={emailAddr} />}
 
-        {/* Participant pills — only when >1 unique sender */}
+        {/* Participant pills */}
         {participants.length > 1 && (
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
             {participants.map((p) => (

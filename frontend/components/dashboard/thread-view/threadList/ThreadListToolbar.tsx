@@ -7,8 +7,9 @@ import { mailboxKeys, useDeleteSavedSearch } from "@/features/mailbox/mailbox.qu
 import { mailboxService } from "@/features/mailbox/mailbox.api";
 import { cn } from "@/lib/utils";
 import {
-  Search, X, BookmarkCheck, Zap, Bell, Tag,
+  Search, X, BookmarkCheck, Bell, Tag,
   UserRound, TriangleAlert, SlidersHorizontal,
+  // REMOVED: Zap — was beside "Primary" label, added playful/Slack energy, not premium
 } from "lucide-react";
 import { MailSearchCommand } from "../../MailSearchCommand";
 import type { SearchFilters } from "@/lib/store/ui.store";
@@ -149,10 +150,6 @@ export function ThreadListToolbar() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FLOW TOOLBAR
-// Pixel-perfect 0.email replica:
-//   Row 1 — borderless search ghost input (search icon · text · ⌘K)
-//   Row 2 — "Primary" filled pill + icon-only category pills
-//   Row 3 — (contextual) active search summary
 // ─────────────────────────────────────────────────────────────────────────────
 
 function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
@@ -198,19 +195,19 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
       </div>
 
       {/* Row 2 — Folder tabs */}
+      {/* UPDATED: Removed <Zap> icon from Primary button — cleaner, more authoritative */}
       <div className="flex items-center gap-1 px-4 pb-3 overflow-x-auto scrollbar-none">
 
-        {/* Primary — big solid filled pill */}
+        {/* Primary — solid filled pill, no icon */}
         <button
           onClick={() => { setActiveFolder("inbox"); clearSearch(); }}
           className={cn(
-            "flex items-center gap-1.5 h-[30px] px-3.5 rounded-full text-[13px] font-semibold transition-all duration-150 shrink-0",
+            "flex items-center h-[30px] px-3.5 rounded-full text-[13px] font-semibold transition-all duration-150 shrink-0",
             !hasSearch && activeFolder === "inbox"
               ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
               : "text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/6",
           )}
         >
-          <Zap className="w-3 h-3 opacity-70 shrink-0" />
           Primary
         </button>
 
@@ -249,7 +246,7 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
                     className={cn(
                       "flex items-center gap-1 h-[26px] px-2.5 rounded-full text-[11.5px] font-medium transition-all duration-150",
                       isActive
-                        ? "bg-blue-500 text-white"
+                        ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
                         : "bg-black/4 dark:bg-white/5 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
                     )}
                   >
@@ -269,7 +266,7 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
         )}
       </div>
 
-      {/* Row 3 — Active search context (contextual) */}
+      {/* Row 3 — Active search context */}
       {hasSearch && (
         <div className="flex items-center gap-2 px-4 pb-2.5 -mt-1">
           <span className="text-[10.5px] text-gray-400 dark:text-white/25 shrink-0">
@@ -294,9 +291,6 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VELOCITY TOOLBAR
-// Power-user command bar — everything in two compact rows:
-//   Row 1 — folder tabs (underline active) + inline search token chips + filter icon
-//   Row 2 — (only if saved searches exist) compact saved searches strip
 // ─────────────────────────────────────────────────────────────────────────────
 
 function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
@@ -324,7 +318,7 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
       {/* Row 1 — unified command bar */}
       <div className="flex items-stretch h-10 border-b border-black/[0.06] dark:border-white/[0.06]">
 
-        {/* Folder tabs — underline style, no pill bg */}
+        {/* Folder tabs — underline style */}
         <div className="flex items-stretch overflow-x-auto scrollbar-none shrink-0">
           {allTabs.map((tab) => {
             const isActive = !hasSearch && activeFolder === tab.id;
@@ -333,7 +327,7 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
                 key={tab.id}
                 onClick={() => { setActiveFolder(tab.id); clearSearch(); }}
                 className={cn(
-                  "relative flex items-center px-3.5 h-full text-[12px] font-medium whitespace-nowrap transition-colors duration-100",
+                  "relative flex items-center px-3.5 h-full text-[12px] font-medium whitespace-nowrap transition-colors duration-100 tracking-[-0.01em]",
                   isActive
                     ? "text-gray-900 dark:text-white"
                     : "text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
@@ -341,7 +335,8 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
               >
                 {tab.label}
                 {isActive && (
-                  <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-gray-900 dark:bg-white" />
+                  // UPDATED: near-black underline (was also near-black, kept consistent)
+                  <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-zinc-900 dark:bg-white" />
                 )}
               </button>
             );
@@ -353,7 +348,7 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
           <div className="w-px h-4 bg-black/8 dark:bg-white/8" />
         </div>
 
-        {/* Search area — fills remaining space */}
+        {/* Search area */}
         <button
           onClick={onOpenSearch}
           className="flex-1 flex items-center gap-2 px-2 h-full min-w-0 group text-left"
@@ -377,7 +372,7 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
               )}
             </div>
           ) : (
-            <span className="flex-1 text-[12px] text-gray-300 dark:text-white/20">
+            <span className="flex-1 text-[12px] text-gray-300 dark:text-white/20 tracking-[-0.005em]">
               Search mail…
             </span>
           )}
@@ -389,7 +384,7 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
           )}
         </button>
 
-        {/* Right action — clear or filter */}
+        {/* Right action */}
         <div className="flex items-center pr-2 shrink-0">
           {hasSearch ? (
             <button
@@ -411,7 +406,7 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
         </div>
       </div>
 
-      {/* Row 2 — saved searches strip (only if saved searches exist) */}
+      {/* Row 2 — saved searches strip */}
       {savedSearches && savedSearches.length > 0 && (
         <div className="flex items-center gap-1 px-3 h-[26px] border-b border-black/[0.04] dark:border-white/[0.04] overflow-x-auto scrollbar-none">
           <span className="text-[8.5px] font-bold tracking-[0.12em] uppercase text-gray-300 dark:text-white/18 shrink-0 mr-0.5 select-none">
@@ -426,7 +421,8 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
                   className={cn(
                     "flex items-center gap-1 h-[18px] px-2 rounded text-[10px] font-medium transition-all",
                     isActive
-                      ? "bg-blue-500 text-white"
+                      // UPDATED: active saved search uses near-black (was blue-500) for monochrome consistency
+                      ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
                       : "text-gray-400 dark:text-white/30 hover:text-gray-700 dark:hover:text-white/55 hover:bg-black/4 dark:hover:bg-white/5",
                   )}
                 >
