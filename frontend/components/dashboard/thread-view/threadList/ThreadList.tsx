@@ -90,7 +90,14 @@ function SearchResultsList({
   const activeThreadId  = useUIStore((s) => s.activeThreadId);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useSearchEmails({ query: query.trim() || " ", size: 20, ...filters });
+    useSearchEmails({
+      query:   query.trim() || " ",
+      size:    20,
+      // FIX: SearchQueryParams.labels is string, but SearchFilters.labels is
+      // string[]. Join here at the boundary so neither type needs to change.
+      ...filters,
+      labels:  filters?.labels?.join(","),
+    });
 
   const allEmails = data.pages.flatMap((p) => p.emails);
 

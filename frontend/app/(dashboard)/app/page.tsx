@@ -1,12 +1,12 @@
 "use client";
 
+import { useRef, useSyncExternalStore } from "react";
 import { useUIStore } from "@/lib/store/ui.store";
 import { ThreadList }      from "@/components/dashboard/thread-view/threadList/ThreadList";
 import { ThreadDetail }    from "@/components/dashboard/thread-view/ThreadDetail";
 import { SenderPane }      from "@/components/dashboard/thread-view/SenderPane";
-import { ThreadSideSheet } from "@/components/dashboard/thread-view/ThreadSheet"
+import { ThreadSideSheet } from "@/components/dashboard/thread-view/ThreadSheet";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -18,19 +18,28 @@ const MAX_SPLIT: Record<string, number> = { velocity: 75, flow: 60 };
 const DEFAULT_SPLIT: Record<string, number> = { velocity: 62, flow: 42 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mobile detection
+// useIsMobile — SSR-safe via useSyncExternalStore
+//
+// Three arguments:
+//   1. subscribe        — attaches / detaches the MediaQueryList listener
+//   2. getSnapshot      — returns the live client value
+//   3. getServerSnapshot — returned during SSR; false = render desktop on
+//                          server so initial paint matches hydration
+//
+// This replaces useState + useEffect which caused:
+//   "Calling setState synchronously within an effect" warning.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, [breakpoint]);
-  return isMobile;
+function useIsMobile(breakpoint = 768): boolean {
+  return useSyncExternalStore(
+    (callback) => {
+      const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+      mq.addEventListener("change", callback);
+      return () => mq.removeEventListener("change", callback);
+    },
+    () => window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches,
+    () => false,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,10 +194,7 @@ function DesktopLayout() {
 
 export default function AppPage() {
   const isMobile = useIsMobile(768);
-  // Avoid layout flash before breakpoint is known
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
-
+  // No mounted state needed — useSyncExternalStore handles SSR gracefully.
+  // Server snapshot returns false (desktop), client hydrates with real value.
   return isMobile ? <MobileLayout /> : <DesktopLayout />;
 }

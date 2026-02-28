@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import {
   Search, X, BookmarkCheck, Bell, Tag,
   UserRound, TriangleAlert, SlidersHorizontal,
-  // REMOVED: Zap — was beside "Primary" label, added playful/Slack energy, not premium
 } from "lucide-react";
 import { MailSearchCommand } from "../../MailSearchCommand";
 import type { SearchFilters } from "@/lib/store/ui.store";
@@ -47,7 +46,8 @@ function summariseFilters(q: string | null, f: SearchFilters | null): string {
   if (f?.isArchived)           parts.push("Archived");
   if (f?.filterFrom)           parts.push(`from:${f.filterFrom}`);
   if (f?.filterTo)             parts.push(`to:${f.filterTo}`);
-  if (f?.labels)               parts.push(f.labels.replace(/^CATEGORY_/, "").toLowerCase());
+  // FIX: labels is string[] — iterate instead of calling .replace() directly
+  if (f?.labels?.length)       f.labels.forEach((l) => parts.push(l.replace(/^CATEGORY_/, "").toLowerCase()));
   if (f?.dateFrom)             parts.push(`after:${f.dateFrom}`);
   return parts.join("  ·  ") || "Filtered";
 }
@@ -62,7 +62,8 @@ function buildFilterTokens(q: string | null, f: SearchFilters | null): string[] 
   if (f?.isArchived)           t.push("archived");
   if (f?.filterFrom)           t.push(`from:${f.filterFrom}`);
   if (f?.filterTo)             t.push(`to:${f.filterTo}`);
-  if (f?.labels)               t.push(f.labels.replace(/^CATEGORY_/, "").toLowerCase());
+  // FIX: labels is string[] — iterate instead of calling .replace() directly
+  if (f?.labels?.length)       f.labels.forEach((l) => t.push(l.replace(/^CATEGORY_/, "").toLowerCase()));
   if (f?.dateFrom)             t.push(`after:${f.dateFrom}`);
   return t;
 }
@@ -195,7 +196,6 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
       </div>
 
       {/* Row 2 — Folder tabs */}
-      {/* UPDATED: Removed <Zap> icon from Primary button — cleaner, more authoritative */}
       <div className="flex items-center gap-1 px-4 pb-3 overflow-x-auto scrollbar-none">
 
         {/* Primary — solid filled pill, no icon */}
@@ -335,7 +335,6 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
               >
                 {tab.label}
                 {isActive && (
-                  // UPDATED: near-black underline (was also near-black, kept consistent)
                   <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-zinc-900 dark:bg-white" />
                 )}
               </button>
@@ -421,7 +420,6 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
                   className={cn(
                     "flex items-center gap-1 h-[18px] px-2 rounded text-[10px] font-medium transition-all",
                     isActive
-                      // UPDATED: active saved search uses near-black (was blue-500) for monochrome consistency
                       ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
                       : "text-gray-400 dark:text-white/30 hover:text-gray-700 dark:hover:text-white/55 hover:bg-black/4 dark:hover:bg-white/5",
                   )}

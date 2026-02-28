@@ -5,15 +5,15 @@ import { useShallow } from "zustand/react/shallow";
 export type LayoutMode = "velocity" | "flow" | "zen";
 
 export interface SearchFilters {
-  isRead?: boolean;
-  isStarred?: boolean;
+  isRead?:         boolean;
+  isStarred?:      boolean;
   hasAttachments?: boolean;
-  isArchived?: boolean;
-  filterFrom?: string;
-  filterTo?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  labels?: string;
+  isArchived?:     boolean;
+  filterFrom?:     string;
+  filterTo?:       string;
+  dateFrom?:       string;
+  dateTo?:         string;
+  labels?:         string[];  // string[] — matches SavedSearchQuery.filters exactly
 }
 
 interface LayoutSlice {

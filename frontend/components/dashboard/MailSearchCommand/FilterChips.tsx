@@ -233,9 +233,6 @@ const ContactAvatar = memo(function ContactAvatar({ name, email }: { name?: stri
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Email popover
-// KEY FIX: `autoFocus` prop — when opened via keyboard (Tab), we do NOT steal
-// focus from the main input. Arrow nav is driven by parent via `focusedIdx`.
-// Tab inside this popover calls `onTabOut` to cycle to the next chip.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface EmailPopoverProps {
@@ -252,7 +249,6 @@ function EmailPopover({ initialValue, onChange, placeholder, autoFocus = true, f
   const [localVal, setLocalVal] = useState(initialValue);
   const [queryVal, setQueryVal] = useState(initialValue);
 
-  // Only auto-focus when opened via mouse (autoFocus=true)
   useEffect(() => {
     if (!autoFocus) return;
     const id = setTimeout(() => inputRef.current?.focus(), 40);
@@ -288,8 +284,6 @@ function EmailPopover({ initialValue, onChange, placeholder, autoFocus = true, f
           onChange={(e) => handleChange(e.target.value)}
           placeholder={placeholder}
           onKeyDown={(e) => {
-            // Prevent Tab from leaving to browser-native focus flow
-            // Parent handles Tab via handleChipKeyDown
             if (e.key === "Tab") { e.preventDefault(); onTabOut?.(); }
           }}
           className="w-full h-7 px-2.5 rounded-md text-[12.5px] outline-none bg-gray-100 text-gray-900 placeholder:text-gray-400 dark:bg-white/[0.07] dark:text-white/80 dark:placeholder:text-white/25"
@@ -305,7 +299,6 @@ function EmailPopover({ initialValue, onChange, placeholder, autoFocus = true, f
                 onMouseDown={(e) => { e.preventDefault(); commit(sg.email); }}
                 className={cn(
                   "w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors",
-                  // Arrow-key highlight driven from parent
                   focusedIdx === i ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/[0.04]",
                 )}
               >
@@ -327,6 +320,8 @@ function EmailPopover({ initialValue, onChange, placeholder, autoFocus = true, f
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Labels popover — focusedIdx driven externally
+// active is a single string (the first selected label) — labels chip is
+// single-select in the UI even though filters.labels is string[] in the store.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function LabelsPopover({ active, onSelect, onClose, focusedIdx }: {
@@ -427,25 +422,17 @@ function DatePopover({ filters, onChange, onClose, focusedIdx }: {
 type OpenChip = "status" | "from" | "to" | "date" | "label" | null;
 const CHIP_SEQUENCE: NonNullable<OpenChip>[] = ["status", "from", "to", "date", "label"];
 
-// Max option counts per chip type (for arrow key clamping)
 const CHIP_OPTION_MAX: Record<NonNullable<OpenChip>, number> = {
   status: STATUS_OPTIONS.length,
-  from:   8,  // max suggestions from query
+  from:   8,
   to:     8,
   date:   DATE_PRESETS.length,
-  label:  50, // generous — actual label count from server
+  label:  50,
 };
 
 export interface FilterChipsHandle {
-  /** Move keyboard ring to next/prev chip. Returns false when past the end. */
   cycleChip: (reverse?: boolean) => boolean;
-  /** Remove keyboard ring. */
   blurChips: () => void;
-  /**
-   * Route a keypress from the main input to the currently open chip.
-   * Handles: ArrowUp/Down (navigate options), Enter (select), u/s/a/e (status shortcuts), Tab (cycle to next chip).
-   * Returns true if the key was consumed — parent should preventDefault().
-   */
   handleChipKeyDown: (key: string) => boolean;
 }
 
@@ -457,11 +444,13 @@ export interface FilterChipsProps {
 
 export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
   function FilterChips({ filters, onChange, onChipEscape }, ref) {
-    const [open,          setOpen]         = useState<OpenChip>(null);
-    const [kbChipIdx,     setKbChipIdx]    = useState(-1);
+    const [open,           setOpen]          = useState<OpenChip>(null);
+    const [kbChipIdx,      setKbChipIdx]     = useState(-1);
     const [optionFocusIdx, setOptionFocusIdx] = useState(-1);
-    // Track whether the current open was triggered by keyboard (no email input autofocus)
-    const [kbOpened,      setKbOpened]     = useState(false);
+    const [kbOpened,       setKbOpened]      = useState(false);
+
+    // emailSuggestCount is reported upward by EmailPopoverWithCount via callback
+    const [emailSuggestCount, setEmailSuggestCount] = useState(0);
 
     const statusRef = useRef<HTMLButtonElement>(null!);
     const fromRef   = useRef<HTMLButtonElement>(null!);
@@ -469,60 +458,63 @@ export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
     const dateRef   = useRef<HTMLButtonElement>(null!);
     const labelRef  = useRef<HTMLButtonElement>(null!);
 
-    // Need to know suggestion count for From/To to properly clamp arrow nav
-    // We read it via a ref that EmailPopover updates
-    const emailSuggestCountRef = useRef(0);
-
-    const getLabelCount = useCallback(() => {
-      // Will be updated by LabelsPopover render — read from a shared ref
-      return labelCountRef.current;
-    }, []);
-    const labelCountRef = useRef(0);
-
-    // Auto-open chip when keyboard ring moves to it
-    useEffect(() => {
-      if (kbChipIdx < 0) { setOpen(null); return; }
-      setOpen(CHIP_SEQUENCE[kbChipIdx]);
-      setOptionFocusIdx(-1);
-      setKbOpened(true);
-    }, [kbChipIdx]);
-
-    const closeAll  = useCallback(() => { setOpen(null); setOptionFocusIdx(-1); }, []);
-    const toggle    = useCallback((key: OpenChip) => { setKbOpened(false); setOpen((p) => (p === key ? null : key)); setOptionFocusIdx(-1); }, []);
+    const closeAll = useCallback(() => { setOpen(null); setOptionFocusIdx(-1); }, []);
+    const toggle   = useCallback((key: OpenChip) => { setKbOpened(false); setOpen((p) => (p === key ? null : key)); setOptionFocusIdx(-1); }, []);
 
     // ── Imperative handle ──────────────────────────────────────────────────
 
     useImperativeHandle(ref, () => ({
       cycleChip: (reverse = false) => {
+        // We need the current kbChipIdx; read it via functional updater trick
+        // but we also need to know the new value — use a local ref snapshot.
+        let nextIdx = -1;
         let inRange = true;
         setKbChipIdx((prev) => {
-          const next = reverse ? prev - 1 : prev + 1;
-          if (next >= CHIP_SEQUENCE.length || next < 0) { inRange = false; return -1; }
-          return next;
+          nextIdx = reverse ? prev - 1 : prev + 1;
+          if (nextIdx >= CHIP_SEQUENCE.length || nextIdx < 0) {
+            inRange = false;
+            nextIdx = -1;
+          }
+          return nextIdx;
         });
+        // Sync open/kbOpened/optionFocusIdx in the same event tick
+        if (inRange) {
+          setOpen(CHIP_SEQUENCE[nextIdx]);
+          setOptionFocusIdx(-1);
+          setKbOpened(true);
+        } else {
+          setOpen(null);
+          setOptionFocusIdx(-1);
+          setKbOpened(false);
+        }
         return inRange;
       },
 
-      blurChips: () => { setKbChipIdx(-1); setOpen(null); setOptionFocusIdx(-1); },
+      blurChips: () => {
+        setKbChipIdx(-1);
+        setOpen(null);
+        setOptionFocusIdx(-1);
+        setKbOpened(false);
+      },
 
       handleChipKeyDown: (key: string): boolean => {
         if (!open) return false;
 
-        // ── Arrow navigation within open chip ────────────────────────────
+        // ── Arrow navigation ────────────────────────────────────────────
         if (key === "ArrowDown" || key === "ArrowUp") {
           const dir = key === "ArrowDown" ? 1 : -1;
           let max: number;
           if (open === "status") max = STATUS_OPTIONS.length - 1;
-          else if (open === "from" || open === "to") max = Math.max(0, emailSuggestCountRef.current - 1);
+          else if (open === "from" || open === "to") max = Math.max(0, emailSuggestCount - 1);
           else if (open === "date") max = DATE_PRESETS.length - 1;
-          else max = Math.max(0, labelCountRef.current - 1);
+          else max = Math.max(0, labelCount - 1);
           setOptionFocusIdx((prev) => Math.min(Math.max(prev + dir, 0), max));
           return true;
         }
 
-        // ── Enter: commit the focused option ──────────────────────────────
+        // ── Enter ──────────────────────────────────────────────────────
         if (key === "Enter") {
-          if (optionFocusIdx < 0) return false; // nothing focused, let parent handle
+          if (optionFocusIdx < 0) return false;
           if (open === "status") {
             const opt = STATUS_OPTIONS[optionFocusIdx];
             if (opt) {
@@ -540,28 +532,32 @@ export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
               return true;
             }
           }
-          // From/To and Labels selection via Enter is handled by the
-          // parent's Enter handler after it reads the focusedEmail/label
           return false;
         }
 
-        // ── Status letter shortcuts (work even without arrow focus) ────────
+        // ── Status letter shortcuts ────────────────────────────────────
         if (open === "status") {
           const idx = STATUS_SHORTCUT_IDX[key];
           if (idx !== undefined) {
             const opt = STATUS_OPTIONS[idx];
             const active = filters[opt.key] === opt.val;
             onChange({ ...filters, [opt.key]: active ? undefined : opt.val });
-            setOptionFocusIdx(idx); // also highlight the toggled row
+            setOptionFocusIdx(idx);
             return true;
           }
         }
 
-        // ── Tab: move to next chip ─────────────────────────────────────────
+        // ── Tab: move to next chip ─────────────────────────────────────
         if (key === "Tab") {
           setKbChipIdx((prev) => {
             const next = prev + 1;
-            if (next >= CHIP_SEQUENCE.length) { setOpen(null); return -1; }
+            if (next >= CHIP_SEQUENCE.length) {
+              setOpen(null);
+              setKbOpened(false);
+              return -1;
+            }
+            setOpen(CHIP_SEQUENCE[next]);
+            setKbOpened(true);
             return next;
           });
           setOptionFocusIdx(-1);
@@ -572,12 +568,14 @@ export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
       },
     }));
 
-    // ── Sync label count so arrow nav can clamp properly ──────────────────
+    // Derive label count directly from query data — no state sync needed
     const { data: labelsData } = useQuery({ queryKey: mailboxKeys.folders(), queryFn: () => mailboxService.getFolders(undefined), staleTime: 60_000 });
-    useEffect(() => { labelCountRef.current = labelsData?.data?.labels?.length ?? 0; }, [labelsData]);
+    const labelCount = labelsData?.data?.labels?.length ?? 0;
 
-    // We pass a callback to EmailPopover so it can update the suggestion count
-    const onEmailSuggestionsLoaded = useCallback((count: number) => { emailSuggestCountRef.current = count; }, []);
+    // FIX: useCallback with setState setter — no ref mutation inside hook
+    const onEmailSuggestionsLoaded = useCallback((count: number) => {
+      setEmailSuggestCount(count);
+    }, []);
 
     const activeStatusCount = STATUS_OPTIONS.filter((o) => filters[o.key] === o.val).length;
     const activeStatusLabel =
@@ -591,16 +589,20 @@ export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
       onChange(c); closeAll();
     }, [filters, onChange, closeAll]);
 
-    const dateLabel       = filters.dateFrom ? `After ${new Date(filters.dateFrom).toLocaleDateString([], { month: "short", day: "numeric" })}` : "Date";
-    const activeLabelName = filters.labels ? formatLabelName(filters.labels) : null;
-    const filterCount     = Object.values(filters).filter((v) => v !== undefined && v !== "").length;
-    const divider         = <div className="w-px h-3.5 bg-gray-200 dark:bg-white/[0.07] mx-1 shrink-0" />;
+    const dateLabel = filters.dateFrom
+      ? `After ${new Date(filters.dateFrom).toLocaleDateString([], { month: "short", day: "numeric" })}`
+      : "Date";
 
-    // onTabOut from EmailPopover (mouse-opened) — cycle to next chip
+    // FIX: filters.labels is string[] — use [0] to get the display label for the chip
+    const activeLabel     = filters.labels?.[0];
+    const activeLabelName = activeLabel ? formatLabelName(activeLabel) : null;
+
+    const filterCount = Object.values(filters).filter((v) => v !== undefined && v !== "").length;
+    const divider     = <div className="w-px h-3.5 bg-gray-200 dark:bg-white/[0.07] mx-1 shrink-0" />;
+
     const handleEmailTabOut = useCallback(() => {
       setKbChipIdx((prev) => {
-        // figure out current chip index
-        const cur = CHIP_SEQUENCE.indexOf(open as NonNullable<OpenChip>);
+        const cur  = CHIP_SEQUENCE.indexOf(open as NonNullable<OpenChip>);
         const next = cur + 1;
         if (next >= CHIP_SEQUENCE.length) { setOpen(null); return -1; }
         setKbOpened(true);
@@ -676,13 +678,20 @@ export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
         </PortalPopover>
 
         {/* ── Labels ── */}
-        <BaseChip chipRef={labelRef} label={activeLabelName ?? "Labels"} active={!!filters.labels} icon={<Tag className="w-2.5 h-2.5" />}
+        {/* FIX: pass labels[0] (string|undefined) to LabelsPopover which expects string|undefined */}
+        {/* FIX: onSelect wraps string back into string[] to match ActiveFilters.labels */}
+        <BaseChip chipRef={labelRef} label={activeLabelName ?? "Labels"} active={!!activeLabel} icon={<Tag className="w-2.5 h-2.5" />}
           onClick={() => { setKbChipIdx(-1); toggle("label"); }}
           onClear={() => onChange({ ...filters, labels: undefined })}
           kbFocused={kbChipIdx === 4}
         />
         <PortalPopover open={open === "label"} anchorRef={labelRef} onClose={closeAll} width={200}>
-          <LabelsPopover active={filters.labels} onSelect={(v) => onChange({ ...filters, labels: v })} onClose={closeAll} focusedIdx={optionFocusIdx} />
+          <LabelsPopover
+            active={activeLabel}
+            onSelect={(v) => onChange({ ...filters, labels: v ? [v] : undefined })}
+            onClose={closeAll}
+            focusedIdx={optionFocusIdx}
+          />
         </PortalPopover>
 
         {/* ── Clear all ── */}

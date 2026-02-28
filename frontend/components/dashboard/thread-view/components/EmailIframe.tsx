@@ -1,87 +1,178 @@
 "use client";
 
-import { useRef, useState, useCallback, memo } from "react";
+import { useRef, useState, useCallback, useEffect, memo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface EmailIframeProps {
   html: string;
-  /** Cap images to this px height — default 360 */
-  maxImageHeight?: number;
+  className?: string;
 }
 
 export const EmailIframe = memo(function EmailIframe({
   html,
-  maxImageHeight = 360,
+  className,
 }: EmailIframeProps) {
-  const ref           = useRef<HTMLIFrameElement>(null);
-  const [h, setH]     = useState(0);
-  const [ready, setR] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(0);
+  const [ready, setReady] = useState(false);
 
-  const srcDoc = `<!DOCTYPE html><html><head>
-<meta charset="utf-8">
-<meta name="color-scheme" content="light">
-<style>
-  *, *::before, *::after { box-sizing: border-box; }
-  html { overflow: hidden; }
-  body {
-    margin: 0; padding: 20px 22px 24px;
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-    font-size: 14px; line-height: 1.7; color: #1f2937;
-    background: transparent; overflow-x: hidden; word-break: break-word;
-  }
-  img {
-    max-width: 100% !important;
-    max-height: ${maxImageHeight}px;
-    height: auto;
-    object-fit: contain;
-    display: block;
-    border-radius: 6px;
-  }
-  a    { color: #2563eb; text-underline-offset: 2px; }
-  table, td, th { max-width: 100% !important; word-break: break-word; }
-  [width]        { width: auto !important; max-width: 100% !important; }
-  pre, code      { white-space: pre-wrap; word-break: break-all; font-size: 13px; }
-  blockquote     { border-left: 2px solid #e5e7eb; margin: 8px 0; padding: 2px 12px; color: #9ca3af; }
-  /* Strip hard-coded heights from email templates */
-  [height]       { height: auto !important; }
-</style>
-</head><body>${html}</body></html>`;
+  const srcDoc = buildSrcDoc(html);
 
-  const fit = useCallback((iframe: HTMLIFrameElement) => {
+  const measure = useCallback((iframe: HTMLIFrameElement) => {
     try {
       const body = iframe.contentDocument?.body;
       if (!body) return;
-      iframe.style.height = "0px";
-      const s = body.scrollHeight;
-      if (s > 0) { iframe.style.height = `${s}px`; setH(s); setR(true); }
-    } catch { /* cross-origin guard */ }
+
+      iframe.style.height = "1px";
+      const h = body.scrollHeight;
+
+      if (h > 0) {
+        iframe.style.height = `${h}px`;
+        setHeight(h);
+        setReady(true);
+      }
+    } catch {}
+  }, []);
+
+  const patchLinks = useCallback((iframe: HTMLIFrameElement) => {
+    try {
+      iframe.contentDocument
+        ?.querySelectorAll<HTMLAnchorElement>("a[href]")
+        .forEach((a) => {
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+        });
+    } catch {}
+  }, []);
+
+  const onLoad = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    patchLinks(iframe);
+    measure(iframe);
+
+    // re-measure after images load
+    iframe.contentDocument?.querySelectorAll("img").forEach((img) => {
+      img.addEventListener("load", () => measure(iframe));
+    });
+  }, [measure, patchLinks]);
+
+  useEffect(() => {
+    return () => {};
   }, []);
 
   return (
-    <div className="relative">
+    <div
+      className={className}
+      style={{ position: "relative", overflowX: "hidden" }}
+    >
       {!ready && (
-        <div className="space-y-2 px-5 py-4">
-          {[100, 83, 92, 76, 88, 65, 50].map((w, i) => (
-            <Skeleton key={i} className="h-[13px] rounded-sm" style={{ width: `${w}%` }} />
+        <div className="space-y-2.5 px-5 py-5">
+          {[100, 85, 93, 70, 88, 60, 75, 50].map((w, i) => (
+            <Skeleton
+              key={i}
+              className="h-[13px] rounded-sm"
+              style={{ width: `${w}%` }}
+            />
           ))}
         </div>
       )}
+
       <iframe
-        ref={ref}
+        ref={iframeRef}
         srcDoc={srcDoc}
         sandbox="allow-same-origin"
-        title="Email"
-        className={ready ? "w-full border-0 block opacity-100" : "w-full border-0 block opacity-0 absolute inset-0"}
-        style={{ height: ready ? h : 0 }}
-        onLoad={(e) => {
-          const f = e.currentTarget;
-          fit(f);
-          // Retry for lazy-loaded images inside the email
-          setTimeout(() => fit(f), 300);
-          setTimeout(() => fit(f), 900);
-          setTimeout(() => fit(f), 2500);
+        referrerPolicy="no-referrer"
+        title="Email content"
+        onLoad={onLoad}
+        style={{
+          width: "100%",
+          height: ready ? height : 0,
+          border: "none",
+          display: "block",
+          opacity: ready ? 1 : 0,
+          transition: ready ? "opacity 120ms ease" : "none",
         }}
       />
     </div>
   );
 });
+
+function buildSrcDoc(html: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html {
+    overflow-x: hidden;
+  }
+
+  body {
+    margin: 0;
+    padding: 16px 20px 24px;
+
+    /* THE IMPORTANT FIX */
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1f2937;
+    background: #ffffff;
+
+    word-break: break-word;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Let email tables behave normally */
+  table {
+    border-collapse: collapse;
+    max-width: 100%;
+  }
+
+  td, th {
+    word-break: break-word;
+  }
+
+  /* Only constrain images — do not force full width */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Prevent giant horizontal overflow */
+  div, table {
+    max-width: 100%;
+  }
+
+  a {
+    color: #2563eb;
+    text-underline-offset: 2px;
+  }
+
+  pre, code {
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 12.5px;
+  }
+
+  blockquote {
+    border-left: 3px solid #e5e7eb;
+    margin: 8px 0;
+    padding: 2px 12px;
+    color: #6b7280;
+  }
+</style>
+</head>
+<body>
+  ${html}
+</body>
+</html>`;
+}
