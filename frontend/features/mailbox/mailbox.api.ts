@@ -111,8 +111,10 @@ export const mailboxService = {
       body: JSON.stringify(params),
     }),
 
-  getThreadNote: (threadId: string) =>
-    apiClient<GetThreadNoteResponse>(`/mail/threads/${threadId}/note`),
+  getThreadNote: (threadId: string, emailAddress: string) =>
+    apiClient<GetThreadNoteResponse>(
+      `/mail/threads/${threadId}/${emailAddress}/note`,
+    ),
 
   upsertThreadNote: ({
     threadId,

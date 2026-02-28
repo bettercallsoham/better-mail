@@ -356,7 +356,7 @@ function NotesFetcher({
   threadId:     string;
   emailAddress: string;
 }) {
-  const { data } = useThreadNote(threadId);
+  const { data } = useThreadNote(threadId, emailAddress);
 
   return (
     <NotesEditor

@@ -341,10 +341,10 @@ export function useDeleteSavedSearch() {
   });
 }
 
-export function useThreadNote(threadId: string) {
+export function useThreadNote(threadId: string , emailAddress:string) {
   return useSuspenseQuery({
     queryKey: mailboxKeys.threadNote(threadId),
-    queryFn: () => mailboxService.getThreadNote(threadId),
+    queryFn: () => mailboxService.getThreadNote(threadId, emailAddress),
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     select: (data) => data.data,

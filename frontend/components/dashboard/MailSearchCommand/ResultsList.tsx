@@ -4,7 +4,6 @@ import { memo, useMemo } from "react";
 import { Clock, Bookmark, BookmarkCheck, Paperclip, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCreateSavedSearch } from "@/features/mailbox/mailbox.query";
-import type { SearchEmail } from "@/features/mailbox/mailbox.type";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared utils
@@ -46,12 +45,12 @@ export function SectionHead({ label, meta }: { label: string; meta?: string }) {
     <div className="flex items-center justify-between px-3 pt-4 pb-1.5">
       <span className={cn(
         "text-[10px] font-semibold tracking-[0.09em] uppercase select-none",
-        "text-gray-400/70 dark:text-white/[0.25]",
+        "text-gray-400/70 dark:text-white/25",
       )}>
         {label}
       </span>
       {meta && (
-        <span className="text-[10.5px] tabular-nums text-gray-400/60 dark:text-white/[0.2]">
+        <span className="text-[10.5px] tabular-nums text-gray-400/60 dark:text-white/20">
           {meta}
         </span>
       )}
@@ -79,7 +78,7 @@ const SaveBtn = memo(function SaveBtn({ text }: { text: string }) {
       }}
       className={cn(
         "opacity-0 group-hover/row:opacity-100 shrink-0 p-0.5 rounded transition-all",
-        "text-gray-300 dark:text-white/[0.18]",
+        "text-gray-300 dark:text-white/18",
         "hover:text-gray-500 dark:hover:text-white/50",
       )}
     >
@@ -104,12 +103,12 @@ export const RecentRow = memo(function RecentRow({
       onClick={onClick}
       className={cn(
         "group/row w-full flex items-center gap-2.5 px-3 py-1.5 text-left rounded-lg mx-1 transition-colors",
-        "hover:bg-gray-50 dark:hover:bg-white/[0.04]",
+        "hover:bg-gray-50 dark:hover:bg-white/4",
       )}
       style={{ width: "calc(100% - 8px)" }}
     >
-      <Clock className="w-3 h-3 text-gray-300 dark:text-white/[0.15] shrink-0" />
-      <span className="flex-1 text-[13px] text-gray-500 dark:text-white/[0.42] truncate">{text}</span>
+      <Clock className="w-3 h-3 text-gray-300 dark:text-white/15 shrink-0" />
+      <span className="flex-1 text-[13px] text-gray-500 dark:text-white/42 truncate">{text}</span>
       <SaveBtn text={text} />
     </button>
   );
@@ -153,10 +152,10 @@ export const ThreadRow = memo(function ThreadRow({
       onMouseEnter={onHover}
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-3 py-[7px] text-left transition-colors rounded-lg mx-1",
+        "w-full flex items-center gap-3 px-3 py-1.75 text-left transition-colors rounded-lg mx-1",
         focused
-          ? "bg-gray-100/80 dark:bg-white/[0.06]"
-          : "hover:bg-gray-50 dark:hover:bg-white/[0.03]",
+          ? "bg-gray-100/80 dark:bg-white/6"
+          : "hover:bg-gray-50 dark:hover:bg-white/3",
       )}
       style={{ width: "calc(100% - 8px)" }}
     >
@@ -170,10 +169,10 @@ export const ThreadRow = memo(function ThreadRow({
 
       {/* From */}
       <span className={cn(
-        "text-[13px] shrink-0 w-[130px] truncate",
+        "text-[13px] shrink-0 w-32.5 truncate",
         isUnread
-          ? "font-semibold text-gray-900 dark:text-white/[0.88]"
-          : "text-gray-500 dark:text-white/[0.38]",
+          ? "font-semibold text-gray-900 dark:text-white/88"
+          : "text-gray-500 dark:text-white/38",
       )}>
         {from}
       </span>
@@ -184,15 +183,15 @@ export const ThreadRow = memo(function ThreadRow({
           className={cn(
             "text-[13px] shrink-0 truncate max-w-[45%]",
             isUnread
-              ? "text-gray-800 dark:text-white/[0.82]"
-              : "text-gray-600 dark:text-white/[0.45]",
+              ? "text-gray-800 dark:text-white/82"
+              : "text-gray-600 dark:text-white/45",
           )}
           dangerouslySetInnerHTML={{ __html: highlightedSubject }}
         />
         {plainSnippet && (
           <>
-            <span className="text-gray-200 dark:text-white/[0.1] text-[11px] shrink-0 select-none">—</span>
-            <span className="text-[12.5px] text-gray-400 dark:text-white/[0.25] truncate">
+            <span className="text-gray-200 dark:text-white/10 text-[11px] shrink-0 select-none">—</span>
+            <span className="text-[12.5px] text-gray-400 dark:text-white/25 truncate">
               {plainSnippet}
             </span>
           </>
@@ -202,8 +201,8 @@ export const ThreadRow = memo(function ThreadRow({
       {/* Right meta */}
       <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-2">
         {isStarred     && <Star      className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />}
-        {hasAttachment && <Paperclip className="w-2.5 h-2.5 text-gray-300 dark:text-white/[0.2]" />}
-        <span className="text-[11.5px] tabular-nums text-gray-400 dark:text-white/[0.25]">
+        {hasAttachment && <Paperclip className="w-2.5 h-2.5 text-gray-300 dark:text-white/20" />}
+        <span className="text-[11.5px] tabular-nums text-gray-400 dark:text-white/25">
           {formattedDate}
         </span>
       </div>
@@ -233,9 +232,9 @@ export function EmptyState({ query }: { query: string }) {
         <span className="text-gray-600 dark:text-white/45">{query}</span>
         &rdquo;
       </p>
-      <p className="text-[11.5px] text-gray-300 dark:text-white/[0.18]">
+      <p className="text-[11.5px] text-gray-300 dark:text-white/18">
         Try{" "}
-        <code className="bg-gray-100 dark:bg-white/[0.06] px-1.5 py-0.5 rounded-md text-[11px] font-mono text-gray-500 dark:text-white/[0.32]">
+        <code className="bg-gray-100 dark:bg-white/6 px-1.5 py-0.5 rounded-md text-[11px] font-mono text-gray-500 dark:text-white/32">
           from:{query.split(" ")[0]}
         </code>
       </p>
@@ -250,7 +249,7 @@ export function EmptyState({ query }: { query: string }) {
 export function Spinner() {
   return (
     <div className="flex items-center justify-center py-10">
-      <span className="w-4 h-4 rounded-full border border-gray-200 border-t-gray-400 dark:border-white/[0.08] dark:border-t-white/30 animate-spin" />
+      <span className="w-4 h-4 rounded-full border border-gray-200 border-t-gray-400 dark:border-white/8 dark:border-t-white/30 animate-spin" />
     </div>
   );
 }

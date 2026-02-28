@@ -17,7 +17,7 @@ function CollapsedRow({ email, onClick }: { email: FullEmail; onClick: () => voi
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors group"
+      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-black/3 dark:hover:bg-white/4 transition-colors group"
     >
       <EmailAvatar name={email.from.name} email={email.from.email} size={7} />
       <span className="text-[12.5px] font-medium text-gray-500 dark:text-white/38 truncate flex-1 text-left">
@@ -50,7 +50,7 @@ function OpenCard({
     <div className={cn(
       "rounded-2xl overflow-hidden",
       "bg-white dark:bg-[#1e1e1e]",
-      "ring-1 ring-black/[0.04] dark:ring-white/[0.07]",
+      "ring-1 ring-black/4 dark:ring-white/[0.07]",
       "shadow-[0_2px_8px_rgba(0,0,0,0.04)]",
       "dark:shadow-[0_2px_20px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.04)]",
     )}>
@@ -70,13 +70,13 @@ function OpenCard({
 
         <div className="flex items-center gap-1.5 shrink-0">
           {hasAttachments && (
-            <span className="flex items-center px-1.5 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/[0.06]">
+            <span className="flex items-center px-1.5 py-0.5 rounded-md bg-black/4 dark:bg-white/6">
               <IconPaperclip size={10} className="text-gray-400 dark:text-white/30" />
             </span>
           )}
           <button
             onClick={onStar}
-            className="w-7 h-7 flex items-center justify-center rounded-xl hover:bg-black/[0.05] dark:hover:bg-white/[0.07] transition-all"
+            className="w-7 h-7 flex items-center justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/[0.07] transition-all"
           >
             {email.isStarred
               ? <IconStarFilled size={14} className="text-amber-400" />
@@ -94,7 +94,7 @@ function OpenCard({
       </div>
 
       {/* Body */}
-      <div className="border-t border-black/[0.04] dark:border-white/[0.05]">
+      <div className="border-t border-black/4 dark:border-white/5">
         {email.bodyHtml
           ? <EmailIframe html={email.bodyHtml} />
           : (
@@ -106,17 +106,17 @@ function OpenCard({
       </div>
 
       {/* Footer actions */}
-      <div className="flex items-center gap-1.5 px-4 py-3 border-t border-black/[0.04] dark:border-white/[0.05]">
+      <div className="flex items-center gap-1.5 px-4 py-3 border-t border-black/4 dark:border-white/5">
         <button
           onClick={onReply}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium text-gray-500 dark:text-white/42 hover:text-gray-800 dark:hover:text-white/80 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium text-gray-500 dark:text-white/42 hover:text-gray-800 dark:hover:text-white/80 hover:bg-black/4 dark:hover:bg-white/6 transition-colors"
         >
           <IconArrowBackUp size={14} />
           Reply
         </button>
         <button
           onClick={onForward}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium text-gray-500 dark:text-white/42 hover:text-gray-800 dark:hover:text-white/80 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium text-gray-500 dark:text-white/42 hover:text-gray-800 dark:hover:text-white/80 hover:bg-black/4 dark:hover:bg-white/6 transition-colors"
         >
           <IconArrowForwardUp size={14} />
           Forward

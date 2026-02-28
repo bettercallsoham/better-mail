@@ -159,7 +159,7 @@ router.put(
 );
 
 router.get(
-  "/threads/:threadId/note",
+  "/threads/:threadId/:emailAddress/note",
   verifyAccessToken(),
   mailValidator.validateGetThreadNote,
   mailController.getThreadNote,

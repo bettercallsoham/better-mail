@@ -15,7 +15,6 @@ import { useQuery } from "@tanstack/react-query";
 import { mailboxKeys } from "@/features/mailbox/mailbox.query";
 import { mailboxService } from "@/features/mailbox/mailbox.api";
 import type { ActiveFilters } from "./useSearchState";
-import { SHORTCUT_MAP } from "./useSearchState";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -120,18 +119,18 @@ function StatusDropdown({
             key={opt.label}
             onMouseDown={(e) => { e.preventDefault(); onChange({ ...filters, [opt.key]: active ? undefined : opt.val }); }}
             className={cn(
-              "w-full flex items-center gap-2.5 px-3 py-[7px] text-left transition-colors text-[13px]",
-              kbFocused ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/[0.04]",
+              "w-full flex items-center gap-2.5 px-3 py-1.75 text-left transition-colors text-[13px]",
+              kbFocused ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/4",
               active ? "text-gray-900 dark:text-white/90" : "text-gray-500 dark:text-white/45",
             )}
           >
-            <span className={cn("w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 transition-all", active ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "border border-gray-200 dark:border-white/[0.12]")}>
+            <span className={cn("w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 transition-all", active ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "border border-gray-200 dark:border-white/12")}>
               {active && <Check className="w-2 h-2" />}
             </span>
             <span className={cn("shrink-0", active ? "text-gray-700 dark:text-white/60" : "text-gray-300 dark:text-white/20")}>{opt.icon}</span>
             <span className="flex-1">{opt.label}</span>
             {opt.shortcut && (
-              <kbd className="text-[9px] px-1.5 py-px rounded-md bg-gray-100 dark:bg-white/[0.06] font-mono text-gray-400 dark:text-white/[0.2] border border-gray-200/60 dark:border-white/[0.07]">
+              <kbd className="text-[9px] px-1.5 py-px rounded-md bg-gray-100 dark:bg-white/6 font-mono text-gray-400 dark:text-white/20 border border-gray-200/60 dark:border-white/[0.07]">
                 {opt.shortcut}
               </kbd>
             )}
@@ -157,9 +156,9 @@ const BaseChip = memo(function BaseChip({
       ref={chipRef}
       onMouseDown={(e) => { e.preventDefault(); onClick(); }}
       className={cn(
-        "flex items-center gap-1 h-[24px] px-2 rounded-md text-[12px] font-medium transition-all shrink-0 select-none",
+        "flex items-center gap-1 h-6 px-2 rounded-md text-[12px] font-medium transition-all shrink-0 select-none",
         active ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900"
-               : "text-gray-400 dark:text-white/35 hover:text-gray-600 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/[0.06]",
+               : "text-gray-400 dark:text-white/35 hover:text-gray-600 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/6",
         kbFocused && !active && "ring-1 ring-gray-400/60 dark:ring-white/[0.28] bg-gray-100 dark:bg-white/[0.07] text-gray-700 dark:text-white/60",
         kbFocused && active  && "ring-1 ring-gray-500 dark:ring-white/40",
       )}
@@ -167,7 +166,7 @@ const BaseChip = memo(function BaseChip({
       {icon && <span className="opacity-70 flex items-center">{icon}</span>}
       <span>{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="flex items-center justify-center rounded-full min-w-[14px] h-[14px] px-[3px] text-[9px] font-bold bg-white/20 dark:bg-black/20">{badge}</span>
+        <span className="flex items-center justify-center rounded-full min-w-3.5 h-3.5 px-0.75 text-[9px] font-bold bg-white/20 dark:bg-black/20">{badge}</span>
       )}
       <ChevronDown className="w-2.5 h-2.5 opacity-40" />
       {active && onClear && (
@@ -196,9 +195,9 @@ const EmailChip = memo(function EmailChip({
       ref={chipRef}
       onMouseDown={(e) => { e.preventDefault(); onClick(); }}
       className={cn(
-        "flex items-center gap-1 h-[24px] px-1.5 rounded-md text-[12px] font-medium transition-all shrink-0 select-none",
+        "flex items-center gap-1 h-6 px-1.5 rounded-md text-[12px] font-medium transition-all shrink-0 select-none",
         active ? "bg-gray-900 dark:bg-white/90 text-white dark:text-gray-900"
-               : "text-gray-400 dark:text-white/35 hover:text-gray-600 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/[0.06]",
+               : "text-gray-400 dark:text-white/35 hover:text-gray-600 dark:hover:text-white/60 hover:bg-gray-100 dark:hover:bg-white/6",
         kbFocused && !active && "ring-1 ring-gray-400/60 dark:ring-white/[0.28] bg-gray-100 dark:bg-white/[0.07] text-gray-700 dark:text-white/60",
         kbFocused && active  && "ring-1 ring-gray-500 dark:ring-white/40",
       )}
@@ -244,85 +243,8 @@ interface EmailPopoverProps {
   onTabOut?: () => void;
 }
 
-function EmailPopover({ initialValue, onChange, placeholder, autoFocus = true, focusedIdx = -1, onTabOut }: EmailPopoverProps) {
-  const inputRef   = useRef<HTMLInputElement>(null);
-  const [localVal, setLocalVal] = useState(initialValue);
-  const [queryVal, setQueryVal] = useState(initialValue);
 
-  useEffect(() => {
-    if (!autoFocus) return;
-    const id = setTimeout(() => inputRef.current?.focus(), 40);
-    return () => clearTimeout(id);
-  }, [autoFocus]);
 
-  useEffect(() => { const t = setTimeout(() => setQueryVal(localVal), 180); return () => clearTimeout(t); }, [localVal]);
-
-  const trimmed = queryVal.trim();
-  const { data: recentData } = useQuery({
-    queryKey: mailboxKeys.suggestions({ limit: 8 }),
-    queryFn:  () => mailboxService.getEmailSuggestions(undefined, 8),
-    staleTime: 60_000,
-    enabled:  trimmed.length < 2,
-  });
-  const { data: searchData } = useQuery({
-    queryKey: mailboxKeys.suggestions({ query: trimmed, limit: 8 }),
-    queryFn:  () => mailboxService.getEmailSuggestions(trimmed, 8),
-    staleTime: 30_000,
-    enabled:  trimmed.length >= 2,
-  });
-  const suggestions = trimmed.length >= 2 ? (searchData?.data?.suggestions ?? []) : (recentData?.data?.suggestions ?? []);
-
-  const handleChange = useCallback((v: string) => { setLocalVal(v); onChange(v || undefined); }, [onChange]);
-  const commit = useCallback((v: string) => { setLocalVal(v); onChange(v || undefined); }, [onChange]);
-
-  return (
-    <div className="flex flex-col" style={{ minWidth: 240, maxHeight: 300 }}>
-      <div className="px-2 pt-2 pb-1.5 shrink-0">
-        <input
-          ref={inputRef}
-          value={localVal}
-          onChange={(e) => handleChange(e.target.value)}
-          placeholder={placeholder}
-          onKeyDown={(e) => {
-            if (e.key === "Tab") { e.preventDefault(); onTabOut?.(); }
-          }}
-          className="w-full h-7 px-2.5 rounded-md text-[12.5px] outline-none bg-gray-100 text-gray-900 placeholder:text-gray-400 dark:bg-white/[0.07] dark:text-white/80 dark:placeholder:text-white/25"
-        />
-      </div>
-      {suggestions.length > 0 ? (
-        <>
-          <div className="h-px bg-gray-100 dark:bg-white/[0.06] shrink-0" />
-          <div className="overflow-y-auto py-1">
-            {suggestions.map((sg, i) => (
-              <button
-                key={sg.email}
-                onMouseDown={(e) => { e.preventDefault(); commit(sg.email); }}
-                className={cn(
-                  "w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors",
-                  focusedIdx === i ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/[0.04]",
-                )}
-              >
-                <ContactAvatar name={sg.name} email={sg.email} />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[12.5px] text-gray-700 dark:text-white/70 truncate leading-tight">{sg.name || sg.email}</span>
-                  {sg.name && <span className="text-[10.5px] text-gray-400 dark:text-white/28 truncate">{sg.email}</span>}
-                </div>
-              </button>
-            ))}
-          </div>
-        </>
-      ) : (
-        <p className="px-3 py-2.5 text-[11.5px] text-gray-400 dark:text-white/25 text-center shrink-0">No contacts found</p>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Labels popover — focusedIdx driven externally
-// active is a single string (the first selected label) — labels chip is
-// single-select in the UI even though filters.labels is string[] in the store.
-// ─────────────────────────────────────────────────────────────────────────────
 
 function LabelsPopover({ active, onSelect, onClose, focusedIdx }: {
   active: string | undefined;
@@ -344,14 +266,14 @@ function LabelsPopover({ active, onSelect, onClose, focusedIdx }: {
               key={l.label}
               onMouseDown={(e) => { e.preventDefault(); onSelect(isActive ? undefined : l.label); onClose(); }}
               className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-[7px] text-left transition-colors text-[13px]",
-                focusedIdx === i ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/[0.04]",
+                "w-full flex items-center gap-2.5 px-3 py-1.75 text-left transition-colors text-[13px]",
+                focusedIdx === i ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/4",
                 isActive ? "text-gray-900 dark:text-white/90" : "text-gray-500 dark:text-white/45",
               )}
             >
-              <Tag className={cn("w-3 h-3 shrink-0", isActive ? "text-blue-500" : "text-gray-300 dark:text-white/[0.18]")} />
+              <Tag className={cn("w-3 h-3 shrink-0", isActive ? "text-blue-500" : "text-gray-300 dark:text-white/18")} />
               <span className="flex-1 truncate">{formatLabelName(l.label)}</span>
-              {l.count > 0 && <span className="text-[10.5px] tabular-nums text-gray-400 dark:text-white/[0.22] shrink-0">{l.count > 999 ? "999+" : l.count}</span>}
+              {l.count > 0 && <span className="text-[10.5px] tabular-nums text-gray-400 dark:text-white/22 shrink-0">{l.count > 999 ? "999+" : l.count}</span>}
               {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
             </button>
           );
@@ -388,14 +310,14 @@ function DatePopover({ filters, onChange, onClose, focusedIdx }: {
             onClose();
           }}
           className={cn(
-            "w-full flex items-center px-3 py-[7px] text-[13px] text-gray-600 dark:text-white/50 transition-colors text-left",
-            focusedIdx === i ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/[0.04]",
+            "w-full flex items-center px-3 py-1.75 text-[13px] text-gray-600 dark:text-white/50 transition-colors text-left",
+            focusedIdx === i ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/4",
           )}
         >
           {p.label}
         </button>
       ))}
-      <div className="h-px bg-gray-100 dark:bg-white/[0.06] my-1.5" />
+      <div className="h-px bg-gray-100 dark:bg-white/6 my-1.5" />
       <div className="px-2 pb-2">
         <p className="text-[10px] font-semibold tracking-[0.09em] uppercase text-gray-400/70 dark:text-white/[0.28] px-1 py-1.5 select-none">Custom range</p>
         <Calendar
@@ -422,13 +344,6 @@ function DatePopover({ filters, onChange, onClose, focusedIdx }: {
 type OpenChip = "status" | "from" | "to" | "date" | "label" | null;
 const CHIP_SEQUENCE: NonNullable<OpenChip>[] = ["status", "from", "to", "date", "label"];
 
-const CHIP_OPTION_MAX: Record<NonNullable<OpenChip>, number> = {
-  status: STATUS_OPTIONS.length,
-  from:   8,
-  to:     8,
-  date:   DATE_PRESETS.length,
-  label:  50,
-};
 
 export interface FilterChipsHandle {
   cycleChip: (reverse?: boolean) => boolean;
@@ -443,7 +358,7 @@ export interface FilterChipsProps {
 }
 
 export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
-  function FilterChips({ filters, onChange, onChipEscape }, ref) {
+  function FilterChips({ filters, onChange }, ref) {
     const [open,           setOpen]          = useState<OpenChip>(null);
     const [kbChipIdx,      setKbChipIdx]     = useState(-1);
     const [optionFocusIdx, setOptionFocusIdx] = useState(-1);
@@ -601,7 +516,7 @@ export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
     const divider     = <div className="w-px h-3.5 bg-gray-200 dark:bg-white/[0.07] mx-1 shrink-0" />;
 
     const handleEmailTabOut = useCallback(() => {
-      setKbChipIdx((prev) => {
+      setKbChipIdx(() => {
         const cur  = CHIP_SEQUENCE.indexOf(open as NonNullable<OpenChip>);
         const next = cur + 1;
         if (next >= CHIP_SEQUENCE.length) { setOpen(null); return -1; }
@@ -612,7 +527,7 @@ export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
     }, [open]);
 
     return (
-      <div className="flex items-center gap-0.5 px-2.5 py-1.5 overflow-x-auto scrollbar-none border-b border-gray-100 dark:border-white/[0.05]">
+      <div className="flex items-center gap-0.5 px-2.5 py-1.5 overflow-x-auto scrollbar-none border-b border-gray-100 dark:border-white/5">
 
         {/* ── Status ── */}
         <BaseChip chipRef={statusRef} label={activeStatusLabel} active={activeStatusCount > 0} icon={<SlidersHorizontal className="w-2.5 h-2.5" />}
@@ -700,7 +615,7 @@ export const FilterChips = forwardRef<FilterChipsHandle, FilterChipsProps>(
             {divider}
             <button
               onMouseDown={(e) => { e.preventDefault(); onChange({}); }}
-              className="flex items-center gap-1 text-[11.5px] transition-colors shrink-0 px-1 text-gray-400 dark:text-white/[0.22] hover:text-gray-600 dark:hover:text-white/50"
+              className="flex items-center gap-1 text-[11.5px] transition-colors shrink-0 px-1 text-gray-400 dark:text-white/22 hover:text-gray-600 dark:hover:text-white/50"
             >
               <X className="w-2.5 h-2.5" />
               Clear all
@@ -755,7 +670,7 @@ function EmailPopoverWithCount({
       </div>
       {suggestions.length > 0 ? (
         <>
-          <div className="h-px bg-gray-100 dark:bg-white/[0.06] shrink-0" />
+          <div className="h-px bg-gray-100 dark:bg-white/6 shrink-0" />
           <div className="overflow-y-auto py-1">
             {suggestions.map((sg, i) => (
               <button
@@ -763,7 +678,7 @@ function EmailPopoverWithCount({
                 onMouseDown={(e) => { e.preventDefault(); commit(sg.email); }}
                 className={cn(
                   "w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors",
-                  focusedIdx === i ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/[0.04]",
+                  focusedIdx === i ? "bg-gray-100 dark:bg-white/[0.07]" : "hover:bg-gray-50 dark:hover:bg-white/4",
                 )}
               >
                 <ContactAvatar name={sg.name} email={sg.email} />

@@ -69,7 +69,7 @@ function MobileLayout() {
         showDetail ? "translate-x-0" : "translate-x-full",
       )}>
         {/* Back button */}
-        <div className="flex items-center gap-2 px-4 h-11 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
+        <div className="flex items-center gap-2 px-4 h-11 border-b border-black/6 dark:border-white/6 shrink-0">
           <button
             onClick={() => setActiveThread(null)}
             className="flex items-center gap-1.5 text-[13px] font-medium text-blue-500 hover:text-blue-600 transition-colors"
@@ -153,7 +153,7 @@ function DesktopLayout() {
     <div ref={containerRef} className="flex h-full w-full overflow-hidden">
       {/* Left — thread list */}
       <div
-        className="h-full overflow-hidden flex-shrink-0"
+        className="h-full overflow-hidden shrink-0"
         style={{ width: `${splitPct}%` }}
       >
         <ThreadList className="h-full" />
@@ -163,7 +163,7 @@ function DesktopLayout() {
       <div
         onMouseDown={startDrag}
         className={cn(
-          "relative w-px bg-black/[0.06] dark:bg-white/[0.06] flex-shrink-0 cursor-col-resize",
+          "relative w-px bg-black/6 dark:bg-white/6 shrink-0 cursor-col-resize",
           "hover:bg-blue-400 dark:hover:bg-blue-500 transition-colors duration-150",
           // Widen the hit area without affecting layout
           "after:absolute after:inset-y-0 after:-left-1.5 after:-right-1.5 after:content-['']",

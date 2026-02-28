@@ -61,14 +61,14 @@ export function AISummary({ threadId, emailAddress, variant = "card" }: AISummar
   return (
     <div className={cn(
       "mx-4 sm:mx-6 mt-4 rounded-2xl overflow-hidden",
-      "bg-white/60 dark:bg-white/[0.03]",
-      "ring-1 ring-black/[0.05] dark:ring-white/[0.07]",
+      "bg-white/60 dark:bg-white/3",
+      "ring-1 ring-black/5 dark:ring-white/[0.07]",
     )}>
       <button
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-black/2 dark:hover:bg-white/2 transition-colors"
       >
-        <div className="w-5 h-5 rounded-md bg-black/[0.04] dark:bg-white/[0.07] flex items-center justify-center shrink-0">
+        <div className="w-5 h-5 rounded-md bg-black/4 dark:bg-white/[0.07] flex items-center justify-center shrink-0">
           <IconSparkles size={11} className="text-gray-500 dark:text-white/40" />
         </div>
         <span className="text-[11px] font-semibold text-gray-400 dark:text-white/30 select-none shrink-0 tracking-[0.07em] uppercase">
@@ -81,7 +81,7 @@ export function AISummary({ threadId, emailAddress, variant = "card" }: AISummar
             isLoading ? "text-transparent" : "text-gray-500 dark:text-white/42",
           )}>
             {isLoading
-              ? <Skeleton className="h-2.5 w-full rounded-full max-w-[220px] inline-block" />
+              ? <Skeleton className="h-2.5 w-full rounded-full max-w-55 inline-block" />
               : s?.text
             }
           </p>
@@ -93,7 +93,7 @@ export function AISummary({ threadId, emailAddress, variant = "card" }: AISummar
             <span
               role="button"
               onClick={copy}
-              className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-300 dark:text-white/20 hover:text-gray-600 dark:hover:text-white/55 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors"
+              className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-300 dark:text-white/20 hover:text-gray-600 dark:hover:text-white/55 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
             >
               {copied ? <IconCheck size={11} className="text-emerald-500" /> : <IconCopy size={11} />}
             </span>
@@ -110,7 +110,7 @@ export function AISummary({ threadId, emailAddress, variant = "card" }: AISummar
       {/* Collapsed action pill */}
       {!expanded && !isLoading && hasAction && (
         <div className="px-4 pb-3 -mt-1">
-          <div className="flex items-center gap-1.5 w-fit px-2.5 py-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.04]">
+          <div className="flex items-center gap-1.5 w-fit px-2.5 py-1 rounded-lg bg-black/3 dark:bg-white/4">
             <IconBolt size={10} className="text-gray-400 dark:text-white/25 shrink-0" />
             <p className="text-[11px] text-gray-500 dark:text-white/38 leading-snug truncate">
               {String(s!.actionItems)}
@@ -121,7 +121,7 @@ export function AISummary({ threadId, emailAddress, variant = "card" }: AISummar
 
       {/* Expanded body */}
       {expanded && (
-        <div className="px-4 pb-4 pt-0 space-y-3 border-t border-black/[0.04] dark:border-white/[0.05]">
+        <div className="px-4 pb-4 pt-0 space-y-3 border-t border-black/4 dark:border-white/5">
           {isLoading ? (
             <div className="space-y-1.5 pt-3">
               {[100, 88, 72].map((w, i) => (
@@ -135,13 +135,13 @@ export function AISummary({ threadId, emailAddress, variant = "card" }: AISummar
               </p>
               {hasKeyPoints && (
                 <div className="space-y-2">
-                  <p className="text-[9.5px] font-bold tracking-[0.1em] uppercase text-gray-300 dark:text-white/20 select-none">
+                  <p className="text-[9.5px] font-bold tracking-widest uppercase text-gray-300 dark:text-white/20 select-none">
                     Highlights
                   </p>
                   <ul className="space-y-1.5">
                     {String(s!.keyPoints).split("\n").filter(Boolean).map((pt, i) => (
                       <li key={i} className="flex items-start gap-2 text-[12.5px] text-gray-500 dark:text-white/38 leading-snug">
-                        <span className="mt-[6px] w-1 h-1 rounded-full bg-gray-300 dark:bg-white/18 shrink-0" />
+                        <span className="mt-1.5 w-1 h-1 rounded-full bg-gray-300 dark:bg-white/18 shrink-0" />
                         {pt}
                       </li>
                     ))}
@@ -149,8 +149,8 @@ export function AISummary({ threadId, emailAddress, variant = "card" }: AISummar
                 </div>
               )}
               {hasAction && (
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-black/[0.025] dark:bg-white/[0.04] ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
-                  <div className="p-1.5 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] shrink-0 mt-px">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-black/2.5 dark:bg-white/4 ring-1 ring-black/4 dark:ring-white/6">
+                  <div className="p-1.5 rounded-lg bg-black/5 dark:bg-white/8 shrink-0 mt-px">
                     <IconBolt size={11} className="text-gray-500 dark:text-white/38" />
                   </div>
                   <div>
