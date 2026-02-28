@@ -204,22 +204,138 @@ export function useRecentSearches() {
   });
 }
 
-export function useSavedSearches() {
-  return useSuspenseQuery({
-    queryKey: mailboxKeys.savedSearches(),
-    queryFn: mailboxService.getSavedSearches,
-    staleTime: 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    select: (data) => data.data,
-  });
-}
+
+import type { SavedSearch } from "./mailbox.type";
+
+type SavedSearchCache = { success: boolean; data: SavedSearch[] };
+
+// ── 1. CREATE — no optimistic, just fast invalidation ────────────────────────
 
 export function useCreateSavedSearch() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (params: CreateSavedSearchParams) =>
       mailboxService.createSavedSearch(params),
+
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearches() });
+    },
+
+    onError: () => {
+      toast.error("Failed to save filter", {
+        description: "Please try again.",
+        duration: 4000,
+      });
+    },
+  });
+}
+
+// ── 2. UPDATE — optimistic: patch real cache data in place ───────────────────
+
+export function useUpdateSavedSearch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: UpdateSavedSearchParams) =>
+      mailboxService.updateSavedSearch(params),
+
+    onMutate: async (params) => {
+      // Cancel any in-flight refetches so they don't overwrite our patch
+      await queryClient.cancelQueries({ queryKey: mailboxKeys.savedSearches() });
+      await queryClient.cancelQueries({
+        queryKey: mailboxKeys.savedSearch(params.id),
+      });
+
+      // Snapshot before mutation
+      const previous = queryClient.getQueryData<SavedSearchCache>(
+        mailboxKeys.savedSearches(),
+      );
+
+      // Apply only the fields that were actually provided — no stubs
+      queryClient.setQueryData<SavedSearchCache>(
+        mailboxKeys.savedSearches(),
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            data: old.data.map((s) =>
+              s.id !== params.id
+                ? s
+                : {
+                    ...s,
+                    ...(params.name  !== undefined && { name:  params.name  }),
+                    ...(params.color !== undefined && { color: params.color }),
+                    ...(params.query !== undefined && { query: params.query }),
+                  },
+            ),
+          };
+        },
+      );
+
+      return { previous };
+    },
+
+    onError: (_err, _params, context) => {
+      // Rollback to snapshot
+      if (context?.previous) {
+        queryClient.setQueryData(mailboxKeys.savedSearches(), context.previous);
+      }
+      toast.error("Failed to update filter", {
+        description: "Changes reverted. Please try again.",
+        duration: 4000,
+      });
+    },
+
+    onSettled: (_data, _err, params) => {
+      queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearches() });
+      queryClient.invalidateQueries({
+        queryKey: mailboxKeys.savedSearch(params.id),
+      });
+    },
+  });
+}
+
+// ── 3. DELETE — optimistic: remove from cache immediately ────────────────────
+
+export function useDeleteSavedSearch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => mailboxService.deleteSavedSearch(id),
+
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: mailboxKeys.savedSearches() });
+
+      // Snapshot before removal
+      const previous = queryClient.getQueryData<SavedSearchCache>(
+        mailboxKeys.savedSearches(),
+      );
+
+      // Remove the item immediately
+      queryClient.setQueryData<SavedSearchCache>(
+        mailboxKeys.savedSearches(),
+        (old) =>
+          old
+            ? { ...old, data: old.data.filter((s) => s.id !== id) }
+            : old,
+      );
+
+      return { previous };
+    },
+
+    onError: (_err, _id, context) => {
+      // Re-insert by rolling back to snapshot
+      if (context?.previous) {
+        queryClient.setQueryData(mailboxKeys.savedSearches(), context.previous);
+      }
+      toast.error("Failed to remove filter", {
+        description: "Changes reverted. Please try again.",
+        duration: 4000,
+      });
+    },
+
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearches() });
     },
   });
@@ -428,27 +544,7 @@ export function useExecuteSavedSearch(id: string) {
   });
 }
 
-export function useUpdateSavedSearch() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (params: UpdateSavedSearchParams) =>
-      mailboxService.updateSavedSearch(params),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearches() });
-      queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearch(id) });
-    },
-  });
-}
 
-export function useDeleteSavedSearch() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => mailboxService.deleteSavedSearch(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: mailboxKeys.savedSearches() });
-    },
-  });
-}
 
 export function useEmailSuggestions(query?: string, limit = 10) {
   return useQuery({

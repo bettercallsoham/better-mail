@@ -13,15 +13,12 @@ import type {
   useUpdateSavedSearch,
 } from "@/features/mailbox/mailbox.query";
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 interface SavedSearchesStripProps {
   savedSearches:     SavedSearch[] | undefined;
   searchQuery:       string | null;
   searchFilters:     SearchFilters | null;
   hasSearch:         boolean;
   categoryLabels:    CategoryLabel[];
-  onLiveApply:       (q: string, f: SearchFilters | null) => void;
   onSelectSaved:     (s: SavedSearch) => void;
   deleteSavedSearch: ReturnType<typeof useDeleteSavedSearch>;
   createSavedSearch: ReturnType<typeof useCreateSavedSearch>;
@@ -34,13 +31,11 @@ export function SavedSearchesStrip({
   searchFilters,
   hasSearch,
   categoryLabels,
-  onLiveApply,
   onSelectSaved,
   deleteSavedSearch,
   createSavedSearch,
   updateSavedSearch,
 }: SavedSearchesStripProps) {
-  // Which dropdown is open: null = closed, "create" = new, string id = edit
   const [dropdownState, setDropdownState] = useState<"create" | string | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
@@ -56,13 +51,14 @@ export function SavedSearchesStrip({
   const close = () => setDropdownState(null);
 
   return (
-    // overflow-visible so the dropdown can escape the strip's height
     <div className="relative flex items-center h-[28px] border-b border-black/[0.04] dark:border-white/[0.04]">
       <div className="flex items-center gap-1 px-3 overflow-x-auto no-scrollbar flex-1 min-w-0">
 
-        {/* ── Saved filter chips ── */}
         {savedSearches?.map((s) => {
-          const isActive = hasSearch && searchQuery === s.query.searchText;
+          const isActive =
+            hasSearch &&
+            searchQuery === (s.query.searchText ?? null) &&
+            JSON.stringify(searchFilters ?? {}) === JSON.stringify(s.query.filters ?? {});
           return (
             <SavedFilterChip
               key={s.id}
@@ -75,15 +71,13 @@ export function SavedSearchesStrip({
           );
         })}
 
-        {/* Divider — only when chips exist */}
         {savedSearches && savedSearches.length > 0 && (
           <div className="w-px h-3 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5 shrink-0" />
         )}
 
-        {/* ── Always-present + Add filter button ── */}
         <button
           ref={btnRef}
-          onClick={() => setDropdownState((v) => v === null ? "create" : null)}
+          onClick={() => setDropdownState((v) => (v === null ? "create" : null))}
           className={cn(
             "flex items-center gap-1 h-[22px] px-2 rounded-lg text-[11px] font-medium shrink-0 transition-all duration-100",
             dropdownState === "create"
@@ -96,17 +90,14 @@ export function SavedSearchesStrip({
         </button>
       </div>
 
-      {/* ── Dropdown — key remounts fresh on each open/edit so useState seeds correctly ── */}
       <FilterDropdown
         key={dropdownState ?? "closed"}
         anchorRef={btnRef as React.RefObject<HTMLElement>}
         open={isOpen}
         mode={dropdownMode}
         onClose={close}
-        searchQuery={searchQuery}
-        searchFilters={searchFilters}
         categoryLabels={categoryLabels}
-        onLiveApply={onLiveApply}
+        savedSearches={savedSearches}   // ← passed through for duplicate check
         createSavedSearch={createSavedSearch}
         updateSavedSearch={updateSavedSearch}
       />

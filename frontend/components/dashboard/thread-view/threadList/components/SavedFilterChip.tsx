@@ -2,11 +2,8 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { BookmarkCheck, Pencil, X } from "lucide-react";
-import { hexToRgba } from "./FilterDropdown";
+import { Pencil, X } from "lucide-react";
 import type { SavedSearch } from "@/features/mailbox/mailbox.type";
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface SavedFilterChipProps {
   savedSearch: SavedSearch;
@@ -24,90 +21,90 @@ export function SavedFilterChip({
   onDelete,
 }: SavedFilterChipProps) {
   const [delConfirm, setDelConfirm] = useState(false);
-  const color = savedSearch.color;
 
-  // ── Color-derived style ────────────────────────────────────────────────────
-  // Active:   solid tinted bg + white text (or dark text on light colors)
-  // Inactive: very faint tint + normal muted text
-  const activeStyle = color
-    ? {
-        backgroundColor: hexToRgba(color, 0.18),
-        color:           color,
-        borderColor:     hexToRgba(color, 0.30),
-      }
-    : undefined;
-
-  const inactiveStyle = color
-    ? {
-        backgroundColor: hexToRgba(color, 0.07),
-        borderColor:     "transparent",
-      }
-    : undefined;
-
-  // ── Delete confirmation flicker ────────────────────────────────────────────
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (delConfirm) {
       onDelete();
     } else {
       setDelConfirm(true);
-      // Auto-reset after 2s if not confirmed
       setTimeout(() => setDelConfirm(false), 2000);
     }
   };
 
   return (
-    <div className="group/chip shrink-0 flex items-center">
-      {/* Main chip button */}
+    <div
+      className={cn(
+        // Always a fully rounded pill — never splits into left/right halves
+        "group/chip shrink-0 inline-flex cursor-pointer items-center rounded-full h-[22px]",
+        "transition-all duration-150",
+        isActive
+          ? "bg-gray-900 dark:bg-white/[0.14] text-white dark:text-white/88"
+          : "bg-black/[0.05] dark:bg-white/[0.06] text-gray-500 dark:text-white/40",
+      )}
+    >
+      {/* ── Label ─────────────────────────────────────────────────────────── */}
       <button
         onClick={onSelect}
-        style={isActive ? activeStyle : inactiveStyle}
-        className={cn(
-          "flex items-center gap-1.5 h-[22px] pl-2 pr-1.5 rounded-lg text-[11px] font-medium",
-          "border transition-all duration-100",
-          !color && [
-            isActive
-              ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-transparent"
-              : "bg-black/[0.04] dark:bg-white/[0.06] text-gray-500 dark:text-white/38 border-transparent",
-          ],
-          !color && !isActive && "hover:bg-black/[0.07] dark:hover:bg-white/[0.09] hover:text-gray-700 dark:hover:text-white/62",
-        )}
+        className="h-full cursor-pointer flex items-center pl-2.5 pr-2 text-[11px] font-medium leading-none"
       >
-        <BookmarkCheck
-          className="w-2.5 h-2.5 shrink-0 opacity-70"
-          style={isActive && color ? { color } : undefined}
-        />
-        <span className="truncate max-w-[72px]" style={!isActive && color ? { color: `${color}cc` } : undefined}>
-          {savedSearch.name}
-        </span>
+        <span className="truncate max-w-[80px]">{savedSearch.name}</span>
       </button>
 
-      {/* Edit + delete — appear on hover */}
-      <div className="flex items-center gap-px ml-0.5 opacity-0 group-hover/chip:opacity-100 transition-opacity duration-100">
-        {/* Edit pencil */}
+      {/* ── Actions: hidden (max-w-0) → visible (max-w-[48px]) on hover ───── */}
+      {/*   max-width trick keeps the pill fully rounded because there's no    */}
+      {/*   separate DOM element — the pill just gets wider.                   */}
+      <div
+        className={cn(
+          "flex items-center overflow-hidden",
+          "max-w-0 group-hover/chip:max-w-[52px]",
+          "transition-[max-width] duration-150 ease-out",
+        )}
+      >
+        {/* Hairline separator */}
+        <span
+          className={cn(
+            "block w-px h-3 mx-1 rounded-full shrink-0",
+            isActive
+              ? "bg-white/15"
+              : "bg-black/[0.10] dark:bg-white/[0.12]",
+          )}
+        />
+
+        {/* Edit button */}
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-white/20 hover:text-gray-600 dark:hover:text-white/60 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] transition-all"
           title="Edit filter"
+          className={cn(
+            "w-[18px] h-[18px] flex cursor-pointer items-center justify-center rounded-full shrink-0 transition-colors",
+            isActive
+              ? "text-white/45 hover:text-white hover:bg-white/10"
+              : "text-gray-400 dark:text-white/25 hover:text-gray-700 dark:hover:text-white/70 hover:bg-black/[0.08] dark:hover:bg-white/[0.09]",
+          )}
         >
           <Pencil className="w-2.5 h-2.5" />
         </button>
 
-        {/* Delete — two-step confirm */}
+        {/* Delete button — two-step confirm */}
         <button
           onClick={handleDeleteClick}
-          className={cn(
-            "h-[18px] flex items-center justify-center rounded transition-all",
-            delConfirm
-              ? "px-1.5 gap-1 bg-red-500/[0.12] dark:bg-red-500/[0.18] text-red-500"
-              : "w-[18px] text-gray-300 dark:text-white/20 hover:text-red-400 hover:bg-black/[0.05] dark:hover:bg-white/[0.07]",
-          )}
           title={delConfirm ? "Click again to confirm" : "Remove filter"}
+          className={cn(
+            "flex items-center justify-center cursor-pointer rounded-full shrink-0 transition-all mr-1",
+            delConfirm
+              ? "h-[18px] px-1.5 gap-0.5 bg-red-500/[0.12] dark:bg-red-500/[0.18] text-red-500 dark:text-red-400"
+              : cn(
+                  "w-[18px] h-[18px]",
+                  isActive
+                    ? "text-white/45 hover:text-red-300 hover:bg-white/10"
+                    : "text-gray-400 dark:text-white/25 hover:text-red-500 dark:hover:text-red-400 hover:bg-black/[0.08] dark:hover:bg-white/[0.09]",
+                ),
+          )}
         >
           {delConfirm ? (
             <>
-              <X className="w-2.5 h-2.5" />
-              <span className="text-[10px] font-semibold">Delete?</span>
+              <X className="w-2.5 h-2.5 shrink-0" />
+              <span className="text-[9.5px] font-semibold whitespace-nowrap">Del?</span>
             </>
           ) : (
             <X className="w-2.5 h-2.5" />
