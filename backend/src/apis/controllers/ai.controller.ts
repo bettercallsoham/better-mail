@@ -32,6 +32,16 @@ function cleanJsonResponse(text: string): string {
     .trim();
 }
 
+function stripQuotedReplies(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => !line.startsWith(">"))
+    .join("\n")
+    .replace(/On .+wrote:\s*/gs, "") // "On Mon, John wrote:"
+    .replace(/[-_]{3,}/g, "") // horizontal dividers
+    .trim();
+}
+
 /**
  * Summarize email thread
  * POST /api/ai/threads/:threadId/summarize
@@ -102,10 +112,11 @@ export const summarizeThread = asyncHandler(
               })
             : email.bodyText || "";
 
+          const cleanedBody = stripQuotedReplies(body);
           const truncatedBody =
-            body.length > 1000
-              ? body.substring(0, 800) + "\n[...truncated...]"
-              : body;
+            cleanedBody.length > 1000
+              ? cleanedBody.substring(0, 800) + "\n[...truncated...]"
+              : cleanedBody;
 
           return `Email ${i + 1}:
 From: ${email.from.name || email.from.email}
@@ -186,4 +197,3 @@ ${truncatedBody}
   },
   "summarizeThread",
 );
-

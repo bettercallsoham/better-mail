@@ -41,9 +41,9 @@ export class AISummaryService {
     try {
       const systemPrompt = `You're an  assistant that summarizes email threads.
 Provide a comprehensive summary in pure JSON format (no markdown, no code blocks) with these fields:
-- summary: A concise overview of the thread
+- summary: A concise overview of the thread [keep it complete , short and correct]
 - keyPoints: Array of main discussion points
-- actionItems: Array of tasks or follow-ups needed
+- actionItems: Array of tasks or follow-ups needed [include coupon codes given or any important info]
 - sentiment: "positive", "neutral", or "negative"
 - priority: "low", "medium", or "high"
 
@@ -52,7 +52,13 @@ DON'T MISS OUT ON ANY IMPORTANT INFORMATION.
 Return ONLY the JSON object, nothing else.`;
 
       const userPrompt = previousSummary
-        ? `Previous Summary:\n${previousSummary}\n\nNew Emails:\n${emailsText}\n\nUpdate the summary with the new information.`
+        ? `Previous Summary:
+${previousSummary}
+
+New Emails:
+${emailsText}
+
+Update the summary. For action items, distinguish between resolved, ongoing, and new ones.`
         : `Emails:\n${emailsText}\n\nSummarize this email thread.`;
 
       const response = await azureClient4o_mini.chat.completions.create({
