@@ -63,8 +63,9 @@
 }
 
 
-
-
+/* ─────────────────────────────────────────────────────────────────────────────
+   LIGHT MODE
+───────────────────────────────────────────────────────────────────────────── */
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -99,56 +100,87 @@
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
 
-  --app-sidebar-bg:     #f4f4f4;  
-  --app-sidebar-border: #e5e5e5;   
-  --app-sidebar-hover:  #ebebeb;   
-  --app-sidebar-active: #e0e0e0;   
-  --app-sidebar-muted:  #d4d4d4;   
+  --app-sidebar-bg:     #f4f4f4;
+  --app-sidebar-border: #e5e5e5;
+  --app-sidebar-hover:  #ebebeb;
+  --app-sidebar-active: #e0e0e0;
+  --app-sidebar-muted:  #d4d4d4;
 }
 
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DARK MODE
+   Strategy: single warm-dark family rooted at #18181b (zinc-900 equivalent
+   with a very slight warm tint). All elevation steps use rgba white overlays
+   on this base — never independent color values.
+   
+   Elevation ladder:
+     base body:      #18181b              (main content area)
+     sidebar:        #131315              (slightly receded)
+     card/surface:   rgba(255,255,255,0.035) over base
+     border:         rgba(255,255,255,0.07)
+     hover row:      rgba(255,255,255,0.04)
+     focused row:    rgba(255,255,255,0.055)
+     active row:     rgba(255,255,255,0.07)
+     
+   Text opacity ladder (4 levels):
+     primary/unread: white/88
+     secondary:      white/60
+     tertiary/read:  white/32
+     muted/dates:    white/20
+───────────────────────────────────────────────────────────────────────────── */
 .dark {
-  --background: oklch(27.313% 0.00185 286.033);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
+  /* Body / page background — warm dark, not pure black */
+  --background: #18181b;
+  --foreground: rgba(255, 255, 255, 0.88);
+
+  --card: #1f1f22;
+  --card-foreground: rgba(255, 255, 255, 0.88);
+
+  --popover: #1c1c1f;
+  --popover-foreground: rgba(255, 255, 255, 0.88);
+
+  --primary: rgba(255, 255, 255, 0.88);
+  --primary-foreground: #18181b;
+
+  --secondary: rgba(255, 255, 255, 0.05);
+  --secondary-foreground: rgba(255, 255, 255, 0.88);
+
+  --muted: rgba(255, 255, 255, 0.05);
+  --muted-foreground: rgba(255, 255, 255, 0.40);
+
+  --accent: rgba(255, 255, 255, 0.06);
+  --accent-foreground: rgba(255, 255, 255, 0.88);
+
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
+
+  /* Borders: barely-there, consistent hue */
+  --border: rgba(255, 255, 255, 0.07);
+  --input: rgba(255, 255, 255, 0.10);
+  --ring: rgba(255, 255, 255, 0.18);
+
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
 
-  
-  --app-sidebar-bg:     #1c1c1f;   
-  --app-sidebar-border: #2e2e32;   
-  --app-sidebar-hover:  #26262a;   
-  --app-sidebar-active: #2e2e32;  
-  --app-sidebar-muted:  #2e2e32;   
+  /* Sidebar — noticeably darker than body, clear intent */
+  --sidebar: #131315;
+  --sidebar-foreground: rgba(255, 255, 255, 0.88);
+  --sidebar-primary: rgba(255, 255, 255, 0.88);
+  --sidebar-primary-foreground: #131315;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: rgba(255, 255, 255, 0.88);
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-ring: rgba(255, 255, 255, 0.18);
 
-  --popover:            #1c1c1f;
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --border:             #2e2e32;
+  /* App sidebar — uses the deeper receded surface */
+  --app-sidebar-bg:     #131315;
+  --app-sidebar-border: rgba(255, 255, 255, 0.07);
+  --app-sidebar-hover:  rgba(255, 255, 255, 0.05);
+  --app-sidebar-active: rgba(255, 255, 255, 0.08);
+  --app-sidebar-muted:  rgba(255, 255, 255, 0.04);
 }
 
 @layer base {
@@ -183,10 +215,9 @@
 }
 
 *:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.10) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
 }
 
-/* WebKit (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
   width: 3px;
   height: 3px;
@@ -202,22 +233,20 @@
   transition: background 0.2s ease;
 }
 
-/* Only show thumb when parent is hovered */
 *:hover::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 *:hover::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.15);
 }
 
-/* Light mode variant */
 .light *:hover::-webkit-scrollbar-thumb,
 :root:not(.dark) *:hover::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.10);
 }
 
 .light *:hover::-webkit-scrollbar-thumb:hover,
 :root:not(.dark) *:hover::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.20);
+  background: rgba(0, 0, 0, 0.18);
 }

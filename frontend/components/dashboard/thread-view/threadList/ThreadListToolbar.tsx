@@ -3,15 +3,21 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useUIStore } from "@/lib/store/ui.store";
-import { mailboxKeys, useDeleteSavedSearch } from "@/features/mailbox/mailbox.query";
+import {
+  mailboxKeys,
+  useDeleteSavedSearch,
+  useCreateSavedSearch,
+  useUpdateSavedSearch,
+} from "@/features/mailbox/mailbox.query";
 import { mailboxService } from "@/features/mailbox/mailbox.api";
 import { cn } from "@/lib/utils";
 import {
-  Search, X, BookmarkCheck, Bell, Tag,
-  UserRound, TriangleAlert, SlidersHorizontal,
+  Search, X, Tag, UserRound, Bell, TriangleAlert, SlidersHorizontal,
 } from "lucide-react";
 import { MailSearchCommand } from "../../MailSearchCommand";
+import { SavedSearchesStrip } from "./components/SavedSearchesStrip";
 import type { SearchFilters } from "@/lib/store/ui.store";
+import type { SavedSearch } from "@/features/mailbox/mailbox.type";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -46,7 +52,6 @@ function summariseFilters(q: string | null, f: SearchFilters | null): string {
   if (f?.isArchived)           parts.push("Archived");
   if (f?.filterFrom)           parts.push(`from:${f.filterFrom}`);
   if (f?.filterTo)             parts.push(`to:${f.filterTo}`);
-  // FIX: labels is string[] — iterate instead of calling .replace() directly
   if (f?.labels?.length)       f.labels.forEach((l) => parts.push(l.replace(/^CATEGORY_/, "").toLowerCase()));
   if (f?.dateFrom)             parts.push(`after:${f.dateFrom}`);
   return parts.join("  ·  ") || "Filtered";
@@ -62,7 +67,6 @@ function buildFilterTokens(q: string | null, f: SearchFilters | null): string[] 
   if (f?.isArchived)           t.push("archived");
   if (f?.filterFrom)           t.push(`from:${f.filterFrom}`);
   if (f?.filterTo)             t.push(`to:${f.filterTo}`);
-  // FIX: labels is string[] — iterate instead of calling .replace() directly
   if (f?.labels?.length)       f.labels.forEach((l) => t.push(l.replace(/^CATEGORY_/, "").toLowerCase()));
   if (f?.dateFrom)             t.push(`after:${f.dateFrom}`);
   return t;
@@ -96,12 +100,18 @@ function useToolbarData() {
   });
 
   const deleteSavedSearch = useDeleteSavedSearch();
+  const createSavedSearch = useCreateSavedSearch();
+  const updateSavedSearch = useUpdateSavedSearch();
 
   const categoryLabels = useMemo(
     () =>
       foldersData?.data?.labels
         ?.filter((l) => LABEL_DISPLAY[l.label])
-        .map((l) => ({ id: `label:${l.label}`, label: LABEL_DISPLAY[l.label], raw: l.label })) ?? [],
+        .map((l) => ({
+          id:    `label:${l.label}`,
+          label: LABEL_DISPLAY[l.label],
+          raw:   l.label,
+        })) ?? [],
     [foldersData],
   );
 
@@ -112,7 +122,8 @@ function useToolbarData() {
     activeFolder, setActiveFolder,
     searchQuery, searchFilters,
     clearSearch, setSearchQuery,
-    categoryLabels, savedSearches, deleteSavedSearch,
+    categoryLabels, savedSearches,
+    deleteSavedSearch, createSavedSearch, updateSavedSearch,
     hasSearch, activeDesc,
   };
 }
@@ -156,15 +167,21 @@ export function ThreadListToolbar() {
 function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
   const {
     activeFolder, setActiveFolder,
-    searchQuery, clearSearch, setSearchQuery,
-    categoryLabels, savedSearches, deleteSavedSearch,
+    searchQuery, searchFilters,
+    clearSearch, setSearchQuery,
+    categoryLabels, savedSearches,
+    deleteSavedSearch, createSavedSearch, updateSavedSearch,
     hasSearch, activeDesc,
   } = useToolbarData();
+
+  const handleLiveApply   = (q: string, f: SearchFilters | null) => setSearchQuery(q, f);
+  const handleSelectSaved = (s: SavedSearch) =>
+    setSearchQuery(s.query.searchText, (s.query.filters as SearchFilters) ?? null);
 
   return (
     <div className="shrink-0 flex flex-col select-none">
 
-      {/* Row 1 — Search */}
+      {/* Row 1 — Search bar */}
       <div className="flex items-center gap-2 px-4 h-[42px]">
         <button
           onClick={onOpenSearch}
@@ -180,25 +197,17 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
               Search
             </span>
           )}
-          <kbd className="shrink-0 text-[10px] font-mono text-gray-300 dark:text-white/18 tracking-tight">
-            ⌘K
-          </kbd>
+          <kbd className="shrink-0 text-[10px] font-mono text-gray-300 dark:text-white/18 tracking-tight">⌘K</kbd>
         </button>
-
         {hasSearch && (
-          <button
-            onClick={clearSearch}
-            className="w-5 h-5 flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors shrink-0"
-          >
+          <button onClick={clearSearch} className="w-5 h-5 flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors shrink-0">
             <X className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
 
       {/* Row 2 — Folder tabs */}
-      <div className="flex items-center gap-1 px-4 pb-3 overflow-x-auto scrollbar-none">
-
-        {/* Primary — solid filled pill, no icon */}
+      <div className="flex items-center gap-1 px-4 pb-3 overflow-x-auto no-scrollbar">
         <button
           onClick={() => { setActiveFolder("inbox"); clearSearch(); }}
           className={cn(
@@ -210,8 +219,6 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
         >
           Primary
         </button>
-
-        {/* Icon-only category pills */}
         {categoryLabels.map((cat) => {
           const icon     = FOLDER_ICON[cat.id] ?? <Tag className="w-3.5 h-3.5" />;
           const isActive = !hasSearch && activeFolder === cat.id;
@@ -231,42 +238,9 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
             </button>
           );
         })}
-
-        {/* Saved searches */}
-        {savedSearches && savedSearches.length > 0 && (
-          <>
-            <div className="w-px h-4 bg-black/8 dark:bg-white/8 mx-1 shrink-0" />
-            {savedSearches.slice(0, 4).map((s) => {
-              const isActive = hasSearch && searchQuery === s.query.searchText;
-              return (
-                <div key={s.id} className="group/ss shrink-0 flex items-center">
-                  <button
-                    onClick={() => setSearchQuery(s.query.searchText, null)}
-                    title={s.name}
-                    className={cn(
-                      "flex items-center gap-1 h-[26px] px-2.5 rounded-full text-[11.5px] font-medium transition-all duration-150",
-                      isActive
-                        ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
-                        : "bg-black/4 dark:bg-white/5 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
-                    )}
-                  >
-                    <BookmarkCheck className="w-2.5 h-2.5 shrink-0 opacity-70" />
-                    <span className="truncate max-w-[80px]">{s.name}</span>
-                  </button>
-                  <button
-                    onClick={() => deleteSavedSearch.mutate(s.id)}
-                    className="ml-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-gray-300 dark:text-white/15 hover:text-red-400 opacity-0 group-hover/ss:opacity-100 transition-all"
-                  >
-                    <X className="w-2 h-2" />
-                  </button>
-                </div>
-              );
-            })}
-          </>
-        )}
       </div>
 
-      {/* Row 3 — Active search context */}
+      {/* Row 3 — Active search context banner */}
       {hasSearch && (
         <div className="flex items-center gap-2 px-4 pb-2.5 -mt-1">
           <span className="text-[10.5px] text-gray-400 dark:text-white/25 shrink-0">
@@ -284,6 +258,20 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
         </div>
       )}
 
+      {/* Row 4 — Saved filters strip */}
+      <SavedSearchesStrip
+        savedSearches={savedSearches}
+        searchQuery={searchQuery}
+        searchFilters={searchFilters}
+        hasSearch={hasSearch}
+        categoryLabels={categoryLabels}
+        onLiveApply={handleLiveApply}
+        onSelectSaved={handleSelectSaved}
+        deleteSavedSearch={deleteSavedSearch}
+        createSavedSearch={createSavedSearch}
+        updateSavedSearch={updateSavedSearch}
+      />
+
       <div className="h-px bg-black/[0.06] dark:bg-white/[0.06]" />
     </div>
   );
@@ -298,7 +286,8 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
     activeFolder, setActiveFolder,
     searchQuery, searchFilters,
     clearSearch, setSearchQuery,
-    categoryLabels, savedSearches, deleteSavedSearch,
+    categoryLabels, savedSearches,
+    deleteSavedSearch, createSavedSearch, updateSavedSearch,
     hasSearch,
   } = useToolbarData();
 
@@ -312,14 +301,18 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
     ...categoryLabels.map((c) => ({ id: c.id, label: c.label })),
   ], [categoryLabels]);
 
+  const handleLiveApply   = (q: string, f: SearchFilters | null) => setSearchQuery(q, f);
+  const handleSelectSaved = (s: SavedSearch) =>
+    setSearchQuery(s.query.searchText, (s.query.filters as SearchFilters) ?? null);
+
   return (
     <div className="shrink-0 flex flex-col select-none">
 
-      {/* Row 1 — unified command bar */}
+      {/* Row 1 — command bar */}
       <div className="flex items-stretch h-10 border-b border-black/[0.06] dark:border-white/[0.06]">
 
-        {/* Folder tabs — underline style */}
-        <div className="flex items-stretch overflow-x-auto scrollbar-none shrink-0">
+        {/* Folder tabs */}
+        <div className="flex items-center gap-px px-2 overflow-x-auto no-scrollbar shrink-0">
           {allTabs.map((tab) => {
             const isActive = !hasSearch && activeFolder === tab.id;
             return (
@@ -327,24 +320,22 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
                 key={tab.id}
                 onClick={() => { setActiveFolder(tab.id); clearSearch(); }}
                 className={cn(
-                  "relative flex items-center px-3.5 h-full text-[12px] font-medium whitespace-nowrap transition-colors duration-100 tracking-[-0.01em]",
+                  "relative flex items-center gap-1.5 px-2.5 h-[28px] rounded-md",
+                  "text-[11.5px] whitespace-nowrap transition-all duration-100 tracking-[-0.01em]",
                   isActive
-                    ? "text-gray-900 dark:text-white"
-                    : "text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
+                    ? "font-semibold text-gray-900 dark:text-white/90 bg-black/[0.06] dark:bg-white/[0.08]"
+                    : "font-medium text-gray-400 dark:text-white/28 hover:text-gray-700 dark:hover:text-white/60 hover:bg-black/[0.04] dark:hover:bg-white/[0.05]",
                 )}
               >
+                {isActive && <span className="w-1 h-1 rounded-full bg-gray-700 dark:bg-white/70 shrink-0" />}
                 {tab.label}
-                {isActive && (
-                  <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-zinc-900 dark:bg-white" />
-                )}
               </button>
             );
           })}
         </div>
 
-        {/* Separator */}
         <div className="flex items-center px-1 shrink-0">
-          <div className="w-px h-4 bg-black/8 dark:bg-white/8" />
+          <div className="w-px h-4 bg-black/[0.08] dark:bg-white/[0.08]" />
         </div>
 
         {/* Search area */}
@@ -353,91 +344,51 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
           className="flex-1 flex items-center gap-2 px-2 h-full min-w-0 group text-left"
         >
           <Search className="w-3 h-3 text-gray-300 dark:text-white/20 shrink-0 group-hover:text-gray-400 dark:group-hover:text-white/40 transition-colors" />
-
           {hasSearch ? (
             <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
               {filterTokens.slice(0, 3).map((tok, i) => (
-                <span
-                  key={i}
-                  className="shrink-0 px-1.5 py-[2px] rounded text-[10.5px] font-medium bg-gray-100 dark:bg-white/8 text-gray-600 dark:text-white/55"
-                >
+                <span key={i} className="shrink-0 px-1.5 py-[2px] rounded text-[10.5px] font-medium bg-gray-100 dark:bg-white/[0.08] text-gray-600 dark:text-white/55">
                   {tok}
                 </span>
               ))}
               {filterTokens.length > 3 && (
-                <span className="text-[10.5px] text-gray-400 dark:text-white/30 shrink-0">
-                  +{filterTokens.length - 3} more
-                </span>
+                <span className="text-[10.5px] text-gray-400 dark:text-white/30 shrink-0">+{filterTokens.length - 3} more</span>
               )}
             </div>
           ) : (
-            <span className="flex-1 text-[12px] text-gray-300 dark:text-white/20 tracking-[-0.005em]">
-              Search mail…
-            </span>
+            <span className="flex-1 text-[12px] text-gray-300 dark:text-white/20 tracking-[-0.005em]">Search mail…</span>
           )}
-
           {!hasSearch && (
-            <kbd className="shrink-0 text-[9px] font-mono text-gray-300 dark:text-white/18">
-              ⌘K
-            </kbd>
+            <kbd className="shrink-0 text-[9px] font-mono text-gray-300 dark:text-white/18">⌘K</kbd>
           )}
         </button>
 
-        {/* Right action */}
         <div className="flex items-center pr-2 shrink-0">
           {hasSearch ? (
-            <button
-              onClick={clearSearch}
-              title="Clear search"
-              className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/25 hover:text-gray-700 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/6 transition-all"
-            >
+            <button onClick={clearSearch} title="Clear search" className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/25 hover:text-gray-700 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/[0.06] transition-all">
               <X className="w-3 h-3" />
             </button>
           ) : (
-            <button
-              onClick={onOpenSearch}
-              title="Filters (⌘K)"
-              className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-600 dark:hover:text-white/55 hover:bg-black/5 dark:hover:bg-white/6 transition-all"
-            >
+            <button onClick={onOpenSearch} title="Filters (⌘K)" className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-600 dark:hover:text-white/55 hover:bg-black/5 dark:hover:bg-white/[0.06] transition-all">
               <SlidersHorizontal className="w-3 h-3" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Row 2 — saved searches strip */}
-      {savedSearches && savedSearches.length > 0 && (
-        <div className="flex items-center gap-1 px-3 h-[26px] border-b border-black/[0.04] dark:border-white/[0.04] overflow-x-auto scrollbar-none">
-          <span className="text-[8.5px] font-bold tracking-[0.12em] uppercase text-gray-300 dark:text-white/18 shrink-0 mr-0.5 select-none">
-            Saved
-          </span>
-          {savedSearches.slice(0, 6).map((s) => {
-            const isActive = hasSearch && searchQuery === s.query.searchText;
-            return (
-              <div key={s.id} className="group/ss shrink-0 flex items-center">
-                <button
-                  onClick={() => setSearchQuery(s.query.searchText, null)}
-                  className={cn(
-                    "flex items-center gap-1 h-[18px] px-2 rounded text-[10px] font-medium transition-all",
-                    isActive
-                      ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
-                      : "text-gray-400 dark:text-white/30 hover:text-gray-700 dark:hover:text-white/55 hover:bg-black/4 dark:hover:bg-white/5",
-                  )}
-                >
-                  <BookmarkCheck className="w-2.5 h-2.5 opacity-60 shrink-0" />
-                  <span className="truncate max-w-[80px]">{s.name}</span>
-                </button>
-                <button
-                  onClick={() => deleteSavedSearch.mutate(s.id)}
-                  className="w-3 h-3 ml-0.5 flex items-center justify-center text-gray-300 hover:text-red-400 opacity-0 group-hover/ss:opacity-100 transition-all"
-                >
-                  <X className="w-2 h-2" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Row 2 — Saved filters strip */}
+      <SavedSearchesStrip
+        savedSearches={savedSearches}
+        searchQuery={searchQuery}
+        searchFilters={searchFilters}
+        hasSearch={hasSearch}
+        categoryLabels={categoryLabels}
+        onLiveApply={handleLiveApply}
+        onSelectSaved={handleSelectSaved}
+        deleteSavedSearch={deleteSavedSearch}
+        createSavedSearch={createSavedSearch}
+        updateSavedSearch={updateSavedSearch}
+      />
     </div>
   );
 }

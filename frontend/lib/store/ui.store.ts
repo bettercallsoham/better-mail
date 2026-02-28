@@ -154,7 +154,6 @@ export const useUIStore = create<UIState>()(
     {
       name:    "bettermail-ui",
       storage: createJSONStorage(() => localStorage),
-      // Only persist the keys that should survive a refresh
       partialize: (state) =>
         Object.fromEntries(
           PERSISTED_KEYS.map((k) => [k, state[k]]),

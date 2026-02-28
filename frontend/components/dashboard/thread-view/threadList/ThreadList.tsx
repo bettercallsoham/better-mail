@@ -93,8 +93,6 @@ function SearchResultsList({
     useSearchEmails({
       query:   query.trim() || " ",
       size:    20,
-      // FIX: SearchQueryParams.labels is string, but SearchFilters.labels is
-      // string[]. Join here at the boundary so neither type needs to change.
       ...filters,
       labels:  filters?.labels?.join(","),
     });
@@ -180,23 +178,23 @@ const SearchResultRow = memo(function SearchResultRow({
           <span className={cn(
             "text-[12.5px] truncate",
             !email.isRead
-              ? "font-semibold text-gray-900 dark:text-white"
-              : "font-medium text-gray-600 dark:text-white/55",
+              ? "font-semibold text-gray-900 dark:text-white/90"
+              : "font-medium text-gray-600 dark:text-white/50",
           )}>
             {email.from.name || email.from.email}
           </span>
-          <span className="text-[11px] text-gray-400 dark:text-white/25 shrink-0">{dateStr}</span>
+          <span className="text-[11px] text-gray-400 dark:text-white/22 shrink-0">{dateStr}</span>
         </div>
         <p
           className={cn(
             "text-[12.5px] truncate mb-0.5",
             !email.isRead
-              ? "font-medium text-gray-800 dark:text-white/90"
-              : "text-gray-600 dark:text-white/50",
+              ? "font-medium text-gray-800 dark:text-white/75"
+              : "text-gray-600 dark:text-white/45",
           )}
           dangerouslySetInnerHTML={{ __html: highlightedSubject }}
         />
-        <p className="text-[11.5px] text-gray-400 dark:text-white/30 truncate">
+        <p className="text-[11.5px] text-gray-400 dark:text-white/28 truncate">
           {stripMark(email.snippet)}
         </p>
       </div>
@@ -230,6 +228,14 @@ const ThreadRowWithActions = memo(function ThreadRowWithActions({
     if (isFocused) focusedActionsRef.current = actions;
   });
 
+  // Auto-mark as read when a thread is opened
+  const handleSelect = useCallback(() => {
+    onSelect();
+    if (thread.isUnread) {
+      actions.markRead();
+    }
+  }, [onSelect, thread.isUnread, actions]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <ThreadRow
       thread={thread}
@@ -237,7 +243,7 @@ const ThreadRowWithActions = memo(function ThreadRowWithActions({
       isFocused={isFocused}
       mode={isFlow ? "flow" : "velocity"}
       actions={actions}
-      onSelect={onSelect}
+      onSelect={handleSelect}
       onHover={onHover}
     />
   );
@@ -305,8 +311,9 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
     <div className={cn("flex-1 overflow-y-auto overscroll-contain", isFlow && "py-1")}>
       {groups.map(({ label, items }) => (
         <div key={label}>
-          <div className="sticky top-0 z-10 px-4 py-1.5 bg-white/90 dark:bg-[#111]/90 backdrop-blur-sm border-b border-black/4 dark:border-white/4">
-            <span className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-white/25 select-none">
+          {/* Fixed sticky header — matches body bg, no jarring banding */}
+          <div className="sticky top-0 z-10 px-4 py-1.5 bg-white/90 dark:bg-[#191919]/92 backdrop-blur-sm border-b border-black/[0.04] dark:border-white/[0.04]">
+            <span className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-white/22 select-none">
               {label}
             </span>
           </div>
@@ -339,7 +346,7 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
 function LoadingSpinner() {
   return (
     <div className="flex justify-center py-3">
-      <span className="w-4 h-4 rounded-full border-2 border-gray-200 border-t-gray-500 dark:border-white/10 dark:border-t-white/40 animate-spin" />
+      <span className="w-4 h-4 rounded-full border-2 border-gray-200 border-t-gray-500 dark:border-white/[0.10] dark:border-t-white/40 animate-spin" />
     </div>
   );
 }
@@ -349,7 +356,7 @@ function ThreadListSkeleton() {
   return (
     <div className="flex-1 overflow-hidden">
       {Array.from({ length: 12 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 px-4 h-12 border-b border-black/4 dark:border-white/4">
+        <div key={i} className="flex items-center gap-3 px-4 h-12 border-b border-black/[0.04] dark:border-white/[0.04]">
           <Skeleton className="w-1.5 h-1.5 rounded-full" />
           <Skeleton className="w-32 h-3 rounded" />
           <Skeleton className="flex-1 h-3 rounded" />
