@@ -1,7 +1,35 @@
 "use client";
 
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
-import { IconArrowLeft, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconArrowBackUp,
+  IconArrowForwardUp,
+  IconAlignLeft,
+  IconAlignCenter,
+  IconAlignRight,
+  IconBlockquote,
+  IconBold,
+  IconH1,
+  IconH2,
+  IconItalic,
+  IconList,
+  IconListNumbers,
+  IconMinus,
+  IconPlus,
+  IconTrash,
+  IconUnderline,
+  IconX,
+} from "@tabler/icons-react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import { Extension } from "@tiptap/core";
+import type { Editor } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
+import Underline from "@tiptap/extension-underline";
+import TextAlign from "@tiptap/extension-text-align";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { cn } from "@/lib/utils";
 import {
   useTemplates,
@@ -16,24 +44,103 @@ import type {
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
 
-// ─── Variable-highlighted textarea ─────────────────────────────────────────────
-// Mirror-div technique: textarea is transparent (caret visible), the mirror div
-// behind it renders all text in normal color, with {{var}} replaced by a clean
-// chip — braces are color-transparent so only the name shows through.
+// ─── Variable decoration extension ─────────────────────────────────────────────
+// ProseMirror plugin that adds an amber chip class to any {{varname}} found in
+// text nodes — purely visual, doesn't change the stored content.
 
-function highlightBody(raw: string): string {
+const varPluginKey = new PluginKey("template-variable-decoration");
+
+const VariableDecoration = Extension.create({
+  name: "variableDecoration",
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: varPluginKey,
+        props: {
+          decorations(state) {
+            const decos: Decoration[] = [];
+            const re = /\{\{(\w+)\}\}/g;
+            state.doc.descendants((node, pos) => {
+              if (!node.isText || !node.text) return;
+              re.lastIndex = 0;
+              let m: RegExpExecArray | null;
+              while ((m = re.exec(node.text)) !== null) {
+                decos.push(
+                  Decoration.inline(
+                    pos + m.index,
+                    pos + m.index + m[0].length,
+                    { class: "var-chip" },
+                  ),
+                );
+              }
+            });
+            return DecorationSet.create(state.doc, decos);
+          },
+        },
+      }),
+    ];
+  },
+});
+
+// ─── Toolbar ────────────────────────────────────────────────────────────────────
+function ToolbarBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    raw
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(
-        /\{\{(\w+)\}\}/g,
-        `<mark class="var-pill">{{<span class="var-name">$1</span>}}</mark>`,
-      ) + "\n"
-  ); // trailing newline prevents scroll jump on last line
+    <button
+      type="button"
+      onMouseDown={(e) => {
+        e.preventDefault(); // keep editor focused
+        onClick();
+      }}
+      className={cn(
+        "w-6 h-6 flex items-center justify-center rounded-md transition-colors",
+        active
+          ? "bg-black/[0.07] dark:bg-white/[0.1] text-gray-800 dark:text-white/80"
+          : "text-gray-400 dark:text-white/35 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-700 dark:hover:text-white/65",
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
+function EditorToolbar({ editor }: { editor: Editor | null }) {
+  if (!editor) return null;
+  return (
+    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-black/[0.06] dark:border-white/[0.07] overflow-x-auto">
+      <ToolbarBtn active={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}><IconH1 size={12} /></ToolbarBtn>
+      <ToolbarBtn active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}><IconH2 size={12} /></ToolbarBtn>
+      <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
+      <ToolbarBtn active={editor.isActive("bold")}      onClick={() => editor.chain().focus().toggleBold().run()}>      <IconBold      size={12} /></ToolbarBtn>
+      <ToolbarBtn active={editor.isActive("italic")}    onClick={() => editor.chain().focus().toggleItalic().run()}>    <IconItalic    size={12} /></ToolbarBtn>
+      <ToolbarBtn active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()}><IconUnderline size={12} /></ToolbarBtn>
+      <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
+      <ToolbarBtn active={editor.isActive("bulletList")}  onClick={() => editor.chain().focus().toggleBulletList().run()}>  <IconList        size={12} /></ToolbarBtn>
+      <ToolbarBtn active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()}><IconListNumbers size={12} /></ToolbarBtn>
+      <ToolbarBtn active={editor.isActive("blockquote")}  onClick={() => editor.chain().focus().toggleBlockquote().run()}><IconBlockquote  size={12} /></ToolbarBtn>
+      <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
+      <ToolbarBtn active={editor.isActive({ textAlign: "left" })}   onClick={() => editor.chain().focus().setTextAlign("left").run()}>  <IconAlignLeft   size={12} /></ToolbarBtn>
+      <ToolbarBtn active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()}><IconAlignCenter size={12} /></ToolbarBtn>
+      <ToolbarBtn active={editor.isActive({ textAlign: "right" })}  onClick={() => editor.chain().focus().setTextAlign("right").run()}> <IconAlignRight  size={12} /></ToolbarBtn>
+      <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
+      <ToolbarBtn onClick={() => editor.chain().focus().setHorizontalRule().run()}><IconMinus size={12} /></ToolbarBtn>
+      {/* Undo / Redo pushed to the right */}
+      <div className="ml-auto flex items-center gap-0.5">
+        <ToolbarBtn onClick={() => editor.chain().focus().undo().run()}><IconArrowBackUp    size={12} /></ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().redo().run()}><IconArrowForwardUp size={12} /></ToolbarBtn>
+      </div>
+    </div>
+  );
+}
+
+// ─── Rich text body editor ──────────────────────────────────────────────────────
 function BodyEditor({
   value,
   onChange,
@@ -41,58 +148,76 @@ function BodyEditor({
   value: string;
   onChange: (v: string) => void;
 }) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const mirrorRef = useRef<HTMLDivElement>(null);
+  const prevValueRef = useRef(value);
 
-  const syncScroll = useCallback(() => {
-    if (mirrorRef.current && textareaRef.current) {
-      mirrorRef.current.scrollTop = textareaRef.current.scrollTop;
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit,
+      Placeholder.configure({
+        placeholder:
+          "Write your template body here.\nUse {{variable_name}} for dynamic placeholders.",
+      }),
+      Underline,
+      TextAlign.configure({ types: ["paragraph", "heading"] }),
+      VariableDecoration,
+    ],
+    content: value,
+    onUpdate({ editor }) {
+      const html = editor.getHTML();
+      prevValueRef.current = html;
+      onChange(html);
+    },
+  });
+
+  // Sync when the form loads a different template (editing changes)
+  useEffect(() => {
+    if (!editor) return;
+    if (value !== prevValueRef.current) {
+      editor.commands.setContent(value || "");
+      prevValueRef.current = value;
     }
-  }, []);
+  }, [editor, value]);
 
   return (
     <div
       className={cn(
-        "relative rounded-lg overflow-hidden",
+        "rounded-lg overflow-hidden",
         "border border-black/[0.08] dark:border-white/[0.09]",
         "bg-gray-50 dark:bg-white/[0.04]",
-        "font-mono text-[12.5px] leading-relaxed",
-        // var-pill: subtle amber background, braces are invisible
-        "[&_.var-pill]:bg-amber-50 dark:[&_.var-pill]:bg-amber-400/[0.13]",
-        "[&_.var-pill]:rounded [&_.var-pill]:text-transparent",
-        // var-name inside pill: only the name is visible
-        "[&_.var-pill_.var-name]:text-amber-600 dark:[&_.var-pill_.var-name]:text-amber-400/90",
-        "[&_.var-pill_.var-name]:font-semibold",
+        // Variable chips
+        "[&_.var-chip]:bg-amber-50 dark:[&_.var-chip]:bg-amber-400/[0.14]",
+        "[&_.var-chip]:text-amber-600 dark:[&_.var-chip]:text-amber-400/90",
+        "[&_.var-chip]:rounded [&_.var-chip]:font-medium [&_.var-chip]:text-[0.85em]",
+        // ProseMirror content area
+        "[&_.ProseMirror]:px-3 [&_.ProseMirror]:py-2.5 [&_.ProseMirror]:min-h-[200px]",
+        "[&_.ProseMirror]:max-h-[300px] [&_.ProseMirror]:overflow-y-auto",
+        "[&_.ProseMirror]:outline-none",
+        "[&_.ProseMirror]:text-[13px] [&_.ProseMirror]:leading-relaxed",
+        "[&_.ProseMirror]:text-gray-800 dark:[&_.ProseMirror]:text-white/80",
+        // Lists
+        "[&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-4",
+        "[&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-4",
+        // Headings
+        "[&_.ProseMirror_h1]:text-[1.2em] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h1]:mb-1",
+        "[&_.ProseMirror_h2]:text-[1.05em] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h2]:mb-0.5",
+        // Blockquote
+        "[&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-gray-200 dark:[&_.ProseMirror_blockquote]:border-white/20",
+        "[&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_blockquote]:text-gray-500 dark:[&_.ProseMirror_blockquote]:text-white/50",
+        // Horizontal rule
+        "[&_.ProseMirror_hr]:border-t [&_.ProseMirror_hr]:border-black/[0.08] dark:[&_.ProseMirror_hr]:border-white/[0.1] [&_.ProseMirror_hr]:my-2",
+        // Placeholder
+        "[&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
+        "[&_.ProseMirror_p.is-editor-empty:first-child::before]:text-gray-300",
+        "dark:[&_.ProseMirror_p.is-editor-empty:first-child::before]:text-white/20",
+        "[&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left",
+        "[&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none",
+        "[&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0",
+        "[&_.ProseMirror_p.is-editor-empty:first-child::before]:whitespace-pre-line",
       )}
     >
-      {/* Mirror layer — shows all text + styled chips, sits behind textarea */}
-      <div
-        ref={mirrorRef}
-        aria-hidden
-        className={cn(
-          "absolute inset-0 px-3 py-2.5 whitespace-pre-wrap break-words overflow-hidden pointer-events-none select-none",
-          "text-gray-800 dark:text-white/80",
-        )}
-        dangerouslySetInnerHTML={{ __html: highlightBody(value) }}
-      />
-      {/* Editable textarea — fully transparent text so mirror shows through */}
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onScroll={syncScroll}
-        rows={9}
-        placeholder={
-          "Write your template body here.\nUse {{variable_name}} for dynamic placeholders."
-        }
-        className={cn(
-          "relative w-full px-3 py-2.5 bg-transparent outline-none resize-none",
-          "text-transparent",
-          "placeholder:text-gray-300 dark:placeholder:text-white/20",
-          "caret-gray-800 dark:caret-white",
-          "min-h-[160px]",
-        )}
-      />
+      <EditorToolbar editor={editor} />
+      <EditorContent editor={editor} />
     </div>
   );
 }
@@ -211,7 +336,9 @@ function ListSkeleton() {
 }
 
 // ─── Form view (create or edit) ────────────────────────────────────────────────
-function detectVariables(text: string): TemplateVariable[] {
+function detectVariables(html: string): TemplateVariable[] {
+  // Strip HTML tags first so we only match {{var}} in actual text content
+  const text = html.replace(/<[^>]*>/g, "");
   const seen = new Set<string>();
   const out: TemplateVariable[] = [];
   const re = /\{\{(\w+)\}\}/g;
@@ -284,27 +411,27 @@ function TemplateForm({
 
   return (
     <div className="flex flex-col gap-4 px-4 py-4 overflow-y-auto">
-      {/* Name */}
-      <div className="flex flex-col gap-1">
-        <label className={labelClass}>Name *</label>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Follow-up after meeting"
-          autoFocus
-          className={inputClass}
-        />
-      </div>
-
-      {/* Subject */}
-      <div className="flex flex-col gap-1">
-        <label className={labelClass}>Subject *</label>
-        <input
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          placeholder="e.g. Re: Great talking with you"
-          className={inputClass}
-        />
+      {/* Name + Subject — side by side on sm+, stacked on mobile */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-1 flex-1">
+          <label className={labelClass}>Name *</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Follow-up after meeting"
+            autoFocus
+            className={inputClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1 flex-1">
+          <label className={labelClass}>Subject *</label>
+          <input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="e.g. Re: Great talking with you"
+            className={inputClass}
+          />
+        </div>
       </div>
 
       {/* Body with variable highlighting */}
@@ -466,8 +593,8 @@ export function TemplatesCommandBar({
             exit={{ opacity: 0, scale: 0.97, y: -8 }}
             transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
             className={cn(
-              "fixed z-[201] left-1/2 -translate-x-1/2 top-[12vh]",
-              "w-[540px] max-h-[72vh] flex flex-col rounded-2xl overflow-hidden",
+              "fixed z-[201] left-1/2 -translate-x-1/2 top-[8vh] sm:top-[12vh]",
+              "w-[calc(100vw-1.5rem)] sm:w-[680px] max-h-[85vh] sm:max-h-[80vh] flex flex-col rounded-xl sm:rounded-2xl overflow-hidden",
               "bg-white dark:bg-[#191919]",
               "border border-black/[0.07] dark:border-white/[0.08]",
               "shadow-[0_24px_80px_rgba(0,0,0,0.14),0_0_0_1px_rgba(0,0,0,0.05)]",

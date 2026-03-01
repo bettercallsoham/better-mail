@@ -102,6 +102,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable}  ${instrumentSerif.variable} font-sans antialiased`}
+        suppressHydrationWarning
       >
         <PostHogProvider>{children}</PostHogProvider>
       </body>

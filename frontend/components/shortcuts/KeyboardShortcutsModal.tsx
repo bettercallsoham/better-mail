@@ -48,6 +48,7 @@ const SECTIONS = [
     title: "App",
     rows: [
       { keys: ["⌘", "K"], label: "Search" },
+      { keys: ["alt", "T"], label: "Templates" },
       { keys: ["`"], label: "Toggle sidebar" },
       { keys: ["⌘", "1–3"], label: "Switch account" },
       { keys: ["⌘", "0"], label: "All accounts" },
@@ -211,7 +212,7 @@ export function KeyboardShortcutsModal({ open, onClose }: Props) {
         {/* Footer */}
         <div className="px-6 py-3 border-t border-black/[0.05] dark:border-white/[0.05] flex items-center justify-between">
           <p className="text-[11.5px] text-gray-300 dark:text-white/20 select-none">
-            Press <Key>?</Key> <span className="mx-1">or</span> <Key>Esc</Key>{" "}
+            Press <Key>Esc</Key>{" "}
             to close
           </p>
           <p className="text-[10.5px] text-gray-200 dark:text-white/15 font-mono select-none">

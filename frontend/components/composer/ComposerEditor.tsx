@@ -6,6 +6,8 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
+import Underline from "@tiptap/extension-underline";
+import TextAlign from "@tiptap/extension-text-align";
 import { cn } from "@/lib/utils";
 import {
   useComposerStore,
@@ -14,7 +16,14 @@ import {
 import {
   IconBold,
   IconItalic,
+  IconUnderline,
   IconStrikethrough,
+  IconH1,
+  IconH2,
+  IconBlockquote,
+  IconAlignLeft,
+  IconAlignCenter,
+  IconAlignRight,
   IconList,
   IconListNumbers,
   IconLink,
@@ -55,6 +64,8 @@ export function ComposerEditor({
         openOnClick: false,
         HTMLAttributes: { class: "text-blue-500 underline cursor-pointer" },
       }),
+      Underline,
+      TextAlign.configure({ types: ["paragraph", "heading"] }),
       TemplateSlashExtension.configure({ instanceId: instance.id }),
     ],
     content: instance.html || "",
@@ -157,12 +168,19 @@ export function ComposerEditor({
   const state = useEditorState({
     editor,
     selector: (ctx) => ({
-      isBold:        ctx.editor?.isActive("bold")        ?? false,
-      isItalic:      ctx.editor?.isActive("italic")      ?? false,
-      isStrike:      ctx.editor?.isActive("strike")      ?? false,
-      isBulletList:  ctx.editor?.isActive("bulletList")  ?? false,
-      isOrderedList: ctx.editor?.isActive("orderedList") ?? false,
-      isLink:        ctx.editor?.isActive("link")        ?? false,
+      isBold:        ctx.editor?.isActive("bold")                    ?? false,
+      isItalic:      ctx.editor?.isActive("italic")                  ?? false,
+      isUnderline:   ctx.editor?.isActive("underline")               ?? false,
+      isStrike:      ctx.editor?.isActive("strike")                  ?? false,
+      isH1:          ctx.editor?.isActive("heading", { level: 1 })   ?? false,
+      isH2:          ctx.editor?.isActive("heading", { level: 2 })   ?? false,
+      isBlockquote:  ctx.editor?.isActive("blockquote")              ?? false,
+      isAlignLeft:   ctx.editor?.isActive({ textAlign: "left" })     ?? false,
+      isAlignCenter: ctx.editor?.isActive({ textAlign: "center" })   ?? false,
+      isAlignRight:  ctx.editor?.isActive({ textAlign: "right" })    ?? false,
+      isBulletList:  ctx.editor?.isActive("bulletList")              ?? false,
+      isOrderedList: ctx.editor?.isActive("orderedList")             ?? false,
+      isLink:        ctx.editor?.isActive("link")                    ?? false,
     }),
   });
 
@@ -207,18 +225,24 @@ export function ComposerEditor({
         ) : (
           /* ── Normal formatting buttons ─────────────────────────────────── */
           <>
-            <Btn onClick={() => editor.chain().focus().toggleBold().run()}        active={state?.isBold}        title="Bold ⌘B">          <IconBold          size={13} /></Btn>
-            <Btn onClick={() => editor.chain().focus().toggleItalic().run()}      active={state?.isItalic}      title="Italic ⌘I">        <IconItalic        size={13} /></Btn>
-            <Btn onClick={() => editor.chain().focus().toggleStrike().run()}      active={state?.isStrike}      title="Strikethrough">    <IconStrikethrough size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={state?.isH1}        title="Heading 1">       <IconH1          size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={state?.isH2}        title="Heading 2">       <IconH2          size={13} /></Btn>
             <div className="w-px h-3.5 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5" />
-            <Btn onClick={() => editor.chain().focus().toggleBulletList().run()}  active={state?.isBulletList}  title="Bullet list">      <IconList          size={13} /></Btn>
-            <Btn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={state?.isOrderedList} title="Numbered list">    <IconListNumbers   size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleBold().run()}                active={state?.isBold}       title="Bold ⌘B">        <IconBold         size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleItalic().run()}              active={state?.isItalic}     title="Italic ⌘I">      <IconItalic       size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleUnderline().run()}           active={state?.isUnderline}  title="Underline ⌘U">   <IconUnderline    size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleStrike().run()}              active={state?.isStrike}     title="Strikethrough">  <IconStrikethrough size={13} /></Btn>
+            <div className="w-px h-3.5 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5" />
+            <Btn onClick={() => editor.chain().focus().toggleBulletList().run()}          active={state?.isBulletList}  title="Bullet list">    <IconList         size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleOrderedList().run()}         active={state?.isOrderedList} title="Numbered list">  <IconListNumbers  size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleBlockquote().run()}          active={state?.isBlockquote}  title="Blockquote">     <IconBlockquote   size={13} /></Btn>
+            <div className="w-px h-3.5 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5" />
+            <Btn onClick={() => editor.chain().focus().setTextAlign("left").run()}   active={state?.isAlignLeft}   title="Align left">    <IconAlignLeft   size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={state?.isAlignCenter} title="Align center">  <IconAlignCenter size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().setTextAlign("right").run()}  active={state?.isAlignRight}  title="Align right">   <IconAlignRight  size={13} /></Btn>
             <div className="w-px h-3.5 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5" />
             <Btn
-              onClick={state?.isLink
-                ? () => editor.chain().focus().unsetLink().run()
-                : openLinkInput
-              }
+              onClick={state?.isLink ? () => editor.chain().focus().unsetLink().run() : openLinkInput}
               active={state?.isLink}
               title={state?.isLink ? "Remove link" : "Add link"}
             >
