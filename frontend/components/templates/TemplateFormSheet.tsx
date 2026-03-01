@@ -3,7 +3,10 @@
 import { useEffect, useState, useRef } from "react";
 import { IconX, IconPlus, IconTrash } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import type { Template, TemplateVariable } from "@/features/templates/templates.types";
+import type {
+  Template,
+  TemplateVariable,
+} from "@/features/templates/templates.types";
 import {
   useCreateTemplate,
   useUpdateTemplate,
@@ -29,17 +32,20 @@ function detectVariables(body: string): TemplateVariable[] {
   return vars;
 }
 
-export function TemplateFormSheet({ template, onClose }: TemplateFormSheetProps) {
+export function TemplateFormSheet({
+  template,
+  onClose,
+}: TemplateFormSheetProps) {
   const isEdit = !!template;
   const createTemplate = useCreateTemplate();
   const updateTemplate = useUpdateTemplate(template?.id ?? 0);
 
-  const [name, setName]         = useState(template?.name ?? "");
-  const [subject, setSubject]   = useState(template?.subject ?? "");
-  const [body, setBody]         = useState(template?.body ?? "");
+  const [name, setName] = useState(template?.name ?? "");
+  const [subject, setSubject] = useState(template?.subject ?? "");
+  const [body, setBody] = useState(template?.body ?? "");
   const [category, setCategory] = useState(template?.category ?? "");
   const [tagInput, setTagInput] = useState("");
-  const [tags, setTags]         = useState<string[]>(template?.tags ?? []);
+  const [tags, setTags] = useState<string[]>(template?.tags ?? []);
   const [detectedVars, setDetectedVars] = useState<TemplateVariable[]>([]);
 
   // Detect variables from body when focus leaves the textarea
@@ -58,7 +64,8 @@ export function TemplateFormSheet({ template, onClose }: TemplateFormSheetProps)
     setTagInput("");
   };
 
-  const removeTag = (tag: string) => setTags((prev) => prev.filter((t) => t !== tag));
+  const removeTag = (tag: string) =>
+    setTags((prev) => prev.filter((t) => t !== tag));
 
   const handleSubmit = async () => {
     if (!name.trim() || !subject.trim()) {
@@ -83,7 +90,9 @@ export function TemplateFormSheet({ template, onClose }: TemplateFormSheetProps)
       }
       onClose();
     } catch {
-      toast.error(isEdit ? "Failed to update template" : "Failed to create template");
+      toast.error(
+        isEdit ? "Failed to update template" : "Failed to create template",
+      );
     }
   };
 
@@ -175,7 +184,10 @@ export function TemplateFormSheet({ template, onClose }: TemplateFormSheetProps)
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(); }
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    addTag();
+                  }
                 }}
                 placeholder="Add tag and press Enter"
                 className={cn(inputClass, "flex-1")}
@@ -195,7 +207,9 @@ export function TemplateFormSheet({ template, onClose }: TemplateFormSheetProps)
               value={body}
               onChange={(e) => setBody(e.target.value)}
               onBlur={handleBodyBlur}
-              placeholder={"Write your template body here.\nUse {{variable_name}} for dynamic fields."}
+              placeholder={
+                "Write your template body here.\nUse {{variable_name}} for dynamic fields."
+              }
               rows={8}
               className={cn(
                 inputClass,
@@ -206,11 +220,13 @@ export function TemplateFormSheet({ template, onClose }: TemplateFormSheetProps)
 
           {/* Detected variables */}
           {detectedVars.length > 0 && (
-            <div className={cn(
-              "rounded-xl p-3",
-              "bg-amber-50/80 dark:bg-amber-500/[0.05]",
-              "border border-amber-200/60 dark:border-amber-500/[0.15]",
-            )}>
+            <div
+              className={cn(
+                "rounded-xl p-3",
+                "bg-amber-50/80 dark:bg-amber-500/[0.05]",
+                "border border-amber-200/60 dark:border-amber-500/[0.15]",
+              )}
+            >
               <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400/70 mb-2">
                 Detected variables
               </p>
@@ -246,7 +262,11 @@ export function TemplateFormSheet({ template, onClose }: TemplateFormSheetProps)
               "disabled:opacity-40 disabled:cursor-not-allowed",
             )}
           >
-            {isPending ? "Saving…" : isEdit ? "Save changes" : "Create template"}
+            {isPending
+              ? "Saving…"
+              : isEdit
+                ? "Save changes"
+                : "Create template"}
           </button>
         </div>
       </div>
@@ -255,7 +275,13 @@ export function TemplateFormSheet({ template, onClose }: TemplateFormSheetProps)
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-[11.5px] font-semibold text-gray-500 dark:text-white/40 uppercase tracking-wide">

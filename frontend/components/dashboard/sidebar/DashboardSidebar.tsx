@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useState, useCallback, Suspense } from "react";
-import { useRouter } from "next/navigation";
 import { Sidebar, SidebarBody } from "@/components/ui/sidebar";
 import { useUIStore } from "@/lib/store/ui.store";
 import { useFolders } from "@/features/mailbox/mailbox.query";
-import { IconMenu2, IconX, IconEdit, IconPlus,  } from "@tabler/icons-react";
+import { IconMenu2, IconX, IconEdit, IconTemplate } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
@@ -135,12 +134,12 @@ function FolderList({
   activeFolder,
   compact,
   onSelect,
-  onNavigate,
+  onOpenTemplates,
 }: SidebarDataChildProps & {
   activeFolder: string;
   compact: boolean;
   onSelect: (f: string) => void;
-  onNavigate: (path: string) => void;
+  onOpenTemplates: () => void;
 }) {
   return (
     <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden min-h-0">
@@ -173,33 +172,29 @@ function FolderList({
         </>
       )}
       {/* Tools section */}
-      {!compact && (
-        <>
-          <SectionHeader label="Tools" />
-          <div className="flex flex-col gap-0.5 py-1">
-            <FolderRow
-              item={{
-                icon: <IconPlus size={16} />,
-                label: "Templates",
-                folder: "tools_templates",
-              }}
-              isActive={false}
-              compact={false}
-              onClick={() => onNavigate("/app/settings/templates")}
-            />
-          </div>
-        </>
-      )}
+      {!compact && <SectionHeader label="Tools" />}
+      <div className="flex flex-col gap-0.5 py-1">
+        <FolderRow
+          item={{
+            icon: <IconTemplate size={16} />,
+            label: "Templates",
+            folder: "tools_templates",
+          }}
+          isActive={false}
+          compact={compact}
+          onClick={onOpenTemplates}
+        />
+      </div>
     </div>
   );
 }
 
 export function DashboardSidebar() {
-  const router = useRouter();
-  const collapsed = useUIStore((s) => s.sidebarCollapsed);
-  const activeFolder = useUIStore((s) => s.activeFolder);
-  const setActiveFolder = useUIStore((s) => s.setActiveFolder);
-  const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
+  const collapsed          = useUIStore((s) => s.sidebarCollapsed);
+  const activeFolder       = useUIStore((s) => s.activeFolder);
+  const setActiveFolder    = useUIStore((s) => s.setActiveFolder);
+  const selectedEmail      = useUIStore((s) => s.selectedEmailAddress);
+  const setTemplatesBarOpen = useUIStore((s) => s.setTemplatesBarOpen);
 
   const [isHovering, setIsHovering] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -300,8 +295,8 @@ export function DashboardSidebar() {
                           setActiveFolder(f);
                           setMobileOpen(false);
                         }}
-                        onNavigate={(path) => {
-                          router.push(path);
+                        onOpenTemplates={() => {
+                          setTemplatesBarOpen(true);
                           setMobileOpen(false);
                         }}
                       />
@@ -389,7 +384,7 @@ export function DashboardSidebar() {
                       activeFolder={activeFolder}
                       compact={!isOpen}
                       onSelect={setActiveFolder}
-                      onNavigate={(path) => router.push(path)}
+                      onOpenTemplates={() => setTemplatesBarOpen(true)}
                     />
                   )}
                 </FolderData>

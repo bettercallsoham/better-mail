@@ -33,7 +33,8 @@ export function VariablesBanner({ variables, onApply, onDismiss }: Props) {
       }
     };
     window.addEventListener("keydown", handler, { capture: true });
-    return () => window.removeEventListener("keydown", handler, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handler, { capture: true });
   }, [onDismiss]);
 
   const handleApply = useCallback(() => {

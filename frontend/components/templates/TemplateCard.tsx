@@ -1,10 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { IconEdit, IconCopy, IconTrash, IconDotsVertical } from "@tabler/icons-react";
+import {
+  IconEdit,
+  IconCopy,
+  IconTrash,
+  IconDotsVertical,
+} from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import type { Template } from "@/features/templates/templates.types";
-import { useDeleteTemplate, useDuplicateTemplate } from "@/features/templates/templates.query";
+import {
+  useDeleteTemplate,
+  useDuplicateTemplate,
+} from "@/features/templates/templates.query";
 import { toast } from "sonner";
 
 interface TemplateCardProps {
@@ -15,7 +23,7 @@ interface TemplateCardProps {
 export function TemplateCard({ template, onEdit }: TemplateCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const deleteTemplate   = useDeleteTemplate();
+  const deleteTemplate = useDeleteTemplate();
   const duplicateTemplate = useDuplicateTemplate();
 
   const handleDelete = async () => {
@@ -63,7 +71,10 @@ export function TemplateCard({ template, onEdit }: TemplateCardProps) {
           {/* Actions menu */}
           <div className="relative">
             <button
-              onClick={() => { setMenuOpen((o) => !o); setConfirmDelete(false); }}
+              onClick={() => {
+                setMenuOpen((o) => !o);
+                setConfirmDelete(false);
+              }}
               className={cn(
                 "w-6 h-6 flex items-center justify-center rounded-md transition-colors",
                 menuOpen
@@ -76,7 +87,13 @@ export function TemplateCard({ template, onEdit }: TemplateCardProps) {
 
             {menuOpen && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => { setMenuOpen(false); setConfirmDelete(false); }} />
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setConfirmDelete(false);
+                  }}
+                />
                 <div
                   className={cn(
                     "absolute right-0 top-full mt-1 z-50 w-40 py-1 rounded-xl",
@@ -87,7 +104,10 @@ export function TemplateCard({ template, onEdit }: TemplateCardProps) {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
-                    onClick={() => { onEdit(template); setMenuOpen(false); }}
+                    onClick={() => {
+                      onEdit(template);
+                      setMenuOpen(false);
+                    }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] text-gray-700 dark:text-white/75 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
                   >
                     <IconEdit size={13} />
@@ -104,7 +124,9 @@ export function TemplateCard({ template, onEdit }: TemplateCardProps) {
                   <div className="my-1 border-t border-black/[0.06] dark:border-white/[0.07]" />
                   {confirmDelete ? (
                     <div className="px-3 py-2">
-                      <p className="text-[11.5px] text-gray-500 dark:text-white/40 mb-1.5">Are you sure?</p>
+                      <p className="text-[11.5px] text-gray-500 dark:text-white/40 mb-1.5">
+                        Are you sure?
+                      </p>
                       <div className="flex gap-1.5">
                         <button
                           onClick={() => setConfirmDelete(false)}
@@ -139,14 +161,19 @@ export function TemplateCard({ template, onEdit }: TemplateCardProps) {
 
       {/* Subject preview */}
       <p className="text-[12px] text-gray-500 dark:text-white/40 truncate leading-none">
-        {template.subject || <span className="italic opacity-60">No subject</span>}
+        {template.subject || (
+          <span className="italic opacity-60">No subject</span>
+        )}
       </p>
 
       {/* Tags */}
       {template.tags.length > 0 && (
         <div className="flex gap-1.5 flex-wrap mt-0.5">
           {template.tags.slice(0, 4).map((tag) => (
-            <span key={tag} className="text-[10px] text-gray-400 dark:text-white/28 font-mono">
+            <span
+              key={tag}
+              className="text-[10px] text-gray-400 dark:text-white/28 font-mono"
+            >
               #{tag}
             </span>
           ))}
@@ -156,7 +183,8 @@ export function TemplateCard({ template, onEdit }: TemplateCardProps) {
       {/* Footer: usage count */}
       {template.usageCount > 0 && (
         <p className="text-[10.5px] text-gray-300 dark:text-white/20 mt-0.5">
-          Used {template.usageCount} {template.usageCount === 1 ? "time" : "times"}
+          Used {template.usageCount}{" "}
+          {template.usageCount === 1 ? "time" : "times"}
         </p>
       )}
     </div>

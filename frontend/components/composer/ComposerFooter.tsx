@@ -5,8 +5,8 @@ import {
   IconSend2,
   IconTrash,
   IconLoader2,
-  // Layout,
   IconBookmark,
+  IconTemplate,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
@@ -227,7 +227,7 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
               : "text-gray-400 dark:text-white/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/60",
           )}
         >
-          <IconBookmark size={15} />
+          <IconTemplate size={15} />
         </button>
 
         {pickerOpen && (

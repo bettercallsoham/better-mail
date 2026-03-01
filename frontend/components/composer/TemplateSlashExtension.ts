@@ -117,7 +117,7 @@ export const TemplateSlashExtension = Extension.create<TemplateSlashOptions>({
             onKeyDown: (props) => {
               // Let Escape close the picker and return focus
               if (props.event.key === "Escape") {
-                props.editor.commands.focus();
+                latestProps?.editor.commands.focus();
                 return true;
               }
               return false;

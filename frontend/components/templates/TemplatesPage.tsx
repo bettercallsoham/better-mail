@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IconSearch, IconPlus,  } from "@tabler/icons-react";
+import { IconSearch, IconPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useTemplates } from "@/features/templates/templates.query";
 import type { Template } from "@/features/templates/templates.types";
@@ -10,7 +10,9 @@ import { TemplateFormSheet } from "./TemplateFormSheet";
 
 export function TemplatesPage() {
   const [search, setSearch] = useState("");
-  const [editingTemplate, setEditingTemplate] = useState<Template | undefined>(undefined);
+  const [editingTemplate, setEditingTemplate] = useState<Template | undefined>(
+    undefined,
+  );
   const [createOpen, setCreateOpen] = useState(false);
 
   const { data } = useTemplates(search ? { search } : undefined);
