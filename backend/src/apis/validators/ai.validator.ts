@@ -87,3 +87,26 @@ export const validateRagChat = [
 
   handleValidationErrors,
 ];
+
+export const validateReplySuggestion = [
+  param("threadId")
+    .exists()
+    .withMessage("threadId is required")
+    .isString()
+    .withMessage("threadId must be a string")
+    .notEmpty()
+    .withMessage("threadId cannot be empty"),
+
+  body("emailAddress")
+    .exists()
+    .withMessage("emailAddress is required")
+    .isEmail()
+    .withMessage("emailAddress must be a valid email"),
+
+  body("tone")
+    .optional()
+    .isIn(["formal", "friendly", "brief", "empathetic"])
+    .withMessage("tone must be one of: formal, friendly, brief, empathetic"),
+
+  handleValidationErrors,
+];

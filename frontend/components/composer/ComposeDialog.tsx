@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef } from "react";
+import { useState, useEffect, Suspense, useRef, useSyncExternalStore } from "react";
 import {
   IconX,
   IconArrowsMaximize,
@@ -22,6 +22,18 @@ const POPUP_H = 460;
 const MARGIN = 16;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
+
+function useIsMobile(breakpoint = 768): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches,
+    () => false,
+  );
+}
 
 function deriveProvider(
   email: string,
@@ -143,10 +155,9 @@ interface ComposeDialogProps {
 
 export function ComposeDialog({ onClose }: ComposeDialogProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  // Controlled drag position — persists across fullscreen toggles so popup
-  // returns to the same spot when exiting fullscreen.
   const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
   const nodeRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // Escape closes (only when not focused in an input/textarea/editor)
   useEffect(() => {
@@ -168,10 +179,53 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
     setDragPos({ x: data.x, y: data.y });
   };
 
+  // ── Mobile: full-width bottom sheet, no dragging ──────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        {/* Scrim — tap to close */}
+        <div
+          className="fixed inset-0 bg-black/40 dark:bg-black/60"
+          style={{ zIndex: 1099 }}
+          onClick={onClose}
+        />
+        <div
+          className={cn(
+            "fixed left-0 right-0 bottom-0 flex flex-col overflow-hidden",
+            "rounded-t-2xl",
+            "bg-white dark:bg-[#27241f]",
+            "shadow-[0_-8px_40px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.06)]",
+            "dark:shadow-[0_-8px_40px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.07)]",
+            "animate-in slide-in-from-bottom-4 fade-in duration-200",
+          )}
+          style={{ height: "85dvh", zIndex: 1100 }}
+        >
+          {/* Drag pill */}
+          <div className="flex justify-center pt-2.5 pb-0.5 shrink-0">
+            <div className="w-9 h-1 rounded-full bg-black/[0.12] dark:bg-white/[0.15]" />
+          </div>
+
+          {/* Title bar */}
+          <div className="shrink-0 flex items-center justify-between px-4 h-11 border-b border-black/[0.06] dark:border-white/[0.06]">
+            <span className="text-[13px] font-semibold text-gray-700 dark:text-white/75">
+              New Message
+            </span>
+            <TitleBtn onClick={onClose} title="Close" danger>
+              <IconX size={13} />
+            </TitleBtn>
+          </div>
+
+          <Suspense fallback={<DialogSkeleton />}>
+            <ComposeDialogInner onClose={onClose} isFullscreen={false} />
+          </Suspense>
+        </div>
+      </>
+    );
+  }
+
+  // ── Desktop: draggable popup ──────────────────────────────────────────────
   return (
     <>
-      {/* Fullscreen backdrop — rendered behind the popup, pointer-events-none
-          so it doesn't capture clicks and close the dialog unexpectedly */}
       {isFullscreen && (
         <div
           className="fixed inset-0 bg-black/40 dark:bg-black/60 pointer-events-none"
@@ -179,11 +233,6 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
         />
       )}
 
-      {/*
-        Single Draggable — always mounted so ComposeDialogInner never remounts.
-        In fullscreen: position reset to (0,0) + CSS fills the viewport inset.
-        In popup: position = last drag offset + CSS anchors bottom-right.
-      */}
       <Draggable
         handle=".compose-drag-handle"
         nodeRef={nodeRef}
@@ -203,33 +252,16 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
           )}
           style={
             isFullscreen
-              ? // Fill viewport with margin; position: fixed + inset handles centering
-                {
-                  position: "fixed",
-                  inset: 40,
-                  width: "auto",
-                  height: "auto",
-                  zIndex: 1100,
-                }
-              : // Anchored bottom-right; Draggable translate shifts from here
-                {
-                  position: "fixed",
-                  bottom: MARGIN,
-                  right: MARGIN,
-                  width: POPUP_W,
-                  height: POPUP_H,
-                  zIndex: 1100,
-                }
+              ? { position: "fixed", inset: 40, width: "auto", height: "auto", zIndex: 1100 }
+              : { position: "fixed", bottom: MARGIN, right: MARGIN, width: POPUP_W, height: POPUP_H, zIndex: 1100 }
           }
         >
-          {/* Title bar — drag handle when not fullscreen */}
+          {/* Title bar — drag handle */}
           <div
             className={cn(
               "compose-drag-handle shrink-0 flex items-center justify-between px-4 h-12 select-none",
               "border-b border-black/[0.06] dark:border-white/[0.06]",
-              isFullscreen
-                ? "cursor-default"
-                : "cursor-grab active:cursor-grabbing",
+              isFullscreen ? "cursor-default" : "cursor-grab active:cursor-grabbing",
             )}
           >
             <span className="text-[13px] font-semibold text-gray-700 dark:text-white/75">
@@ -243,11 +275,7 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
                 onClick={() => setIsFullscreen((f) => !f)}
                 title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               >
-                {isFullscreen ? (
-                  <IconArrowsMinimize size={13} />
-                ) : (
-                  <IconArrowsMaximize size={13} />
-                )}
+                {isFullscreen ? <IconArrowsMinimize size={13} /> : <IconArrowsMaximize size={13} />}
               </TitleBtn>
               <TitleBtn onClick={onClose} title="Close" danger>
                 <IconX size={13} />
@@ -255,7 +283,6 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
             </div>
           </div>
 
-          {/* Body — always mounted, state preserved through fullscreen toggle */}
           <Suspense fallback={<DialogSkeleton />}>
             <ComposeDialogInner onClose={onClose} isFullscreen={isFullscreen} />
           </Suspense>

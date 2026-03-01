@@ -11,7 +11,15 @@ import {
 } from "@/features/mailbox/mailbox.query";
 import { mailboxService } from "@/features/mailbox/mailbox.api";
 import { cn } from "@/lib/utils";
-import { Search, X, Tag, UserRound, Bell, TriangleAlert, SlidersHorizontal } from "lucide-react";
+import {
+  Search,
+  X,
+  Tag,
+  UserRound,
+  Bell,
+  TriangleAlert,
+  SlidersHorizontal,
+} from "lucide-react";
 import { MailSearchCommand } from "../../MailSearchCommand";
 import { SavedSearchesStrip } from "./components/SavedSearchesStrip";
 import type { SearchFilters } from "@/lib/store/ui.store";
@@ -22,18 +30,18 @@ import type { SavedSearch } from "@/features/mailbox/mailbox.type";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LABEL_DISPLAY: Record<string, string> = {
-  CATEGORY_PERSONAL:   "Personal",
+  CATEGORY_PERSONAL: "Personal",
   CATEGORY_PROMOTIONS: "Promotions",
-  CATEGORY_UPDATES:    "Updates",
-  CATEGORY_SOCIAL:     "Social",
-  CATEGORY_FORUMS:     "Forums",
+  CATEGORY_UPDATES: "Updates",
+  CATEGORY_SOCIAL: "Social",
+  CATEGORY_FORUMS: "Forums",
 };
 
 const FOLDER_ICON: Record<string, React.ReactNode> = {
-  "label:CATEGORY_PROMOTIONS": <Tag           className="w-3.5 h-3.5" />,
-  "label:CATEGORY_SOCIAL":     <UserRound     className="w-3.5 h-3.5" />,
-  "label:CATEGORY_UPDATES":    <Bell          className="w-3.5 h-3.5" />,
-  "label:CATEGORY_FORUMS":     <TriangleAlert className="w-3.5 h-3.5" />,
+  "label:CATEGORY_PROMOTIONS": <Tag className="w-3.5 h-3.5" />,
+  "label:CATEGORY_SOCIAL": <UserRound className="w-3.5 h-3.5" />,
+  "label:CATEGORY_UPDATES": <Bell className="w-3.5 h-3.5" />,
+  "label:CATEGORY_FORUMS": <TriangleAlert className="w-3.5 h-3.5" />,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,8 +49,8 @@ const FOLDER_ICON: Record<string, React.ReactNode> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface FilterToken {
-  key:    string;
-  label:  string;
+  key: string;
+  label: string;
   remove: () => void;
 }
 
@@ -57,48 +65,90 @@ export function buildTokens(
   clearSearch: () => void,
 ): FilterToken[] {
   const tokens: FilterToken[] = [];
-  const hasF = f && Object.keys(f).some((k) => (f as Record<string, unknown>)[k] !== undefined);
+  const hasF =
+    f &&
+    Object.keys(f).some((k) => (f as Record<string, unknown>)[k] !== undefined);
 
   if (q?.trim()) {
     tokens.push({
-      key: "q", label: q.trim(),
-      remove: () => hasF ? setSearchQuery("", f) : clearSearch(),
+      key: "q",
+      label: q.trim(),
+      remove: () => (hasF ? setSearchQuery("", f) : clearSearch()),
     });
   }
 
-  if (f?.isRead === false) tokens.push({ key: "unread", label: "Unread",
-    remove: () => setSearchQuery(q ?? "", { ...f, isRead: undefined }) });
+  if (f?.isRead === false)
+    tokens.push({
+      key: "unread",
+      label: "Unread",
+      remove: () => setSearchQuery(q ?? "", { ...f, isRead: undefined }),
+    });
 
-  if (f?.isRead === true) tokens.push({ key: "read", label: "Read",
-    remove: () => setSearchQuery(q ?? "", { ...f, isRead: undefined }) });
+  if (f?.isRead === true)
+    tokens.push({
+      key: "read",
+      label: "Read",
+      remove: () => setSearchQuery(q ?? "", { ...f, isRead: undefined }),
+    });
 
-  if (f?.isStarred) tokens.push({ key: "starred", label: "Starred",
-    remove: () => setSearchQuery(q ?? "", { ...f, isStarred: undefined }) });
+  if (f?.isStarred)
+    tokens.push({
+      key: "starred",
+      label: "Starred",
+      remove: () => setSearchQuery(q ?? "", { ...f, isStarred: undefined }),
+    });
 
-  if (f?.hasAttachments) tokens.push({ key: "attachment", label: "Attachment",
-    remove: () => setSearchQuery(q ?? "", { ...f, hasAttachments: undefined }) });
+  if (f?.hasAttachments)
+    tokens.push({
+      key: "attachment",
+      label: "Attachment",
+      remove: () =>
+        setSearchQuery(q ?? "", { ...f, hasAttachments: undefined }),
+    });
 
-  if (f?.isArchived) tokens.push({ key: "archived", label: "Archived",
-    remove: () => setSearchQuery(q ?? "", { ...f, isArchived: undefined }) });
+  if (f?.isArchived)
+    tokens.push({
+      key: "archived",
+      label: "Archived",
+      remove: () => setSearchQuery(q ?? "", { ...f, isArchived: undefined }),
+    });
 
-  if (f?.filterFrom) tokens.push({ key: "from", label: `from:${f.filterFrom}`,
-    remove: () => setSearchQuery(q ?? "", { ...f, filterFrom: undefined }) });
+  if (f?.filterFrom)
+    tokens.push({
+      key: "from",
+      label: `from:${f.filterFrom}`,
+      remove: () => setSearchQuery(q ?? "", { ...f, filterFrom: undefined }),
+    });
 
-  if (f?.filterTo) tokens.push({ key: "to", label: `to:${f.filterTo}`,
-    remove: () => setSearchQuery(q ?? "", { ...f, filterTo: undefined }) });
+  if (f?.filterTo)
+    tokens.push({
+      key: "to",
+      label: `to:${f.filterTo}`,
+      remove: () => setSearchQuery(q ?? "", { ...f, filterTo: undefined }),
+    });
 
   if (f?.labels?.length) {
-    f.labels.forEach((l) => tokens.push({
-      key: l, label: l.replace(/^CATEGORY_/, "").toLowerCase(),
-      remove: () => {
-        const next = { ...f, labels: f.labels!.filter((x) => x !== l) };
-        setSearchQuery(q ?? "", { ...next, labels: next.labels!.length ? next.labels : undefined });
-      },
-    }));
+    f.labels.forEach((l) =>
+      tokens.push({
+        key: l,
+        label: l.replace(/^CATEGORY_/, "").toLowerCase(),
+        remove: () => {
+          const next = { ...f, labels: f.labels!.filter((x) => x !== l) };
+          setSearchQuery(q ?? "", {
+            ...next,
+            labels: next.labels!.length ? next.labels : undefined,
+          });
+        },
+      }),
+    );
   }
 
-  if (f?.dateFrom) tokens.push({ key: "after", label: `after:${f.dateFrom}`,
-    remove: () => setSearchQuery(q ?? "", { ...f, dateFrom: undefined }) });
+  if (f?.dateFrom)
+    tokens.push({
+      key: "after",
+      label: `after:${f.dateFrom}`,
+      remove: () => setSearchQuery(q ?? "", { ...f, dateFrom: undefined }),
+    });
 
   return tokens;
 }
@@ -115,16 +165,21 @@ export function TokenPill({
   size?: "sm" | "md";
 }) {
   return (
-    <span className={cn(
-      "inline-flex items-center gap-1 rounded-md font-medium shrink-0",
-      "bg-black/[0.06] dark:bg-white/[0.08] text-gray-700 dark:text-white/60",
-      size === "sm"
-        ? "h-[18px] px-1.5 text-[10px]"
-        : "h-[22px] px-2 text-[11px]",
-    )}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md font-medium shrink-0",
+        "bg-black/[0.06] dark:bg-white/[0.08] text-gray-700 dark:text-white/60",
+        size === "sm"
+          ? "h-[18px] px-1.5 text-[10px]"
+          : "h-[22px] px-2 text-[11px]",
+      )}
+    >
       <span className="truncate max-w-[120px]">{token.label}</span>
       <button
-        onClick={(e) => { e.stopPropagation(); token.remove(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          token.remove();
+        }}
         className="text-gray-400 dark:text-white/28 hover:text-gray-700 dark:hover:text-white/70 transition-colors shrink-0 ml-px"
       >
         <X className={size === "sm" ? "w-2 h-2" : "w-2.5 h-2.5"} />
@@ -138,26 +193,26 @@ export function TokenPill({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useToolbarData() {
-  const activeFolder    = useUIStore((s) => s.activeFolder);
+  const activeFolder = useUIStore((s) => s.activeFolder);
   const setActiveFolder = useUIStore((s) => s.setActiveFolder);
-  const selectedEmail   = useUIStore((s) => s.selectedEmailAddress);
-  const searchQuery     = useUIStore((s) => s.searchQuery);
-  const searchFilters   = useUIStore((s) => s.searchFilters);
-  const clearSearch     = useUIStore((s) => s.clearSearch);
-  const setSearchQuery  = useUIStore((s) => s.setSearchQuery);
+  const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
+  const searchQuery = useUIStore((s) => s.searchQuery);
+  const searchFilters = useUIStore((s) => s.searchFilters);
+  const clearSearch = useUIStore((s) => s.clearSearch);
+  const setSearchQuery = useUIStore((s) => s.setSearchQuery);
 
   const { data: foldersData } = useQuery({
     queryKey: mailboxKeys.folders(selectedEmail ?? undefined),
-    queryFn:  () => mailboxService.getFolders(selectedEmail ?? undefined),
+    queryFn: () => mailboxService.getFolders(selectedEmail ?? undefined),
     staleTime: 60_000,
-    gcTime:    5 * 60_000,
+    gcTime: 5 * 60_000,
   });
 
   const { data: savedSearches } = useQuery({
     queryKey: mailboxKeys.savedSearches(),
-    queryFn:  mailboxService.getSavedSearches,
+    queryFn: mailboxService.getSavedSearches,
     staleTime: 60_000,
-    select:   (d) => d.data,
+    select: (d) => d.data,
   });
 
   const deleteSavedSearch = useDeleteSavedSearch();
@@ -169,9 +224,9 @@ function useToolbarData() {
       foldersData?.data?.labels
         ?.filter((l) => LABEL_DISPLAY[l.label])
         .map((l) => ({
-          id:    `label:${l.label}`,
+          id: `label:${l.label}`,
           label: LABEL_DISPLAY[l.label],
-          raw:   l.label,
+          raw: l.label,
         })) ?? [],
     [foldersData],
   );
@@ -185,12 +240,19 @@ function useToolbarData() {
   );
 
   return {
-    activeFolder, setActiveFolder,
-    searchQuery, searchFilters,
-    clearSearch, setSearchQuery,
-    categoryLabels, savedSearches,
-    deleteSavedSearch, createSavedSearch, updateSavedSearch,
-    hasSearch, tokens,
+    activeFolder,
+    setActiveFolder,
+    searchQuery,
+    searchFilters,
+    clearSearch,
+    setSearchQuery,
+    categoryLabels,
+    savedSearches,
+    deleteSavedSearch,
+    createSavedSearch,
+    updateSavedSearch,
+    hasSearch,
+    tokens,
   };
 }
 
@@ -218,10 +280,11 @@ export function ThreadListToolbar() {
   return (
     <>
       <MailSearchCommand open={cmdOpen} onOpenChange={setCmdOpen} />
-      {layoutMode === "flow"
-        ? <FlowToolbar     onOpenSearch={() => setCmdOpen(true)} />
-        : <VelocityToolbar onOpenSearch={() => setCmdOpen(true)} />
-      }
+      {layoutMode === "flow" ? (
+        <FlowToolbar onOpenSearch={() => setCmdOpen(true)} />
+      ) : (
+        <VelocityToolbar onOpenSearch={() => setCmdOpen(true)} />
+      )}
     </>
   );
 }
@@ -232,20 +295,29 @@ export function ThreadListToolbar() {
 
 function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
   const {
-    activeFolder, setActiveFolder,
-    searchQuery, searchFilters,
-    clearSearch, setSearchQuery,
-    categoryLabels, savedSearches,
-    deleteSavedSearch, createSavedSearch, updateSavedSearch,
-    hasSearch, tokens,
+    activeFolder,
+    setActiveFolder,
+    searchQuery,
+    searchFilters,
+    clearSearch,
+    setSearchQuery,
+    categoryLabels,
+    savedSearches,
+    deleteSavedSearch,
+    createSavedSearch,
+    updateSavedSearch,
+    hasSearch,
+    tokens,
   } = useToolbarData();
 
   const handleSelectSaved = (s: SavedSearch) =>
-    setSearchQuery(s.query.searchText ?? "", (s.query.filters as SearchFilters) ?? null);
+    setSearchQuery(
+      s.query.searchText ?? "",
+      (s.query.filters as SearchFilters) ?? null,
+    );
 
   return (
     <div className="shrink-0 flex flex-col select-none">
-
       {/* Row 1 — search bar */}
       <div className="flex items-center gap-2 px-4 h-[42px]">
         <button
@@ -265,10 +337,14 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
               )}
             </div>
           ) : (
-            <span className="flex-1 text-[13px] text-gray-300 dark:text-white/20">Search</span>
+            <span className="flex-1 text-[13px] text-gray-300 dark:text-white/20">
+              Search
+            </span>
           )}
           {!hasSearch && (
-            <kbd className="shrink-0 text-[10px] font-mono text-gray-300 dark:text-white/18 tracking-tight">⌘K</kbd>
+            <kbd className="shrink-0 text-[10px] font-mono text-gray-300 dark:text-white/18 tracking-tight">
+              ⌘K
+            </kbd>
           )}
         </button>
 
@@ -282,8 +358,6 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
           </button>
         )}
       </div>
-
- 
 
       {/* Row 3 — active token pills (individually removable) */}
       {hasSearch && tokens.length > 0 && (
@@ -325,36 +399,50 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
 
 function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
   const {
-    activeFolder, setActiveFolder,
-    searchQuery, searchFilters,
-    clearSearch, setSearchQuery,
-    categoryLabels, savedSearches,
-    deleteSavedSearch, createSavedSearch, updateSavedSearch,
-    hasSearch, tokens,
+    activeFolder,
+    setActiveFolder,
+    searchQuery,
+    searchFilters,
+    clearSearch,
+    setSearchQuery,
+    categoryLabels,
+    savedSearches,
+    deleteSavedSearch,
+    createSavedSearch,
+    updateSavedSearch,
+    hasSearch,
+    tokens,
   } = useToolbarData();
 
-  const allTabs = useMemo(() => [
-    { id: "inbox", label: "Inbox" },
-    ...categoryLabels.map((c) => ({ id: c.id, label: c.label })),
-  ], [categoryLabels]);
+  const allTabs = useMemo(
+    () => [
+      { id: "inbox", label: "Inbox" },
+      ...categoryLabels.map((c) => ({ id: c.id, label: c.label })),
+    ],
+    [categoryLabels],
+  );
 
   const handleSelectSaved = (s: SavedSearch) =>
-    setSearchQuery(s.query.searchText ?? "", (s.query.filters as SearchFilters) ?? null);
+    setSearchQuery(
+      s.query.searchText ?? "",
+      (s.query.filters as SearchFilters) ?? null,
+    );
 
   return (
     <div className="shrink-0 flex flex-col select-none">
-
       {/* Row 1 — command bar */}
       <div className="flex items-stretch h-10 border-b border-black/[0.06] dark:border-white/[0.06]">
-
-        {/* Folder tabs */}
-        <div className="flex items-center gap-px px-2 overflow-x-auto no-scrollbar shrink-0">
+        {/* Folder tabs — hidden on mobile, visible on md+ */}
+        <div className="hidden md:flex items-center gap-px px-2 overflow-x-auto no-scrollbar shrink-0">
           {allTabs.map((tab) => {
             const isActive = !hasSearch && activeFolder === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => { setActiveFolder(tab.id); clearSearch(); }}
+                onClick={() => {
+                  setActiveFolder(tab.id);
+                  clearSearch();
+                }}
                 className={cn(
                   "relative flex items-center gap-1.5 px-2.5 h-[28px] rounded-md",
                   "text-[11.5px] whitespace-nowrap transition-all duration-100 tracking-[-0.01em]",
@@ -363,14 +451,16 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
                     : "font-medium text-gray-400 dark:text-white/28 hover:text-gray-700 dark:hover:text-white/60 hover:bg-black/[0.04] dark:hover:bg-white/[0.05]",
                 )}
               >
-                {isActive && <span className="w-1 h-1 rounded-full bg-gray-700 dark:bg-white/70 shrink-0" />}
+                {isActive && (
+                  <span className="w-1 h-1 rounded-full bg-gray-700 dark:bg-white/70 shrink-0" />
+                )}
                 {tab.label}
               </button>
             );
           })}
         </div>
 
-        <div className="flex items-center px-1 shrink-0">
+        <div className="hidden md:flex items-center px-1 shrink-0">
           <div className="w-px h-4 bg-black/[0.08] dark:bg-white/[0.08]" />
         </div>
 
@@ -383,7 +473,10 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
           {hasSearch ? (
             <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
               {tokens.slice(0, 3).map((tok) => (
-                <span key={tok.key} className="shrink-0 h-[18px] px-1.5 rounded text-[10.5px] font-medium bg-black/[0.06] dark:bg-white/[0.08] text-gray-600 dark:text-white/55">
+                <span
+                  key={tok.key}
+                  className="shrink-0 h-[18px] px-1.5 rounded text-[10.5px] font-medium bg-black/[0.06] dark:bg-white/[0.08] text-gray-600 dark:text-white/55"
+                >
                   {tok.label}
                 </span>
               ))}
@@ -399,17 +492,27 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
             </span>
           )}
           {!hasSearch && (
-            <kbd className="shrink-0 text-[9px] font-mono text-gray-300 dark:text-white/18 ml-auto">⌘K</kbd>
+            <kbd className="shrink-0 text-[9px] font-mono text-gray-300 dark:text-white/18 ml-auto">
+              ⌘K
+            </kbd>
           )}
         </button>
 
         <div className="flex items-center pr-2 shrink-0">
           {hasSearch ? (
-            <button onClick={clearSearch} title="Clear" className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/25 hover:text-gray-700 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/[0.06] transition-all">
+            <button
+              onClick={clearSearch}
+              title="Clear"
+              className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/25 hover:text-gray-700 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/[0.06] transition-all"
+            >
               <X className="w-3 h-3" />
             </button>
           ) : (
-            <button onClick={onOpenSearch} title="Filters (⌘K)" className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-600 dark:hover:text-white/55 hover:bg-black/5 dark:hover:bg-white/[0.06] transition-all">
+            <button
+              onClick={onOpenSearch}
+              title="Filters (⌘K)"
+              className="w-6 h-6 rounded flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-600 dark:hover:text-white/55 hover:bg-black/5 dark:hover:bg-white/[0.06] transition-all"
+            >
               <SlidersHorizontal className="w-3 h-3" />
             </button>
           )}

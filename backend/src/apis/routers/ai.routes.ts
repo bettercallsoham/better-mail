@@ -4,8 +4,9 @@ import { verifyEmailOwnership } from "../middleware/email-ownership";
 import {
   validateThreadSummarization,
   validateRagChat,
+  validateReplySuggestion,
 } from "../validators/ai.validator";
-import { summarizeThread } from "../controllers/ai.controller";
+import { summarizeThread, suggestReply } from "../controllers/ai.controller";
 
 const router = Router();
 
@@ -15,6 +16,14 @@ router.post(
   validateThreadSummarization,
   verifyEmailOwnership,
   summarizeThread,
+);
+
+router.post(
+  "/threads/:threadId/suggest-reply",
+  verifyAccessToken(),
+  validateReplySuggestion,
+  verifyEmailOwnership,
+  suggestReply,
 );
 
 export default router;

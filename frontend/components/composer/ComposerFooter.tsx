@@ -237,11 +237,13 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
               className="fixed inset-0 z-40"
               onClick={() => setPickerOpen(false)}
             />
-            <div className="absolute bottom-full left-0 mb-2 z-50">
+            {/* Mobile: fixed full-width above footer; desktop: absolute above button */}
+            <div className="fixed inset-x-3 bottom-16 z-50 sm:absolute sm:bottom-full sm:left-0 sm:inset-x-auto sm:mb-2">
               <Suspense fallback={null}>
                 <TemplatePicker
                   onClose={() => setPickerOpen(false)}
                   onSelect={handleTemplateSelect}
+                  className="w-full sm:w-[340px]"
                 />
               </Suspense>
             </div>
@@ -270,9 +272,12 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
               className="fixed inset-0 z-40"
               onClick={() => setSaveAsOpen(false)}
             />
+            {/* Mobile: fixed full-width above footer; desktop: absolute above button */}
             <div
               className={cn(
-                "absolute bottom-full left-0 mb-2 z-50 w-72 p-3 rounded-xl",
+                "fixed inset-x-3 bottom-16 z-50",
+                "sm:absolute sm:bottom-full sm:left-0 sm:inset-x-auto sm:mb-2 sm:w-72",
+                "p-3 rounded-xl",
                 "bg-white dark:bg-[#1f1f1f]",
                 "border border-black/[0.07] dark:border-white/[0.08]",
                 "shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
