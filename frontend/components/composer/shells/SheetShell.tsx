@@ -17,11 +17,14 @@ export function SheetShell({ instance }: { instance: ComposerInstance }) {
   const close = useCallback(() => store.close(instance.id), [store, instance.id]);
 
   return (
-    <div className={cn(
-      "flex flex-col border-t border-black/[0.07] dark:border-white/[0.07]",
-      "bg-white dark:bg-[#18181b]",
-      "animate-in slide-in-from-bottom-2 duration-150",
-    )}>
+    <div
+      className={cn(
+        "flex flex-col border-t border-black/[0.07] dark:border-white/[0.07]",
+        "bg-white dark:bg-[#18181b]",
+        "animate-in slide-in-from-bottom-2 duration-150",
+      )}
+      data-instance={instance.id}
+    >
       <div className="flex items-center justify-between px-4 pt-2.5 pb-1 shrink-0">
         <span className="text-[11.5px] font-medium text-gray-400 dark:text-white/35">{MODE_LABEL[instance.mode]}</span>
         <button onClick={close} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 dark:text-white/25 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] transition-colors">

@@ -18,22 +18,26 @@ const GOTO_MAP: Record<string, string> = {
  */
 export function useGoToShortcut() {
   const setActiveFolder = useUIStore((s) => s.setActiveFolder);
-  const waiting   = useRef(false);
-  const timerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const waiting = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const reset = () => {
       waiting.current = false;
-      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
 
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (
-        target.tagName === "INPUT"    ||
+        target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable
-      ) return;
+      )
+        return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       if (waiting.current) {

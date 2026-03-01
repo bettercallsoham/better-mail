@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { IconSend2, IconTrash, IconLoader2 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
@@ -126,6 +126,31 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
     onDiscard?.(); // let parent run optimistic cache removal for pre-loaded drafts
     onClose();
   }, [instance.html, discard, onDiscard, onClose]);
+
+  // ── Composer-scoped keyboard shortcuts ────────────────────────────────────
+  // Fire only when focus is inside this specific composer instance container.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return;
+      const active = document.activeElement;
+      const container = active?.closest(`[data-instance="${instance.id}"]`);
+      if (!container) return;
+
+      // ⌘↵ — send
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+        return;
+      }
+      // ⌘⇧D — discard
+      if ((e.key === "d" || e.key === "D") && e.shiftKey) {
+        e.preventDefault();
+        handleDiscard();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [instance.id, handleSend, handleDiscard]);
 
   return (
     <div

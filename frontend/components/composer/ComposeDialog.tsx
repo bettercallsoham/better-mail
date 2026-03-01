@@ -80,7 +80,7 @@ function ComposeDialogInner({
   if (!instance) return null;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="flex flex-col flex-1 min-h-0" data-instance={instance.id}>
       <ComposerHeader instance={instance} />
       <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto">
         <ComposerEditor

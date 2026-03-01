@@ -10,23 +10,27 @@ export function useThreadNavigation(
   focusedActionsRef: React.MutableRefObject<ThreadActions | null>,
 ) {
   const setFocusedThread = useUIStore((s) => s.setFocusedThread);
-  const setActiveThread  = useUIStore((s) => s.setActiveThread);
-  const focusedThreadId  = useUIStore((s) => s.focusedThreadId);
+  const setActiveThread = useUIStore((s) => s.setActiveThread);
+  const focusedThreadId = useUIStore((s) => s.focusedThreadId);
   // ── KEY FIX: read layoutMode so J/K can open thread in flow mode ────────────
-  const layoutMode       = useUIStore((s) => s.layoutMode);
+  const layoutMode = useUIStore((s) => s.layoutMode);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (
-        target.tagName === "INPUT"     ||
-        target.tagName === "TEXTAREA"  ||
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
         target.isContentEditable
-      ) return;
+      )
+        return;
 
       // Don't steal keypresses while a compose dialog is open — the user is
       // actively composing, so J/K/Enter/S/E/U should not fire list shortcuts.
-      if (useComposerStore.getState().instances.some((i) => i.shell === "dialog")) return;
+      if (
+        useComposerStore.getState().instances.some((i) => i.shell === "dialog")
+      )
+        return;
 
       const idx = focusedThreadId ? threadIds.indexOf(focusedThreadId) : -1;
 
@@ -83,5 +87,12 @@ export function useThreadNavigation(
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [threadIds, focusedThreadId, layoutMode, setFocusedThread, setActiveThread, focusedActionsRef]);
+  }, [
+    threadIds,
+    focusedThreadId,
+    layoutMode,
+    setFocusedThread,
+    setActiveThread,
+    focusedActionsRef,
+  ]);
 }

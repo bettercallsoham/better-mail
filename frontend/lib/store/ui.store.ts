@@ -17,14 +17,16 @@ export interface SearchFilters {
 }
 
 interface LayoutSlice {
-  layoutMode:       LayoutMode;
-  sidebarCollapsed: boolean;
+  layoutMode:           LayoutMode;
+  sidebarCollapsed:     boolean;
+  shortcutsModalOpen:   boolean;
   /** Per-mode panel split percentage (thread list width %) */
   splitPct: Record<string, number>;
-  setLayoutMode:       (mode: LayoutMode) => void;
-  toggleSidebar:       () => void;
-  setSidebarCollapsed: (collapsed: boolean) => void;
-  setSplitPct:         (mode: string, pct: number) => void;
+  setLayoutMode:          (mode: LayoutMode) => void;
+  toggleSidebar:          () => void;
+  setSidebarCollapsed:    (collapsed: boolean) => void;
+  setSplitPct:            (mode: string, pct: number) => void;
+  setShortcutsModalOpen:  (open: boolean) => void;
 }
 
 interface MailboxSlice {
@@ -86,9 +88,10 @@ export const useUIStore = create<UIState>()(
   persist(
     (set, get) => ({
       // ── Layout ──────────────────────────────────────────────────────────────
-      layoutMode:       "velocity",
-      sidebarCollapsed: false,
-      splitPct:         { ...DEFAULT_SPLIT },
+      layoutMode:         "velocity",
+      sidebarCollapsed:   false,
+      shortcutsModalOpen: false,
+      splitPct:           { ...DEFAULT_SPLIT },
 
       setLayoutMode: (mode) =>
         set({ layoutMode: mode, activeThreadId: null, focusedThreadId: null }),
@@ -101,6 +104,9 @@ export const useUIStore = create<UIState>()(
 
       setSplitPct: (mode, pct) =>
         set((s) => ({ splitPct: { ...s.splitPct, [mode]: pct } })),
+
+      setShortcutsModalOpen: (open) =>
+        set({ shortcutsModalOpen: open }),
 
       // ── Mailbox ─────────────────────────────────────────────────────────────
       selectedEmailAddress: null,

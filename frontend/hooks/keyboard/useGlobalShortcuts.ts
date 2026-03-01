@@ -6,7 +6,7 @@ import type { ConnectedAccount } from "@/features/mailbox/mailbox.type";
 
 interface Options {
   /** Connected accounts list — used for ⌘1/2/3 account switching */
-  accounts:        ConnectedAccount[];
+  accounts: ConnectedAccount[];
   /** Called when the user presses ? to open the shortcuts help modal */
   onOpenShortcuts: () => void;
 }
@@ -19,14 +19,14 @@ interface Options {
  *  ?          — open keyboard shortcuts modal
  */
 export function useGlobalShortcuts({ accounts, onOpenShortcuts }: Options) {
-  const toggleSidebar         = useUIStore((s) => s.toggleSidebar);
-  const setSelectedEmail      = useUIStore((s) => s.setSelectedEmailAddress);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const setSelectedEmail = useUIStore((s) => s.setSelectedEmailAddress);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       const isTyping =
-        target.tagName === "INPUT"    ||
+        target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable;
 

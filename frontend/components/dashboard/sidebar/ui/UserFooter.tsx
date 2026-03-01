@@ -56,7 +56,6 @@ const LAYOUT_MODES: {
   },
 ];
 
-
 function LayoutModeSwitcher() {
   const layoutMode = useUIStore((s) => s.layoutMode);
   const setLayoutMode = useUIStore((s) => s.setLayoutMode);
@@ -158,6 +157,7 @@ export function UserDropdownContent({
   const handleLogout = () => console.log("logout");
   const handleFeedback = () =>
     window.open("mailto:feedback@yourapp.com?subject=Feedback", "_blank");
+  const setShortcutsModalOpen = useUIStore((s) => s.setShortcutsModalOpen);
 
   return (
     <DropdownMenuContent
@@ -204,7 +204,10 @@ export function UserDropdownContent({
       {/* Theme toggle */}
       <AnimatedThemeToggler asMenuItem />
 
-      <DropdownMenuItem className="gap-2.5 py-2 cursor-pointer">
+      <DropdownMenuItem
+        onClick={() => setShortcutsModalOpen(true)}
+        className="gap-2.5 py-2 cursor-pointer"
+      >
         <Keyboard
           size={14}
           className="text-neutral-500 dark:text-neutral-400 shrink-0"
