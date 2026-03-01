@@ -73,6 +73,8 @@ export interface FullEmail {
   snippet: string;
   from: EmailAddress;
   to: EmailAddress[];
+  cc?: EmailAddress[];
+  bcc?: EmailAddress[];
   receivedAt: string;
   isRead: boolean;
   hasAttachments: boolean;

@@ -7,27 +7,34 @@ import {
   useComposerStore,
   type ComposerInstance,
 } from "@/lib/store/composer.store";
-// Your existing hooks from mailbox.query.ts
-import { useReplyEmail, useSendEmail } from "@/features/mailbox/mailbox.query";
+import { useReplyEmail, useSendEmail, useDeleteDraft, mailboxKeys } from "@/features/mailbox/mailbox.query";
+import type { FullEmail } from "@/features/mailbox/mailbox.type";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { stripHtml } from "@/lib/utils/stripHtml";
+import { useDraftSync } from "./hooks/useDraftSync";
 
 interface Props {
-  instance: ComposerInstance;
-  onClose: () => void;
+  instance:   ComposerInstance;
+  onClose:    () => void;
+  /** Optional: called after discard so parent can do optimistic cache updates */
+  onDiscard?: () => void;
   className?: string;
 }
 
-export function ComposerFooter({ instance, onClose, className }: Props) {
-  const store = useComposerStore();
-  const replyEmail = useReplyEmail(); // useMutation from mailbox.query.ts
-  const sendEmail = useSendEmail(); // useMutation from mailbox.query.ts
+export function ComposerFooter({ instance, onClose, onDiscard, className }: Props) {
+  const store       = useComposerStore();
+  const queryClient = useQueryClient();
+  const replyEmail  = useReplyEmail();
+  const sendEmail   = useSendEmail();
+  const deleteDraft = useDeleteDraft();
+  const { discard } = useDraftSync(instance);
 
   const isSending = instance.status === "sending";
   const canSend =
     instance.mode === "new"
-      ? instance.to.length > 0 && !!instance.subject
-      : !!stripHtml(instance.html); // needs some content
+      ? instance.to.length > 0 && !!instance.subject && !!stripHtml(instance.html)
+      : !!stripHtml(instance.html);
 
   const handleSend = useCallback(async () => {
     if (isSending || !canSend) return;
@@ -35,32 +42,66 @@ export function ComposerFooter({ instance, onClose, className }: Props) {
 
     try {
       if (instance.mode === "new") {
-        // SendEmailParams from mailbox.type.ts
         await sendEmail.mutateAsync({
-          from: instance.from,
+          from:     instance.from,
           provider: instance.provider,
-          to: instance.to.map((r) => r.email),
-          cc: instance.cc.map((r) => r.email),
-          bcc: instance.bcc.map((r) => r.email),
-          subject: instance.subject,
-          html: instance.html,
+          to:       instance.to.map((r) => r.email),
+          cc:       instance.cc.map((r) => r.email),
+          bcc:      instance.bcc.map((r) => r.email),
+          subject:  instance.subject,
+          html:     instance.html,
         });
       } else {
-        if (!instance.replyToMessageId)
-          throw new Error("Missing replyToMessageId");
+        if (!instance.replyToMessageId) throw new Error("Missing replyToMessageId");
 
-        await replyEmail.mutateAsync({
-          from: instance.from,
-          provider: instance.provider,
+        const res = await replyEmail.mutateAsync({
+          from:             instance.from,
+          provider:         instance.provider,
           replyToMessageId: instance.replyToMessageId,
-          html: instance.html,
-          mode: instance.mode === "reply_all" ? "reply_all" : instance.mode,
-          to: instance.to.map((r) => r.email),
-          cc: instance.cc.map((r) => r.email),
-          bcc: instance.bcc.map((r) => r.email),
-          subject: instance.subject,
+          html:             instance.html,
+          mode:             instance.mode === "reply_all" ? "reply_all" : instance.mode,
+          to:               instance.to.map((r) => r.email),
+          cc:               instance.cc.map((r) => r.email),
+          bcc:              instance.bcc.map((r) => r.email),
+          subject:          instance.subject,
         });
+
+        // Optimistically append the sent email to the thread cache so it appears
+        // instantly without waiting for the server invalidation re-fetch.
+        if (instance.threadId) {
+          const optimistic: FullEmail = {
+            id:                `optimistic_${Date.now()}`,
+            providerMessageId: res.data.messageId,
+            emailAddress:      instance.from,
+            provider:          instance.provider === "GOOGLE" ? "gmail" : "outlook",
+            subject:           instance.subject,
+            isArchived:        false,
+            bodyHtml:          instance.html,
+            bodyText:          "",
+            snippet:           stripHtml(instance.html).slice(0, 120),
+            from:              { email: instance.from, name: instance.from },
+            to:                instance.to,
+            cc:                instance.cc ?? [],
+            receivedAt:        new Date().toISOString(),
+            isRead:            true,
+            hasAttachments:    false,
+            threadId:          instance.threadId,
+            isStarred:         false,
+            isDraft:           false,
+            labels:            [],
+          };
+          queryClient.setQueryData(
+            mailboxKeys.thread(instance.threadId),
+            (old: any) => !old?.data?.emails ? old : {
+              ...old,
+              data: { ...old.data, emails: [...old.data.emails, optimistic] },
+            },
+          );
+        }
       }
+
+      // If there was a draft in ES, clean it up now that the email has been sent.
+      if (instance.draftId) deleteDraft.mutate(instance.draftId);
 
       store.setStatus(instance.id, "sent");
       toast.success("Message sent");
@@ -69,12 +110,15 @@ export function ComposerFooter({ instance, onClose, className }: Props) {
       store.setStatus(instance.id, "error", (err as Error)?.message);
       toast.error("Failed to send", { description: "Please try again." });
     }
-  }, [instance, isSending, canSend, store, sendEmail, replyEmail, onClose]);
+  }, [instance, isSending, canSend, store, queryClient, sendEmail, replyEmail, deleteDraft, onClose]);
 
   const handleDiscard = useCallback(() => {
-    if (instance.isDirty && !confirm("Discard this draft?")) return;
+    const hasTypedContent = !!stripHtml(instance.html);
+    if (hasTypedContent && !confirm("Discard this draft?")) return;
+    discard(); // delete server-side draft if created by this composer session
+    onDiscard?.(); // let parent run optimistic cache removal for pre-loaded drafts
     onClose();
-  }, [instance.isDirty, onClose]);
+  }, [instance.html, discard, onDiscard, onClose]);
 
   return (
     <div
@@ -109,13 +153,9 @@ export function ComposerFooter({ instance, onClose, className }: Props) {
         )}
       >
         {isSending ? (
-          <>
-            <IconLoader2 size={14} className="animate-spin" /> Sending…
-          </>
+          <><IconLoader2 size={14} className="animate-spin" /> Sending…</>
         ) : (
-          <>
-            <IconSend2 size={14} /> Send
-          </>
+          <><IconSend2 size={14} /> Send</>
         )}
       </button>
     </div>

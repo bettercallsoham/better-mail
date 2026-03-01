@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
-export type ComposerMode = "reply" | "reply_all" | "forward" | "new";
+export type ComposerMode   = "reply" | "reply_all" | "forward" | "new";
 export type ComposerStatus = "idle" | "sending" | "sent" | "error";
-export type ComposerShell = "panel" | "sheet" | "window";
+export type ComposerShell  = "panel" | "sheet" | "window" | "dialog";
 
 export interface ComposerRecipient {
   email: string;
@@ -11,86 +11,97 @@ export interface ComposerRecipient {
 }
 
 export interface ComposerInstance {
-  id: string;
+  id:    string;
   shell: ComposerShell;
-  mode: ComposerMode;
+  mode:  ComposerMode;
 
   // context
-  threadId?: string;
+  threadId?:         string;
   replyToMessageId?: string;
-  quotedHtml?: string;
+  quotedHtml?:       string;
+
+  // draft sync — set after createDraft succeeds
+  draftId?:         string;
+  providerDraftId?: string;
 
   // sender — populated from FullEmail.emailAddress + provider
-  from: string;
+  from:     string;
   provider: "GOOGLE" | "OUTLOOK";
 
   // recipients
-  to: ComposerRecipient[];
-  cc: ComposerRecipient[];
-  bcc: ComposerRecipient[];
-  showCc: boolean;
+  to:      ComposerRecipient[];
+  cc:      ComposerRecipient[];
+  bcc:     ComposerRecipient[];
+  showCc:  boolean;
   showBcc: boolean;
 
   subject: string;
-  html: string;
+  html:    string;
 
-  isDirty: boolean;
-  isMinimized: boolean;
-  status: ComposerStatus;
+  isDirty:       boolean;
+  isMinimized:   boolean;
+  status:        ComposerStatus;
   errorMessage?: string;
 }
 
 export interface OpenComposerParams {
-  shell: ComposerShell;
-  mode: ComposerMode;
-  from: string;
+  shell:    ComposerShell;
+  mode:     ComposerMode;
+  from:     string;
   provider: "GOOGLE" | "OUTLOOK";
-  threadId?: string;
+  threadId?:         string;
   replyToMessageId?: string;
-  quotedHtml?: string;
-  to?: ComposerRecipient[];
-  cc?: ComposerRecipient[];
-  bcc?: ComposerRecipient[];
+  quotedHtml?:       string;
+  // pre-populate from a restored draft
+  draftId?:         string;
+  providerDraftId?: string;
+  initialHtml?:     string;
+  to?:      ComposerRecipient[];
+  cc?:      ComposerRecipient[];
+  bcc?:     ComposerRecipient[];
   subject?: string;
 }
 
 interface ComposerStore {
   instances: ComposerInstance[];
-  open: (params: OpenComposerParams) => string;
-  close: (id: string) => void;
-  update: (id: string, patch: Partial<ComposerInstance>) => void;
-  minimize: (id: string) => void;
-  restore: (id: string) => void;
+  open:      (params: OpenComposerParams) => string;
+  close:     (id: string) => void;
+  update:    (id: string, patch: Partial<ComposerInstance>) => void;
+  minimize:  (id: string) => void;
+  restore:   (id: string) => void;
   setStatus: (id: string, status: ComposerStatus, error?: string) => void;
-  setHtml: (id: string, html: string) => void;
-  addTo: (id: string, r: ComposerRecipient) => void;
-  removeTo: (id: string, email: string) => void;
-  addCc: (id: string, r: ComposerRecipient) => void;
-  removeCc: (id: string, email: string) => void;
-  addBcc: (id: string, r: ComposerRecipient) => void;
+  setHtml:   (id: string, html: string) => void;
+  setDraftId:(id: string, draftId: string, providerDraftId?: string) => void;
+  addTo:     (id: string, r: ComposerRecipient) => void;
+  removeTo:  (id: string, email: string) => void;
+  addCc:     (id: string, r: ComposerRecipient) => void;
+  removeCc:  (id: string, email: string) => void;
+  addBcc:    (id: string, r: ComposerRecipient) => void;
   removeBcc: (id: string, email: string) => void;
 }
 
 function makeInstance(params: OpenComposerParams): ComposerInstance {
   return {
-    id: crypto.randomUUID(),
-    shell: params.shell,
-    mode: params.mode,
-    threadId: params.threadId,
+    id:               crypto.randomUUID(),
+    shell:            params.shell,
+    mode:             params.mode,
+    threadId:         params.threadId,
     replyToMessageId: params.replyToMessageId,
-    quotedHtml: params.quotedHtml,
-    from: params.from,
-    provider: params.provider,
-    to: params.to ?? [],
-    cc: params.cc ?? [],
-    bcc: params.bcc ?? [],
-    showCc: (params.cc ?? []).length > 0,
-    showBcc: (params.bcc ?? []).length > 0,
-    subject: params.subject ?? "",
-    html: "",
-    isDirty: false,
-    isMinimized: false,
-    status: "idle",
+    quotedHtml:       params.quotedHtml,
+    draftId:          params.draftId,
+    providerDraftId:  params.providerDraftId,
+    from:             params.from,
+    provider:         params.provider,
+    to:               params.to   ?? [],
+    cc:               params.cc   ?? [],
+    bcc:              params.bcc  ?? [],
+    showCc:           (params.cc  ?? []).length > 0,
+    showBcc:          (params.bcc ?? []).length > 0,
+    subject:          params.subject ?? "",
+    html:             params.initialHtml ?? "",
+    isDirty:          false,
+    isMinimized:      false,
+    status:           "idle",
   };
 }
 
@@ -98,17 +109,26 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
   instances: [],
 
   open: (params) => {
-    // panel / sheet: only one at a time — replace
-    if (params.shell !== "window") {
-      const existing = get().instances.find((i) => i.shell === params.shell);
+    if (params.shell === "panel") {
+      // panel: one globally — replace
+      const existing = get().instances.find((i) => i.shell === "panel");
       if (existing) {
         const next = { ...makeInstance(params), id: existing.id };
-        set((s) => ({
-          instances: s.instances.map((i) => (i.id === existing.id ? next : i)),
-        }));
+        set((s) => ({ instances: s.instances.map((i) => i.id === existing.id ? next : i) }));
+        return existing.id;
+      }
+    } else if (params.shell === "sheet") {
+      // sheet: one per threadId — replace that thread's draft, keep others
+      const existing = get().instances.find(
+        (i) => i.shell === "sheet" && i.threadId === params.threadId,
+      );
+      if (existing) {
+        const next = { ...makeInstance(params), id: existing.id };
+        set((s) => ({ instances: s.instances.map((i) => i.id === existing.id ? next : i) }));
         return existing.id;
       }
     }
+    // window: unlimited; panel/sheet (new): append
     const inst = makeInstance(params);
     set((s) => ({ instances: [...s.instances, inst] }));
     return inst.id;
@@ -125,28 +145,15 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     })),
 
   minimize: (id) =>
-    set((s) => ({
-      instances: s.instances.map((i) =>
-        i.id === id ? { ...i, isMinimized: true } : i,
-      ),
-    })),
+    set((s) => ({ instances: s.instances.map((i) => i.id === id ? { ...i, isMinimized: true  } : i) })),
   restore: (id) =>
-    set((s) => ({
-      instances: s.instances.map((i) =>
-        i.id === id ? { ...i, isMinimized: false } : i,
-      ),
-    })),
+    set((s) => ({ instances: s.instances.map((i) => i.id === id ? { ...i, isMinimized: false } : i) })),
 
   setStatus: (id, status, errorMessage) =>
     set((s) => ({
       instances: s.instances.map((i) =>
         i.id === id
-          ? {
-              ...i,
-              status,
-              errorMessage,
-              isDirty: status === "sent" ? false : i.isDirty,
-            }
+          ? { ...i, status, errorMessage, isDirty: status === "sent" ? false : i.isDirty }
           : i,
       ),
     })),
@@ -155,6 +162,13 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     set((s) => ({
       instances: s.instances.map((i) =>
         i.id === id ? { ...i, html, isDirty: true } : i,
+      ),
+    })),
+
+  setDraftId: (id, draftId, providerDraftId) =>
+    set((s) => ({
+      instances: s.instances.map((i) =>
+        i.id === id ? { ...i, draftId, providerDraftId } : i,
       ),
     })),
 
@@ -169,9 +183,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
   removeTo: (id, email) =>
     set((s) => ({
       instances: s.instances.map((i) =>
-        i.id === id
-          ? { ...i, to: i.to.filter((x) => x.email !== email), isDirty: true }
-          : i,
+        i.id === id ? { ...i, to: i.to.filter((x) => x.email !== email), isDirty: true } : i,
       ),
     })),
 
@@ -186,9 +198,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
   removeCc: (id, email) =>
     set((s) => ({
       instances: s.instances.map((i) =>
-        i.id === id
-          ? { ...i, cc: i.cc.filter((x) => x.email !== email), isDirty: true }
-          : i,
+        i.id === id ? { ...i, cc: i.cc.filter((x) => x.email !== email), isDirty: true } : i,
       ),
     })),
 
@@ -203,19 +213,20 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
   removeBcc: (id, email) =>
     set((s) => ({
       instances: s.instances.map((i) =>
-        i.id === id
-          ? { ...i, bcc: i.bcc.filter((x) => x.email !== email), isDirty: true }
-          : i,
+        i.id === id ? { ...i, bcc: i.bcc.filter((x) => x.email !== email), isDirty: true } : i,
       ),
     })),
 }));
 
-// ─── Selectors ────────────────────────────────────────────────────────────────
+// ─── Selectors ─────────────────────────────────────────────────────────────────
 export const usePanelInstance = () =>
   useComposerStore((s) => s.instances.find((i) => i.shell === "panel"));
-export const useSheetInstance = () =>
-  useComposerStore((s) => s.instances.find((i) => i.shell === "sheet"));
-export const useWindowInstances = () =>
-  useComposerStore(
-    useShallow((s) => s.instances.filter((i) => i.shell === "window")),
+
+/** Thread-scoped: each thread keeps its own sheet draft */
+export const useSheetInstance = (threadId?: string) =>
+  useComposerStore((s) =>
+    s.instances.find((i) => i.shell === "sheet" && i.threadId === threadId),
   );
+
+export const useWindowInstances = () =>
+  useComposerStore(useShallow((s) => s.instances.filter((i) => i.shell === "window")));

@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
-// v3: BubbleMenu moved to @tiptap/react/menus, needs @floating-ui/dom installed
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -20,23 +19,30 @@ import {
   IconListNumbers,
   IconLink,
   IconUnlink,
+  IconCheck,
+  IconX,
 } from "@tabler/icons-react";
 import { QuotedThread } from "./QuotedThread";
 
 interface Props {
-  instance: ComposerInstance;
+  instance:    ComposerInstance;
   placeholder?: string;
-  minHeight?: number;
-  className?: string;
+  minHeight?:  number;
+  className?:  string;
 }
 
 export function ComposerEditor({
   instance,
   placeholder = "Write your reply…",
-  minHeight = 120,
+  minHeight   = 120,
   className,
 }: Props) {
   const store = useComposerStore();
+
+  // ── Link input state ──────────────────────────────────────────────────────
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl,  setLinkUrl]  = useState("");
+  const linkInputRef            = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -71,35 +77,59 @@ export function ComposerEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
-  // v3 requires useEditorState for reactive isActive() — plain editor.isActive() is NOT reactive
+  // Pre-fill URL input when editing an existing link
+  const openLinkInput = useCallback(() => {
+    if (!editor) return;
+    const existing = editor.getAttributes("link").href as string | undefined;
+    setLinkUrl(existing ?? "");
+    setLinkOpen(true);
+    setTimeout(() => linkInputRef.current?.focus(), 0);
+  }, [editor]);
+
+  const commitLink = useCallback(() => {
+    if (!editor) return;
+    const url = linkUrl.trim();
+    if (url) {
+      const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+      editor.chain().focus().setLink({ href }).run();
+    } else {
+      editor.chain().focus().unsetLink().run();
+    }
+    setLinkOpen(false);
+    setLinkUrl("");
+  }, [editor, linkUrl]);
+
+  const cancelLink = useCallback(() => {
+    setLinkOpen(false);
+    setLinkUrl("");
+    editor?.commands.focus();
+  }, [editor]);
+
+  const handleLinkKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter")  { e.preventDefault(); commitLink(); }
+      if (e.key === "Escape") { e.preventDefault(); cancelLink(); }
+    },
+    [commitLink, cancelLink],
+  );
+
+  // v3 requires useEditorState for reactive isActive()
   const state = useEditorState({
     editor,
     selector: (ctx) => ({
-      isBold: ctx.editor?.isActive("bold") ?? false,
-      isItalic: ctx.editor?.isActive("italic") ?? false,
-      isStrike: ctx.editor?.isActive("strike") ?? false,
-      isBulletList: ctx.editor?.isActive("bulletList") ?? false,
+      isBold:        ctx.editor?.isActive("bold")        ?? false,
+      isItalic:      ctx.editor?.isActive("italic")      ?? false,
+      isStrike:      ctx.editor?.isActive("strike")      ?? false,
+      isBulletList:  ctx.editor?.isActive("bulletList")  ?? false,
       isOrderedList: ctx.editor?.isActive("orderedList") ?? false,
-      isLink: ctx.editor?.isActive("link") ?? false,
+      isLink:        ctx.editor?.isActive("link")        ?? false,
     }),
   });
-
-  const toggleLink = useCallback(() => {
-    if (!editor) return;
-    if (state?.isLink) {
-      editor.chain().focus().unsetLink().run();
-    } else {
-      const url = window.prompt("URL:");
-      if (url) editor.chain().focus().setLink({ href: url }).run();
-    }
-  }, [editor, state?.isLink]);
 
   if (!editor) return null;
 
   return (
     <div className={cn("flex flex-col", className)}>
-      {/* BubbleMenu — shows on text selection.
-          v3 API: options.placement, options.offset instead of tippyOptions */}
       <BubbleMenu
         editor={editor}
         options={{ placement: "top-start", offset: 6 }}
@@ -110,69 +140,73 @@ export function ComposerEditor({
           "dark:shadow-[0_4px_20px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.07)]",
         )}
       >
-        <Btn
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          active={state?.isBold}
-          title="Bold ⌘B"
-        >
-          <IconBold size={13} />
-        </Btn>
-        <Btn
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          active={state?.isItalic}
-          title="Italic ⌘I"
-        >
-          <IconItalic size={13} />
-        </Btn>
-        <Btn
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          active={state?.isStrike}
-          title="Strikethrough"
-        >
-          <IconStrikethrough size={13} />
-        </Btn>
-        <div className="w-px h-3.5 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5" />
-        <Btn
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          active={state?.isBulletList}
-          title="Bullet list"
-        >
-          <IconList size={13} />
-        </Btn>
-        <Btn
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          active={state?.isOrderedList}
-          title="Numbered list"
-        >
-          <IconListNumbers size={13} />
-        </Btn>
-        <div className="w-px h-3.5 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5" />
-        <Btn
-          onClick={toggleLink}
-          active={state?.isLink}
-          title={state?.isLink ? "Remove link" : "Add link"}
-        >
-          {state?.isLink ? <IconUnlink size={13} /> : <IconLink size={13} />}
-        </Btn>
+        {linkOpen ? (
+          /* ── Link URL input inline in the BubbleMenu ───────────────────── */
+          <>
+            <input
+              ref={linkInputRef}
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              onKeyDown={handleLinkKeyDown}
+              placeholder="https://…"
+              className={cn(
+                "h-7 w-48 px-2 rounded-lg text-[12px] outline-none",
+                "bg-gray-50 dark:bg-white/[0.07]",
+                "text-gray-800 dark:text-white/85",
+                "placeholder:text-gray-300 dark:placeholder:text-white/25",
+                "border border-black/[0.08] dark:border-white/[0.1]",
+              )}
+            />
+            <Btn onClick={commitLink} title="Apply link (Enter)">
+              <IconCheck size={13} />
+            </Btn>
+            <Btn onClick={cancelLink} title="Cancel (Esc)">
+              <IconX size={13} />
+            </Btn>
+          </>
+        ) : (
+          /* ── Normal formatting buttons ─────────────────────────────────── */
+          <>
+            <Btn onClick={() => editor.chain().focus().toggleBold().run()}        active={state?.isBold}        title="Bold ⌘B">          <IconBold          size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleItalic().run()}      active={state?.isItalic}      title="Italic ⌘I">        <IconItalic        size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleStrike().run()}      active={state?.isStrike}      title="Strikethrough">    <IconStrikethrough size={13} /></Btn>
+            <div className="w-px h-3.5 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5" />
+            <Btn onClick={() => editor.chain().focus().toggleBulletList().run()}  active={state?.isBulletList}  title="Bullet list">      <IconList          size={13} /></Btn>
+            <Btn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={state?.isOrderedList} title="Numbered list">    <IconListNumbers   size={13} /></Btn>
+            <div className="w-px h-3.5 bg-black/[0.08] dark:bg-white/[0.08] mx-0.5" />
+            <Btn
+              onClick={state?.isLink
+                ? () => editor.chain().focus().unsetLink().run()
+                : openLinkInput
+              }
+              active={state?.isLink}
+              title={state?.isLink ? "Remove link" : "Add link"}
+            >
+              {state?.isLink ? <IconUnlink size={13} /> : <IconLink size={13} />}
+            </Btn>
+          </>
+        )}
       </BubbleMenu>
 
-      <div style={{ minHeight }}>
-        <EditorContent editor={editor} />
+      {/* Clicking empty space below the editor text focuses it */}
+      <div
+        style={{ minHeight }}
+        onClick={() => editor.commands.focus("end")}
+      >
+        {/* stopPropagation so clicking inside the editor doesn't jump cursor to end */}
+        <div onClick={(e) => e.stopPropagation()}>
+          <EditorContent editor={editor} />
+        </div>
       </div>
 
-      {/* Quoted thread — collapsible */}
       {instance.quotedHtml && <QuotedThread html={instance.quotedHtml} />}
     </div>
   );
 }
 
-// ─── Bubble button ────────────────────────────────────────────────────────────
-
+// ─── Bubble button ─────────────────────────────────────────────────────────────
 function Btn({
-  children,
-  onClick,
-  active,
-  title,
+  children, onClick, active, title,
 }: {
   children: React.ReactNode;
   onClick: () => void;
@@ -181,10 +215,7 @@ function Btn({
 }) {
   return (
     <button
-      onMouseDown={(e) => {
-        e.preventDefault();
-        onClick();
-      }}
+      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
       title={title}
       className={cn(
         "w-7 h-7 flex items-center justify-center rounded-lg transition-colors",

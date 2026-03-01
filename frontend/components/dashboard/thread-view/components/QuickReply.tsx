@@ -24,9 +24,15 @@ export function QuickReply({
   const onReply = useCallback(() => {
     if (lastEmail) replyTo(lastEmail, shell, "reply");
   }, [lastEmail, replyTo, shell]);
+  const onReplyAll = useCallback(() => {
+    if (lastEmail) replyTo(lastEmail, shell, "reply_all");
+  }, [lastEmail, replyTo, shell]);
   const onForward = useCallback(() => {
     if (lastEmail) forward(lastEmail, shell);
   }, [lastEmail, forward, shell]);
+
+  const hasMultipleRecipients =
+    (lastEmail?.to?.length ?? 0) > 1 || (lastEmail?.cc?.length ?? 0) > 0;
 
   if (variant === "float") {
     return (
@@ -85,6 +91,16 @@ export function QuickReply({
         <IconArrowBackUp size={13} />
         Reply
       </button>
+      {hasMultipleRecipients && (
+        <button
+          onClick={onReplyAll}
+          disabled={!lastEmail}
+          className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-[12px] font-medium text-gray-600 dark:text-white/60 bg-black/[0.05] dark:bg-white/[0.07] hover:bg-black/[0.09] dark:hover:bg-white/[0.11] transition-colors disabled:opacity-40"
+        >
+          <IconArrowBackUp size={13} />
+          Reply All
+        </button>
+      )}
     </div>
   );
 }

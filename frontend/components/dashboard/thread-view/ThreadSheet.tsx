@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useCallback, useEffect, useState } from "react";
+import { Suspense, useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   IconX,
@@ -10,30 +10,29 @@ import {
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStore } from "@/lib/store/ui.store";
-import {
-  useThreadDetail,
-  useEmailAction,
-} from "@/features/mailbox/mailbox.query";
+import { useThreadDetail, useEmailAction } from "@/features/mailbox/mailbox.query";
 import type { FullEmail } from "@/features/mailbox/mailbox.type";
 import { cn } from "@/lib/utils";
-import { useSheetInstance } from "@/lib/store/composer.store";
-
+import { useSheetInstance, useComposerStore } from "@/lib/store/composer.store";
+import { stripHtml } from "@/lib/utils/stripHtml";
 import { TipBtn } from "./components/TipBtn";
 import { EmailCard } from "./components/EmailCard";
 import { QuickReply } from "./components/QuickReply";
-import { ThreadMeta } from "./components/ThreadMeta";
 import { SheetShell } from "@/components/composer/shells/SheetShell";
 import { useComposer } from "@/components/composer/hooks/useComposer";
+
 // ─── Sheet content ─────────────────────────────────────────────────────────────
 function SheetContent({ threadId }: { threadId: string }) {
-  const { data } = useThreadDetail(threadId);
-  const setActive = useUIStore((s) => s.setActiveThread);
+  const { data }      = useThreadDetail(threadId);
+  const setActive     = useUIStore((s) => s.setActiveThread);
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
-  const threadIds = useUIStore((s) => (s.threadIds as string[]) ?? []);
-  const emailAction = useEmailAction();
+  const threadIds     = useUIStore((s) => (s.threadIds as string[]) ?? []);
+  const emailAction   = useEmailAction();
 
   const { replyTo, forward } = useComposer();
-  const sheetInstance = useSheetInstance();
+
+  // One reply composer per thread — tracks whether one is currently open
+  const sheetInstance = useSheetInstance(threadId);
 
   const emails = useMemo(
     () => (data.success ? data.data.emails : []) as FullEmail[],
@@ -41,46 +40,52 @@ function SheetContent({ threadId }: { threadId: string }) {
     [data.success, data.success ? data.data.emails : null],
   );
 
-  const subject = emails[0]?.subject ?? "(no subject)";
+  const subject   = emails[0]?.subject ?? "(no subject)";
   const emailAddr = selectedEmail ?? emails[0]?.emailAddress ?? "";
-  const lastEmail = emails[emails.length - 1];
+
+  // The last non-draft message is the one we reply to.
+  // We deliberately ignore any server-side draft emails here — replies have
+  // no draft concept; the composer state is purely in-memory (Zustand).
+  const lastReal = [...emails].reverse().find((e) => !e.isDraft);
 
   const currentIdx = threadIds.indexOf(threadId);
-  const prevId = currentIdx > 0 ? threadIds[currentIdx - 1] : null;
-  const nextId =
-    currentIdx < threadIds.length - 1 ? threadIds[currentIdx + 1] : null;
+  const prevId = currentIdx > 0                          ? threadIds[currentIdx - 1] : null;
+  const nextId = currentIdx < threadIds.length - 1      ? threadIds[currentIdx + 1] : null;
 
   const act = useCallback(
-    (
-      email: FullEmail,
-      action: Parameters<typeof emailAction.mutate>[0]["action"],
-    ) =>
+    (email: FullEmail, action: Parameters<typeof emailAction.mutate>[0]["action"]) =>
       emailAction.mutate({
-        from: email.from.email,
-        provider:
-          email.provider?.toLowerCase() === "outlook" ? "OUTLOOK" : "GOOGLE",
+        from:       email.from.email,
+        provider:   email.provider?.toLowerCase() === "outlook" ? "OUTLOOK" : "GOOGLE",
         messageIds: [email.id],
         action,
       }),
     [emailAction],
   );
 
-  const handleDelete = useCallback(() => {
-    if (emails[0]) act(emails[0], "delete");
-  }, [emails, act]);
-  const handleReply = useCallback(() => {
-    if (lastEmail) replyTo(lastEmail, "sheet", "reply");
-  }, [lastEmail, replyTo]);
-  const handleForward = useCallback(() => {
-    if (lastEmail) forward(lastEmail, "sheet");
-  }, [lastEmail, forward]);
+  const handleDelete   = useCallback(() => { if (emails[0]) act(emails[0], "delete"); }, [emails, act]);
+  // Always replyTo the last real (non-draft) message — its providerMessageId is the
+  // correct thread anchor for the Gmail/Outlook reply API.
+  const handleReply    = useCallback(() => { if (lastReal) replyTo(lastReal, "sheet", "reply");     }, [lastReal, replyTo]);
+  const handleReplyAll = useCallback(() => { if (lastReal) replyTo(lastReal, "sheet", "reply_all"); }, [lastReal, replyTo]);
+  const handleForward  = useCallback(() => { if (lastReal) forward(lastReal, "sheet");              }, [lastReal, forward]);
+
+  // R — reply, F — forward keyboard shortcuts (only when not typing in an input)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA") return;
+      if (e.key === "r") { e.preventDefault(); handleReply(); }
+      if (e.key === "f") { e.preventDefault(); handleForward(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleReply, handleForward]);
 
   if (!data.success || emails.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-[13px] text-gray-400 dark:text-white/22">
-          Nothing to show
-        </p>
+        <p className="text-[13px] text-gray-400 dark:text-white/22">Nothing to show</p>
       </div>
     );
   }
@@ -99,26 +104,15 @@ function SheetContent({ threadId }: { threadId: string }) {
           {subject}
         </p>
         <div className="flex items-center gap-0.5 shrink-0">
-          <TipBtn
-            onClick={() => prevId && setActive(prevId)}
-            tip="Previous"
-            kbd="K"
-            disabled={!prevId}
-          >
+          <TipBtn onClick={() => prevId && setActive(prevId)} tip="Previous" kbd="K" disabled={!prevId}>
             <IconChevronLeft size={15} />
           </TipBtn>
-          <TipBtn
-            onClick={() => nextId && setActive(nextId)}
-            tip="Next"
-            kbd="J"
-            disabled={!nextId}
-          >
+          <TipBtn onClick={() => nextId && setActive(nextId)} tip="Next" kbd="J" disabled={!nextId}>
             <IconChevronRight size={15} />
           </TipBtn>
           <div className="w-px h-4 bg-black/[0.07] dark:bg-white/[0.07] mx-0.5" />
           <TipBtn
-            tip="Delete"
-            kbd="#"
+            tip="Delete" kbd="#"
             className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
             onClick={handleDelete}
           >
@@ -135,17 +129,18 @@ function SheetContent({ threadId }: { threadId: string }) {
             email={email}
             defaultOpen={i === emails.length - 1}
             onReply={handleReply}
+            onReplyAll={handleReplyAll}
             onForward={handleForward}
             onStar={() => act(email, email.isStarred ? "unstar" : "star")}
           />
         ))}
       </div>
 
-      {/* Quick reply / composer */}
+      {/* Inline reply composer — thread-scoped, purely in-memory (no draft sync) */}
       {!sheetInstance ? (
         <QuickReply
           userEmail={emailAddr}
-          lastEmail={lastEmail}
+          lastEmail={lastReal}
           variant="inline"
           shell="sheet"
         />
@@ -170,10 +165,7 @@ function SheetSkeleton() {
       </div>
       <Skeleton className="h-9 w-full rounded-xl" />
       {[1, 2].map((i) => (
-        <div
-          key={i}
-          className="rounded-2xl border border-black/[0.07] dark:border-white/[0.07] p-4"
-        >
+        <div key={i} className="rounded-2xl border border-black/[0.07] dark:border-white/[0.07] p-4">
           <div className="flex items-center gap-3">
             <Skeleton className="w-8 h-8 rounded-full shrink-0" />
             <div className="flex-1 space-y-1.5">
@@ -190,25 +182,38 @@ function SheetSkeleton() {
 
 // ─── Portal ────────────────────────────────────────────────────────────────────
 export function ThreadSideSheet() {
-  const layoutMode = useUIStore((s) => s.layoutMode);
+  const layoutMode     = useUIStore((s) => s.layoutMode);
   const activeThreadId = useUIStore((s) => s.activeThreadId);
-  const setActive = useUIStore((s) => s.setActiveThread);
+  const setActive      = useUIStore((s) => s.setActiveThread);
 
-  // THE FIX: wait for client mount before creating portal.
-  // Server renders null → client hydrates null → then mounts. No mismatch.
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
-  const isOpen =
-    !!activeThreadId && (layoutMode === "velocity" || layoutMode === "zen");
+  const isOpen = !!activeThreadId && (layoutMode === "velocity" || layoutMode === "zen");
+
+  // Auto-close empty (untouched) sheet composers when user navigates between threads.
+  // Prevents a stale open composer from showing when returning to a thread where
+  // Reply was clicked but nothing was typed.
+  const prevThreadIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prevId = prevThreadIdRef.current;
+    if (prevId && prevId !== activeThreadId) {
+      const inst = useComposerStore.getState().instances.find(
+        (i) => i.shell === "sheet" && i.threadId === prevId,
+      );
+      // Only keep the instance alive if the user actually typed something.
+      // Note: isDirty is unreliable here — TipTap fires onUpdate on mount
+      // with <p></p>, which sets isDirty=true even with no user input.
+      if (inst && !stripHtml(inst.html)) {
+        useComposerStore.getState().close(inst.id);
+      }
+    }
+    prevThreadIdRef.current = activeThreadId;
+  }, [activeThreadId]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActive(null);
-    };
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setActive(null); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, setActive]);
@@ -221,9 +226,7 @@ export function ThreadSideSheet() {
         className={cn(
           "fixed inset-0 z-40 transition-opacity duration-200",
           "bg-black/[0.18] dark:bg-black/[0.35]",
-          isOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none",
+          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
         )}
         onClick={() => setActive(null)}
       />
@@ -240,7 +243,9 @@ export function ThreadSideSheet() {
         onClick={(e) => e.stopPropagation()}
       >
         {activeThreadId && (
-          <Suspense fallback={<SheetSkeleton />}>
+          // key forces a full remount on every thread switch, so the reply
+          // composer state (Zustand sheet instance) is always scoped to one thread.
+          <Suspense key={activeThreadId} fallback={<SheetSkeleton />}>
             <SheetContent threadId={activeThreadId} />
           </Suspense>
         )}

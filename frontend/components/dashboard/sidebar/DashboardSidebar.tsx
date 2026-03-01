@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useCallback, Suspense } from "react";
 import { Sidebar, SidebarBody } from "@/components/ui/sidebar";
 import { useUIStore } from "@/lib/store/ui.store";
 import { useFolders } from "@/features/mailbox/mailbox.query";
-import { IconMenu2, IconX } from "@tabler/icons-react";
+import { IconMenu2, IconX, IconEdit } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
@@ -14,6 +14,14 @@ import {
 } from "@/lib/helper/sidebarHelper";
 import { AccountSwitcher } from "./ui/AccountSwitcher";
 import { UserFooter, MobileUserAvatarButton } from "./ui/UserFooter";
+import { ComposeDialog } from "@/components/composer/ComposeDialog";
+import { useKeyboard } from "@/hooks/keyboard/useKeyboard";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type SidebarDataChildProps = {
   systemFolders: FolderItem[];
@@ -62,7 +70,9 @@ function FolderRow({
       <span className="shrink-0">{item.icon}</span>
       {!compact && (
         <>
-          <span className="text-[13px] font-medium flex-1 truncate">{item.label}</span>
+          <span className="text-[13px] font-medium flex-1 truncate">
+            {item.label}
+          </span>
           <CountBadge count={item.count} />
         </>
       )}
@@ -70,9 +80,20 @@ function FolderRow({
   );
 }
 
-function FolderSkeleton({ rows = 6, compact }: { rows?: number; compact?: boolean }) {
+function FolderSkeleton({
+  rows = 6,
+  compact,
+}: {
+  rows?: number;
+  compact?: boolean;
+}) {
   return (
-    <div className={cn("flex flex-col gap-0.5 py-1 px-2", compact && "items-center")}>
+    <div
+      className={cn(
+        "flex flex-col gap-0.5 py-1 px-2",
+        compact && "items-center",
+      )}
+    >
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
@@ -161,6 +182,14 @@ export function DashboardSidebar() {
   const [isHovering, setIsHovering] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dialogs, setDialogs] = useState<string[]>([]);
+
+  const openCompose = useCallback(() => {
+    if (dialogs.length < 2) setDialogs((d) => [...d, crypto.randomUUID()]);
+  }, [dialogs.length]);
+
+  // N key opens compose (disabled when typing in inputs — handled by useKeyboard)
+  useKeyboard("n", openCompose, [openCompose]);
 
   const isOpen = !collapsed || isHovering || dropdownOpen;
   const noop = () => {};
@@ -207,7 +236,11 @@ export function DashboardSidebar() {
               {/* Drawer header: account switcher + X close */}
               <div className="border-b border-app-sidebar-border flex items-start">
                 <div className="flex-1 min-w-0">
-                  <AccountSwitcher isOpen={true} onAddAccount={noop} onDropdownOpenChange={noop} />
+                  <AccountSwitcher
+                    isOpen={true}
+                    onAddAccount={noop}
+                    onDropdownOpenChange={noop}
+                  />
                 </div>
                 {/* X button — top-right of drawer */}
                 <button
@@ -220,6 +253,19 @@ export function DashboardSidebar() {
 
               {/* Folders */}
               <div className="flex-1 overflow-y-auto py-2">
+                {/* Compose button */}
+                <div className="px-2 pb-2">
+                  <button
+                    onClick={() => {
+                      openCompose();
+                      setMobileOpen(false);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.97] text-white dark:text-neutral-900 text-[13px] font-semibold transition-all duration-150"
+                  >
+                    <IconEdit size={15} />
+                    Compose
+                  </button>
+                </div>
                 <Suspense fallback={<FolderSkeleton rows={7} />}>
                   <FolderData selectedEmail={selectedEmail}>
                     {({ systemFolders, labelFolders }) => (
@@ -228,7 +274,10 @@ export function DashboardSidebar() {
                         labelFolders={labelFolders}
                         activeFolder={activeFolder}
                         compact={false}
-                        onSelect={(f) => { setActiveFolder(f); setMobileOpen(false); }}
+                        onSelect={(f) => {
+                          setActiveFolder(f);
+                          setMobileOpen(false);
+                        }}
                       />
                     )}
                   </FolderData>
@@ -250,15 +299,18 @@ export function DashboardSidebar() {
           <SidebarBody
             className="justify-between border-r py-4 overflow-hidden bg-app-sidebar-bg border-app-sidebar-border"
             onMouseEnter={() => collapsed && setIsHovering(true)}
-            onMouseLeave={() => { if (!dropdownOpen) setIsHovering(false); }}
+            onMouseLeave={() => {
+              if (!dropdownOpen) setIsHovering(false);
+            }}
           >
             <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-
               {/* Account switcher — collapse button lives inside */}
-              <div className={cn(
-                "border-b mb-1 border-app-sidebar-border",
-                !isOpen && "border-transparent",
-              )}>
+              <div
+                className={cn(
+                  "border-b mb-1 border-app-sidebar-border",
+                  !isOpen && "border-transparent",
+                )}
+              >
                 <AccountSwitcher
                   isOpen={isOpen}
                   onAddAccount={noop}
@@ -266,8 +318,44 @@ export function DashboardSidebar() {
                 />
               </div>
 
+              {/* Compose button */}
+              <div
+                className={cn(
+                  "py-2",
+                  isOpen ? "px-2" : "flex justify-center px-0",
+                )}
+              >
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={openCompose}
+                        className={cn(
+                          "flex items-center justify-center gap-2 rounded-xl transition-all duration-150",
+                          "bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.97]",
+                          "text-white dark:text-neutral-900",
+                          isOpen
+                            ? "w-full px-3 py-2 text-[13px] font-semibold"
+                            : "w-9 h-9",
+                        )}
+                      >
+                        <IconEdit size={15} />
+                        {isOpen && <span>Compose</span>}
+                      </button>
+                    </TooltipTrigger>
+                    {!isOpen && (
+                      <TooltipContent side="right" className="text-xs">
+                        Compose
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+
               {/* Folder list */}
-              <Suspense fallback={<FolderSkeleton rows={7} compact={!isOpen} />}>
+              <Suspense
+                fallback={<FolderSkeleton rows={7} compact={!isOpen} />}
+              >
                 <FolderData selectedEmail={selectedEmail}>
                   {(props) => (
                     <FolderList
@@ -288,6 +376,14 @@ export function DashboardSidebar() {
           </SidebarBody>
         </Sidebar>
       </div>
+
+      {/* Compose modals — up to 2 open at once; each is independently closeable */}
+      {dialogs.map((key) => (
+        <ComposeDialog
+          key={key}
+          onClose={() => setDialogs((d) => d.filter((k) => k !== key))}
+        />
+      ))}
     </>
   );
 }
