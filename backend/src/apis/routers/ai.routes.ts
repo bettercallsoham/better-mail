@@ -5,8 +5,9 @@ import {
   validateThreadSummarization,
   validateRagChat,
   validateReplySuggestion,
+  validateSuggestEmail,
 } from "../validators/ai.validator";
-import { summarizeThread, suggestReply } from "../controllers/ai.controller";
+import { summarizeThread, suggestReply, suggestEmail } from "../controllers/ai.controller";
 
 const router = Router();
 
@@ -24,6 +25,13 @@ router.post(
   validateReplySuggestion,
   verifyEmailOwnership,
   suggestReply,
+);
+
+router.post(
+  "/suggest-email",
+  verifyAccessToken(),
+  validateSuggestEmail,
+  suggestEmail,
 );
 
 export default router;

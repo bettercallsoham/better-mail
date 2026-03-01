@@ -110,3 +110,54 @@ export const validateReplySuggestion = [
 
   handleValidationErrors,
 ];
+
+export const validateSuggestEmail = [
+  body("mode")
+    .exists()
+    .withMessage("mode is required")
+    .isIn(["compose", "rewrite"])
+    .withMessage("mode must be one of: compose, rewrite"),
+
+  body("topic")
+    .if(body("mode").equals("compose"))
+    .exists()
+    .withMessage("topic is required when mode is compose")
+    .isString()
+    .withMessage("topic must be a string")
+    .notEmpty()
+    .withMessage("topic cannot be empty")
+    .isLength({ max: 1000 })
+    .withMessage("topic must be at most 1000 characters"),
+
+  body("draft")
+    .if(body("mode").equals("rewrite"))
+    .exists()
+    .withMessage("draft is required when mode is rewrite")
+    .isString()
+    .withMessage("draft must be a string")
+    .notEmpty()
+    .withMessage("draft cannot be empty")
+    .isLength({ max: 5000 })
+    .withMessage("draft must be at most 5000 characters"),
+
+  body("tone")
+    .optional()
+    .isIn(["formal", "friendly", "concise", "professional", "empathetic"])
+    .withMessage("tone must be one of: formal, friendly, concise, professional, empathetic"),
+
+  body("recipientName")
+    .optional()
+    .isString()
+    .withMessage("recipientName must be a string")
+    .isLength({ max: 100 })
+    .withMessage("recipientName must be at most 100 characters"),
+
+  body("subjectHint")
+    .optional()
+    .isString()
+    .withMessage("subjectHint must be a string")
+    .isLength({ max: 200 })
+    .withMessage("subjectHint must be at most 200 characters"),
+
+  handleValidationErrors,
+];

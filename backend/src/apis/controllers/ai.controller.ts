@@ -3,6 +3,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 import {
   AISummaryService,
   AIReplyService,
+  AISuggestEmailService,
 } from "../../shared/services/ai/ai.service";
 import { EmbeddingsService } from "../../shared/services/ai/embeddings.service";
 import { RAGService } from "../../shared/services/ai/rag.service";
@@ -24,6 +25,7 @@ const embeddingsService = new EmbeddingsService();
 const ragService = new RAGService(embeddingsService, vectorSearchService);
 const aiService = new AISummaryService(ragService);
 const aiReplyService = new AIReplyService(ragService);
+const aiSuggestEmailService = new AISuggestEmailService();
 
 function stripQuotedReplies(text: string): string {
   return text
@@ -252,4 +254,46 @@ ${truncatedBody}
     }
   },
   "suggestReply",
+);
+
+/**
+ * Compose a new email or rewrite an existing draft
+ * POST /api/ai/suggest-email
+ * Body: { mode, topic?, draft?, tone?, recipientName?, subjectHint? }
+ */
+export const suggestEmail = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    const { mode, topic, draft, tone, recipientName, subjectHint } = req.body;
+
+    try {
+      logger.info(`Suggest email (${mode}) for user ${userId}`);
+
+      const result = await aiSuggestEmailService.suggestEmail({
+        mode,
+        topic,
+        draft,
+        tone,
+        recipientName,
+        subjectHint,
+      });
+
+      return res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error: any) {
+      logger.error("Suggest email error:", { error: error.message });
+      throw error;
+    }
+  },
+  "suggestEmail",
 );

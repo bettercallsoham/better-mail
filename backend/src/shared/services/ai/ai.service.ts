@@ -173,3 +173,69 @@ ${emailsText}`;
     return validated;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Email composer / rewriter — pure stateless LLM, no agent, no RAG
+// ---------------------------------------------------------------------------
+
+export const SUGGEST_EMAIL_TONES = ["formal", "friendly", "concise", "professional", "empathetic"] as const;
+export type SuggestEmailTone = typeof SUGGEST_EMAIL_TONES[number];
+
+export const SuggestEmailOutputSchema = z.object({
+  subject: z.string(),
+  body: z.string(),
+});
+export type SuggestEmailOutput = z.infer<typeof SuggestEmailOutputSchema>;
+
+interface SuggestEmailInput {
+  mode: "compose" | "rewrite";
+  /** compose mode: what the email should be about */
+  topic?: string;
+  /** rewrite mode: the existing draft to improve */
+  draft?: string;
+  tone?: SuggestEmailTone;
+  /** optional hints for richer output */
+  recipientName?: string;
+  subjectHint?: string;
+}
+
+export class AISuggestEmailService {
+  async suggestEmail(input: SuggestEmailInput): Promise<SuggestEmailOutput> {
+    const { mode, topic, draft, tone = "professional", recipientName, subjectHint } = input;
+
+    const toneInstruction = `Tone: ${tone}.`;
+    const recipientLine = recipientName ? `Recipient: ${recipientName}.` : "";
+    const subjectLine = subjectHint ? `Subject hint: ${subjectHint}.` : "";
+
+    const systemPrompt = `You are an expert email writing assistant for BetterMail.
+Output ONLY a pure JSON object (no markdown, no code blocks):
+{ "subject": "<email subject>", "body": "<full email body>" }
+Rules:
+- ${toneInstruction}
+- ${recipientLine}
+- ${subjectLine}
+- Body must be ready-to-send (proper greeting, content, sign-off).
+- Do NOT include any text outside the JSON object.`;
+
+    const userPrompt =
+      mode === "compose"
+        ? `Compose a new email about the following topic:\n${topic}`
+        : `Rewrite the following email draft to be more ${tone}. Preserve the intent but improve clarity, structure, and ${tone === "concise" ? "brevity" : "tone"}:\n\n${draft}`;
+
+    const response = await azureClient4o_mini.chat.completions.create({
+      model: GPT_4O_MINI_MODEL!,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.6,
+      max_tokens: 1500,
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content || "{}";
+    const validated = SuggestEmailOutputSchema.parse(JSON.parse(content));
+    logger.info(`Email ${mode} generated and validated successfully`);
+    return validated;
+  }
+}
