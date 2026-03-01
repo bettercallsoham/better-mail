@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 // ─── Inner editor (suspense boundary) ─────────────────────────────────────────
 function NotesEditorInner({ threadId, emailAddress }: { threadId: string; emailAddress: string }) {
-  const { data }          = useThreadNote(threadId);
+  const { data }          = useThreadNote(threadId, emailAddress);
   const { mutate }        = useUpsertThreadNote();
   const [value, setValue] = useState(data?.notes ?? "");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");

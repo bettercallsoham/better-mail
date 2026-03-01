@@ -7,6 +7,7 @@ import { DashboardSidebar } from "@/components/dashboard/sidebar/DashboardSideba
 import { DashboardProviders } from "@/components/dashboard/DashboardProviders";
 import { getUserFromToken } from "@/lib/auth/getUserFromToken";
 import { Toaster } from "@/components/ui/sonner"
+import { ComposerPortal } from "@/components/composer";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const token = (await cookies()).get("access_token");
@@ -23,6 +24,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <DashboardSidebar />
           <main className="flex-1 min-w-0 overflow-hidden">{children}</main>
           <Toaster/>
+           <ComposerPortal /> 
         </div>
       </DashboardProviders>
     </QueryProvider>

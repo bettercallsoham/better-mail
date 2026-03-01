@@ -3,54 +3,71 @@
 import { Suspense, useRef, useState, useCallback, useMemo } from "react";
 import { format } from "date-fns";
 import {
-  IconX, IconChevronLeft, IconChevronRight,
-  IconStar, IconStarFilled, IconArchive, IconArchiveOff,
-  IconTrash, IconNotes, IconMailOpened, IconMail,
+  IconX,
+  IconChevronLeft,
+  IconChevronRight,
+  IconStar,
+  IconStarFilled,
+  IconArchive,
+  IconArchiveOff,
+  IconTrash,
+  IconNotes,
+  IconMailOpened,
+  IconMail,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStore } from "@/lib/store/ui.store";
-import { useThreadDetail, useEmailAction } from "@/features/mailbox/mailbox.query";
+import {
+  useThreadDetail,
+  useEmailAction,
+} from "@/features/mailbox/mailbox.query";
 import type { FullEmail } from "@/features/mailbox/mailbox.type";
 import { cn } from "@/lib/utils";
+import { usePanelInstance } from "@/lib/store/composer.store";
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
-import { TipBtn }          from "./components/TipBtn";
-import { AISummary }       from "./components/AISummary";
-import { EmailCard }       from "./components/EmailCard";
-import { QuickReply }      from "./components/QuickReply";
-import { ThreadMeta }      from "./components/ThreadMeta";
-import { NotesDropdown }   from "./components/NotesDropdown";
+import { TipBtn } from "./components/TipBtn";
+import { AISummary } from "./components/AISummary";
+import { EmailCard } from "./components/EmailCard";
+// import { QuickReply }      from "@/components/composer/QuickReply";
+import { ThreadMeta } from "./components/ThreadMeta";
+import { NotesDropdown } from "./components/NotesDropdown";
+import { PanelShell } from "@/components/composer/shells/PanelShell";
+import { useComposer } from "@/components/composer/hooks/useComposer";
+import { QuickReply } from "./components/QuickReply";
 
 // ─── Thread detail content ─────────────────────────────────────────────────────
 function ThreadDetailContent({ threadId }: { threadId: string }) {
-  const { data }        = useThreadDetail(threadId);
-  const setActiveThread = useUIStore(s => s.setActiveThread);
-  const selectedEmail   = useUIStore(s => s.selectedEmailAddress);
-  const threadIds       = useUIStore(s => s.threadIds as string[] ?? []);
-  const emailAction     = useEmailAction();
+  const { data } = useThreadDetail(threadId);
+  const setActiveThread = useUIStore((s) => s.setActiveThread);
+  const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
+  const threadIds = useUIStore((s) => (s.threadIds as string[]) ?? []);
+  const emailAction = useEmailAction();
   const [notesOpen, setNotesOpen] = useState(false);
   const notesAnchorRef = useRef<HTMLDivElement>(null);
 
-  // ── useMemo so React Compiler can track the reference ──────────────────────
-  // FIX: derive emails with useMemo — prevents "could not preserve memoization"
-  // warning because `data` reference is stable from react-query
+  const { replyTo, forward } = useComposer();
+  const panelInstance = usePanelInstance();
+
   const emails = useMemo(
     () => (data.success ? data.data.emails : []) as FullEmail[],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data.success, data.success ? data.data.emails : null],
   );
 
-  // ── Derived state (before guard, after useMemo) ────────────────────────────
-  const subject    = emails[0]?.subject || "(no subject)";
-  const emailAddr  = selectedEmail ?? emails[0]?.emailAddress ?? "";
-  const anyStarred = useMemo(() => emails.some(e => e.isStarred), [emails]);
+  const subject = emails[0]?.subject || "(no subject)";
+  const emailAddr = selectedEmail ?? emails[0]?.emailAddress ?? "";
+  const lastEmail = emails[emails.length - 1];
+  const anyStarred = useMemo(() => emails.some((e) => e.isStarred), [emails]);
   const isArchived = emails[0]?.isArchived ?? false;
-  // FullEmail uses `isRead` — a thread is fully read when no email is unread
-  const isRead     = useMemo(() => emails.length > 0 && emails.every(e => e.isRead), [emails]);
+  const isRead = useMemo(
+    () => emails.length > 0 && emails.every((e) => e.isRead),
+    [emails],
+  );
 
   const currentIdx = threadIds.indexOf(threadId);
-  const prevId     = currentIdx > 0                        ? threadIds[currentIdx - 1] : null;
-  const nextId     = currentIdx < threadIds.length - 1     ? threadIds[currentIdx + 1] : null;
+  const prevId = currentIdx > 0 ? threadIds[currentIdx - 1] : null;
+  const nextId =
+    currentIdx < threadIds.length - 1 ? threadIds[currentIdx + 1] : null;
 
   const dateRange = useMemo(() => {
     if (!emails.length) return "";
@@ -59,49 +76,45 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
       : format(new Date(emails[0].receivedAt), "MMM d, h:mm a");
   }, [emails]);
 
-  // ── ALL useCallbacks declared unconditionally (hooks ordering rule) ─────────
   const act = useCallback(
-    (email: FullEmail, action: string) =>
+    (
+      email: FullEmail,
+      action: Parameters<typeof emailAction.mutate>[0]["action"],
+    ) =>
       emailAction.mutate({
-        from:       email.from.email,
-        provider:   (email.provider ?? "GOOGLE") as "GOOGLE" | "OUTLOOK",
+        from: email.from.email,
+        provider:
+          email.provider?.toLowerCase() === "outlook" ? "OUTLOOK" : "GOOGLE",
         messageIds: [email.id],
-        action:     action as Parameters<typeof emailAction.mutate>[0]["action"],
+        action,
       }),
     [emailAction],
   );
 
   const handleStar = useCallback(() => {
-    if (!emails[0]) return;
-    act(emails[0], anyStarred ? "unstar" : "star");
+    if (emails[0]) act(emails[0], anyStarred ? "unstar" : "star");
   }, [emails, anyStarred, act]);
-
   const handleArchive = useCallback(() => {
-    if (!emails[0]) return;
-    act(emails[0], isArchived ? "unarchive" : "archive");
+    if (emails[0]) act(emails[0], isArchived ? "unarchive" : "archive");
   }, [emails, isArchived, act]);
-
   const handleDelete = useCallback(() => {
-    if (!emails[0]) return;
-    act(emails[0], "delete");
+    if (emails[0]) act(emails[0], "delete");
   }, [emails, act]);
-
   const handleRead = useCallback(() => {
-    if (!emails[0]) return;
-    act(emails[0], isRead ? "markUnread" : "markRead");
+    if (emails[0]) act(emails[0], isRead ? "mark_unread" : "mark_read");
   }, [emails, isRead, act]);
+  const handleToggleNotes = useCallback(() => setNotesOpen((v) => !v), []);
+  const handleReply = useCallback(() => {
+    if (lastEmail) replyTo(lastEmail, "panel", "reply");
+  }, [lastEmail, replyTo]);
+  const handleForward = useCallback(() => {
+    if (lastEmail) forward(lastEmail, "panel");
+  }, [lastEmail, forward]);
 
-  const handleToggleNotes = useCallback(() => setNotesOpen(v => !v), []);
-
-  const handleReply   = useCallback(() => { /* open reply composer */ }, []);
-  const handleForward = useCallback(() => { /* open forward composer */ }, []);
-
-  // ── Guard AFTER all hooks ──────────────────────────────────────────────────
   if (!data.success || emails.length === 0) return <ThreadDetailEmpty />;
 
   return (
     <div className="flex flex-col h-full bg-gray-50/50 dark:bg-[#191919]">
-
       {/* ── Toolbar ── */}
       <div className="shrink-0 flex items-center px-3 pt-3 pb-2 gap-1">
         <div className="flex items-center gap-0.5">
@@ -109,10 +122,20 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
             <IconX size={15} />
           </TipBtn>
           <div className="w-px h-4 bg-black/[0.07] dark:bg-white/[0.07] mx-1" />
-          <TipBtn onClick={() => prevId && setActiveThread(prevId)} tip="Previous" kbd="K" disabled={!prevId}>
+          <TipBtn
+            onClick={() => prevId && setActiveThread(prevId)}
+            tip="Previous"
+            kbd="K"
+            disabled={!prevId}
+          >
             <IconChevronLeft size={16} />
           </TipBtn>
-          <TipBtn onClick={() => nextId && setActiveThread(nextId)} tip="Next" kbd="J" disabled={!nextId}>
+          <TipBtn
+            onClick={() => nextId && setActiveThread(nextId)}
+            tip="Next"
+            kbd="J"
+            disabled={!nextId}
+          >
             <IconChevronRight size={16} />
           </TipBtn>
         </div>
@@ -120,24 +143,41 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
         <div className="flex-1" />
 
         <div className="flex items-center gap-0.5">
-          <TipBtn tip={isRead ? "Mark unread" : "Mark read"} kbd="U" onClick={handleRead}>
+          <TipBtn
+            tip={isRead ? "Mark unread" : "Mark read"}
+            kbd="U"
+            onClick={handleRead}
+          >
             {isRead ? <IconMailOpened size={16} /> : <IconMail size={16} />}
           </TipBtn>
           <TipBtn
-            tip={anyStarred ? "Unstar" : "Star"} kbd="S"
+            tip={anyStarred ? "Unstar" : "Star"}
+            kbd="S"
             onClick={handleStar}
-            className={anyStarred ? "text-amber-400 hover:text-amber-500" : undefined}
-          >
-            {anyStarred
-              ? <IconStarFilled size={16} className="text-amber-400" />
-              : <IconStar size={16} />
+            className={
+              anyStarred ? "text-amber-400 hover:text-amber-500" : undefined
             }
-          </TipBtn>
-          <TipBtn tip={isArchived ? "Move to inbox" : "Archive"} kbd="E" onClick={handleArchive}>
-            {isArchived ? <IconArchiveOff size={16} /> : <IconArchive size={16} />}
+          >
+            {anyStarred ? (
+              <IconStarFilled size={16} className="text-amber-400" />
+            ) : (
+              <IconStar size={16} />
+            )}
           </TipBtn>
           <TipBtn
-            tip="Delete" kbd="#"
+            tip={isArchived ? "Move to inbox" : "Archive"}
+            kbd="E"
+            onClick={handleArchive}
+          >
+            {isArchived ? (
+              <IconArchiveOff size={16} />
+            ) : (
+              <IconArchive size={16} />
+            )}
+          </TipBtn>
+          <TipBtn
+            tip="Delete"
+            kbd="#"
             className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
             onClick={handleDelete}
           >
@@ -145,7 +185,12 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
           </TipBtn>
           <div className="w-px h-4 bg-black/[0.07] dark:bg-white/[0.07] mx-0.5" />
           <div ref={notesAnchorRef} className="relative">
-            <TipBtn tip="Notes" kbd="N" active={notesOpen} onClick={handleToggleNotes}>
+            <TipBtn
+              tip="Notes"
+              kbd="N"
+              active={notesOpen}
+              onClick={handleToggleNotes}
+            >
               <IconNotes size={16} />
             </TipBtn>
             {notesOpen && (
@@ -170,7 +215,11 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
       {/* ── Scrollable body ── */}
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <Suspense fallback={null}>
-          <AISummary threadId={threadId} emailAddress={emailAddr} variant="card" />
+          <AISummary
+            threadId={threadId}
+            emailAddress={emailAddr}
+            variant="card"
+          />
         </Suspense>
 
         <div className="px-6 py-4 space-y-2">
@@ -185,17 +234,22 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
             />
           ))}
         </div>
-        {/* Spacer so last card clears the floating reply bar */}
-        <div className="h-24" />
+
+        {/* Spacer — only when panel is closed so last card clears the float bar */}
+        {!panelInstance && <div className="h-24" />}
       </div>
 
-      {/* ── Floating reply bar ── */}
-      <QuickReply
-        userEmail={emailAddr}
-        onReply={handleReply}
-        onForward={handleForward}
-        variant="float"
-      />
+      {/* ── Float bar — hidden when panel composer is open ── */}
+      {!panelInstance && (
+        <QuickReply
+          userEmail={emailAddr}
+          lastEmail={lastEmail}
+          variant="float"
+        />
+      )}
+
+      {/* ── Composer panel — slides up from bottom ── */}
+      {panelInstance && <PanelShell instance={panelInstance} />}
     </div>
   );
 }
@@ -205,8 +259,16 @@ function ThreadDetailSkeleton() {
   return (
     <div className="flex flex-col h-full bg-gray-50/50 dark:bg-[#191919] p-6 gap-4">
       <div className="flex items-center justify-between">
-        <div className="flex gap-1">{[1, 2, 3].map(i => <Skeleton key={i} className="w-8 h-8 rounded-xl" />)}</div>
-        <div className="flex gap-1">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="w-8 h-8 rounded-xl" />)}</div>
+        <div className="flex gap-1">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="w-8 h-8 rounded-xl" />
+          ))}
+        </div>
+        <div className="flex gap-1">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="w-8 h-8 rounded-xl" />
+          ))}
+        </div>
       </div>
       <div className="space-y-2">
         <Skeleton className="h-6 w-3/4 rounded-lg" />
@@ -217,10 +279,9 @@ function ThreadDetailSkeleton() {
           <Skeleton className="h-6 w-20 rounded-full" />
         </div>
       </div>
-      {/* AI summary skeleton */}
       <Skeleton className="h-12 w-full rounded-2xl" />
       <div className="space-y-2">
-        {[1, 2].map(i => (
+        {[1, 2].map((i) => (
           <div key={i} className="rounded-2xl bg-white dark:bg-[#1e1e1e] p-4">
             <div className="flex items-center gap-3">
               <Skeleton className="w-8 h-8 rounded-full shrink-0" />
@@ -239,22 +300,27 @@ function ThreadDetailSkeleton() {
 
 function ThreadDetailEmpty({ className }: { className?: string }) {
   return (
-    <div className={cn(
-      "flex-1 flex flex-col items-center justify-center gap-2 text-center px-8 dark:bg-[#191919]",
-      className,
-    )}>
+    <div
+      className={cn(
+        "flex-1 flex flex-col items-center justify-center gap-2 text-center px-8 dark:bg-[#191919]",
+        className,
+      )}
+    >
       <span className="text-3xl opacity-10 select-none">✉</span>
-      <p className="text-[13px] text-gray-400 dark:text-white/22">Select a thread to read</p>
+      <p className="text-[13px] text-gray-400 dark:text-white/22">
+        Select a thread to read
+      </p>
     </div>
   );
 }
 
-// ─── Public export ─────────────────────────────────────────────────────────────
 export function ThreadDetail({ className }: { className?: string }) {
-  const activeThreadId = useUIStore(s => s.activeThreadId);
+  const activeThreadId = useUIStore((s) => s.activeThreadId);
   if (!activeThreadId) return <ThreadDetailEmpty className={className} />;
   return (
-    <div className={cn("relative flex flex-col h-full overflow-hidden", className)}>
+    <div
+      className={cn("relative flex flex-col h-full overflow-hidden", className)}
+    >
       <Suspense fallback={<ThreadDetailSkeleton />}>
         <ThreadDetailContent threadId={activeThreadId} />
       </Suspense>

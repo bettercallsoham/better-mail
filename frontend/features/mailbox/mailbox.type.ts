@@ -63,10 +63,11 @@ export interface EmailAddress {
 
 export interface FullEmail {
   id: string;
+  providerMessageId: string;
   emailAddress: string;
   provider: "gmail" | "outlook";
   subject: string;
-  isArchived:string;
+  isArchived: boolean;
   bodyHtml: string;
   bodyText?: string;
   snippet: string;
@@ -232,9 +233,9 @@ export interface UpsertThreadNoteResponse {
 }
 
 export interface UpsertThreadNoteParams {
-  threadId:     string;
-  content:      string;
-  emailAddress: string; 
+  threadId: string;
+  content: string;
+  emailAddress: string;
 }
 // ── Inbox Zero ─────────────────────────────────────────────────────────────────
 export interface InboxZeroEmail {
