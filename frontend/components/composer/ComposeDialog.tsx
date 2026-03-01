@@ -195,7 +195,7 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
           ref={nodeRef}
           className={cn(
             "flex flex-col overflow-hidden rounded-2xl",
-            "bg-white dark:bg-[#252525]",
+            "bg-white dark:bg-[#27241f]",
             isFullscreen
               ? "shadow-[0_24px_80px_rgba(0,0,0,0.25),0_0_0_1px_rgba(0,0,0,0.08)] dark:shadow-[0_24px_80px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.08)]"
               : "shadow-[0_8px_40px_rgba(0,0,0,0.16),0_0_0_1px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.08)]",

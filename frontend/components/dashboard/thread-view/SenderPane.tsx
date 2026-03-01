@@ -165,7 +165,7 @@ function ParticipantPill({ name, email }: { name?: string; email: string }) {
         <div className={cn(
           "absolute top-full left-0 mt-1.5 z-50",
           "flex items-center gap-2 px-2.5 py-1.5 rounded-xl",
-          "bg-white dark:bg-[#252525]",
+          "bg-white dark:bg-[#27241f]",
           "shadow-[0_4px_20px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)]",
           "dark:shadow-[0_4px_20px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)]",
           "whitespace-nowrap",
@@ -520,7 +520,7 @@ function PaneContent({
   const labels = visibleLabels(first?.labels ?? []);
 
   return (
-    <div className={cn("flex flex-col h-full overflow-hidden bg-white dark:bg-[#1a1a1a]", className)}>
+    <div className={cn("flex flex-col h-full overflow-hidden bg-white dark:bg-[#1c1a18]", className)}>
 
       {/* ── Header ── */}
       <div className="px-5 pt-5 pb-4 shrink-0 space-y-3">

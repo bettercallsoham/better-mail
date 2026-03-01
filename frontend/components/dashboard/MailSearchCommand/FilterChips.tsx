@@ -71,7 +71,7 @@ function PortalPopover({ open, anchorRef, onClose, children, width }: PopoverPro
       className={cn(
         "rounded-xl overflow-hidden",
         "bg-white border border-gray-200/60 shadow-xl shadow-black/10",
-        "dark:bg-[#252525] dark:border-white/[0.07] dark:shadow-[0_16px_48px_rgba(0,0,0,0.55)]",
+        "dark:bg-[#27241f] dark:border-white/[0.07] dark:shadow-[0_16px_48px_rgba(0,0,0,0.55)]",
         "animate-in fade-in slide-in-from-top-1 duration-100",
       )}
     >

@@ -24,7 +24,7 @@ export { ComposerEditor } from "./ComposerEditor";
 export { ComposerHeader } from "./ComposerHeader";
 export { ComposerFooter } from "./ComposerFooter";
 export { QuotedThread } from "./QuotedThread";
-export { AttachmentChip } from "./AttachmentChip";
+// export { AttachmentChip } from "./AttachmentChip";
 // TODO: SmartReplies not yet implemented
 export { RecipientInput } from "./RecipientInput";
 

@@ -243,16 +243,18 @@ function ActionTray({
 }
 
 // ─── Dark mode opacity system ──────────────────────────────────────────────────
-// 4-level hierarchy on #1a1a1a (Cursor dark background):
+// 4-level hierarchy on #1c1a18 (warm neutral base):
 //
-//   UNREAD sender   white/88  → 13.4:1  AAA  — primary attention anchor
-//   UNREAD subject  white/60  →  6.7:1  AA   — clearly secondary
-//   READ   sender   white/40  →  3.2:1  UI ✓ — subdued but legible
-//   READ   subject  white/35  →  2.8:1  ↑3:1 — receded, scannable
+//   UNREAD sender   white/88  → 13.4:1  AAA  font-semibold — primary anchor
+//   UNREAD subject  white/60  →  6.7:1  AA   font-medium   — clearly secondary
+//   READ   sender   white/52  →  4.4:1  AA   font-medium   — legible, receded
+//   READ   subject  white/42  →  3.5:1  AA   font-normal   — scannable
 //   dates  unread   white/38  →  3.0:1  UI ✓
-//   dates  read     white/25  →  2.0:1  decorative / lowest priority
+//   dates  read     white/32  →  2.6:1  decorative / lowest priority
 //
-// Row elevations (over #1a1a1a base):
+// Hierarchy through WEIGHT first, opacity second (Notion principle).
+//
+// Row elevations (over #1c1a18 base):
 //   hover   → white/[0.04]
 //   focused → white/[0.055]
 //   active  → white/[0.07]
@@ -285,7 +287,7 @@ function VelocityRow({
       className={cn(
         "group relative flex items-center gap-3 px-4 h-[44px]",
         "cursor-pointer select-none overflow-hidden",
-        "border-b border-black/[0.04] dark:border-white/[0.04]",
+        "border-b border-black/[0.04] dark:border-white/[0.05]",
         "transition-colors duration-75",
         isFocused && !isActive && "bg-black/[0.05] dark:bg-white/[0.055]",
         !isFocused &&
@@ -311,7 +313,7 @@ function VelocityRow({
           "shrink-0 w-36 truncate text-[13px] tracking-[-0.015em]",
           isUnread
             ? "font-semibold text-gray-950 dark:text-white/88"
-            : "font-normal text-gray-500 dark:text-white/40",
+            : "font-medium text-gray-500 dark:text-white/52",
         )}
       >
         {sender}
@@ -323,7 +325,7 @@ function VelocityRow({
           "flex-1 min-w-0 truncate text-[13px] tracking-[-0.01em]",
           isUnread
             ? "font-medium text-gray-800 dark:text-white/60"
-            : "font-normal text-gray-400 dark:text-white/35",
+            : "font-normal text-gray-400 dark:text-white/42",
         )}
       >
         {thread.subject || "(no subject)"}
@@ -336,7 +338,7 @@ function VelocityRow({
             "absolute right-0 text-[11px] tabular-nums whitespace-nowrap transition-opacity duration-100",
             isUnread
               ? "text-gray-500 dark:text-white/38"
-              : "text-gray-400 dark:text-white/25",
+              : "text-gray-400 dark:text-white/32",
             (isFocused || undefined) && "opacity-0",
             !isFocused && "group-hover:opacity-0",
           )}
@@ -427,7 +429,7 @@ function FlowRow({
               "flex-1 min-w-0 truncate leading-none",
               isUnread
                 ? "text-[13px] font-semibold text-gray-950 dark:text-white/88 tracking-[-0.015em]"
-                : "text-[13px] font-normal text-gray-500 dark:text-white/40 tracking-[-0.01em]",
+                : "text-[13px] font-medium text-gray-500 dark:text-white/52 tracking-[-0.01em]",
             )}
           >
             {sender}
@@ -459,7 +461,7 @@ function FlowRow({
                   "text-[11px] tabular-nums whitespace-nowrap",
                   isUnread
                     ? "text-gray-500 dark:text-white/38"
-                    : "text-gray-400 dark:text-white/25",
+                    : "text-gray-400 dark:text-white/32",
                 )}
               >
                 {formatThreadDate(thread.receivedAt)}
@@ -489,7 +491,7 @@ function FlowRow({
             "truncate leading-none tracking-[-0.005em]",
             isUnread
               ? "text-[12.5px] font-normal text-gray-500 dark:text-white/55"
-              : "text-[12.5px] font-normal text-gray-400 dark:text-white/35",
+              : "text-[12.5px] font-normal text-gray-400 dark:text-white/42",
           )}
         >
           {thread.subject || "(no subject)"}

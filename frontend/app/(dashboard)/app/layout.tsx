@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <QueryProvider>
       <DashboardProviders userId={user.id}>
-        <div className="flex h-screen w-screen bg-white dark:bg-[#1a1a1a] overflow-hidden">
+        <div className="flex h-screen w-screen bg-white dark:bg-[#1c1a18] overflow-hidden">
           <DashboardSidebar />
           <main className="flex-1 min-w-0 overflow-hidden">{children}</main>
           <Toaster />

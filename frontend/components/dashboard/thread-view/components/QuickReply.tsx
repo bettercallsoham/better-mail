@@ -40,7 +40,7 @@ export function QuickReply({
         <div
           className={cn(
             "pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-2xl",
-            "bg-white/70 dark:bg-[#252525]/90 backdrop-blur-3xl",
+            "bg-white/70 dark:bg-[#27241f]/90 backdrop-blur-3xl",
             "shadow-[0_2px_20px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.05)]",
             "dark:shadow-[0_-1px_0_rgba(255,255,255,0.06),0_4px_32px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.07)]",
           )}
@@ -73,7 +73,7 @@ export function QuickReply({
       className={cn(
         "shrink-0 flex items-center gap-3 px-4 py-3",
         "border-t border-black/[0.06] dark:border-white/[0.06]",
-        "bg-white dark:bg-[#1a1a1a]",
+        "bg-white dark:bg-[#1c1a18]",
       )}
     >
       <button

@@ -229,7 +229,7 @@ export function MailSearchCommand({ open, onOpenChange }: Props) {
           "relative flex flex-col overflow-hidden rounded-2xl",
           "bg-white border border-gray-200/70",
           "shadow-[0_8px_40px_-4px_rgba(0,0,0,0.15),0_2px_12px_-2px_rgba(0,0,0,0.08)]",
-          "dark:bg-[#1f1f1f] dark:border-white/[0.07]",
+          "dark:bg-[#201e1b] dark:border-white/[0.07]",
           "dark:shadow-[0_24px_72px_-8px_rgba(0,0,0,0.72),0_0_0_1px_rgba(255,255,255,0.04)]",
           filtersActive && "ring-1 ring-blue-500/20 dark:ring-blue-400/[0.12]",
           "transition-all duration-200 max-w-[95vw]",

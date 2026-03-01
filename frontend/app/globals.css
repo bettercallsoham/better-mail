@@ -108,37 +108,38 @@
 
 /* ─────────────────────────────────────────────────────────────────────────────
    DARK MODE
-   Strategy: Cursor IDE–sourced pure neutral grays. Zero color tint — no warm,
-   no cool bias. All surfaces are perfect rgb(n,n,n) grays so every piece of
-   content reads against a truly neutral canvas.
+   Strategy: Warm neutral grays. A consistent +4 warm bias (R channel leads B)
+   applied uniformly across all elevation levels. Feels editorial and premium
+   rather than clinical. Inspired by Raycast / Linear dark palette.
 
    Elevation ladder (darker = further back):
-     sidebar:        #111111              (receded, deepest)
-     base body:      #1a1a1a              (main canvas — Cursor dark exact)
-     card/surface:   #1f1f1f              (slightly raised — Cursor darkBlack)
-     popover:        #252525              (floating surfaces — clear step up)
+     sidebar:        #121110              (receded, deepest)
+     base body:      #1c1a18              (main canvas — warm neutral)
+     card/surface:   #201e1b              (slightly raised)
+     popover:        #27241f              (floating surfaces — clear step up)
      hover/select:   rgba(255,255,255,0.055) over base
      active:         rgba(255,255,255,0.08)  over base
 
    Text opacity ladder:
      primary/unread: white/88
-     secondary:      white/55
-     tertiary/read:  white/38
-     muted/dates:    white/22
+     secondary:      white/60
+     read sender:    white/52  (font-medium, weight-first hierarchy)
+     read body:      white/42
+     muted/dates:    white/32
 ───────────────────────────────────────────────────────────────────────────── */
 .dark {
   /* Body / page background */
-  --background: #1a1a1a;
+  --background: #1c1a18;
   --foreground: rgba(255, 255, 255, 0.88);
 
-  --card: #1f1f1f;
+  --card: #201e1b;
   --card-foreground: rgba(255, 255, 255, 0.88);
 
-  --popover: #252525;
+  --popover: #27241f;
   --popover-foreground: rgba(255, 255, 255, 0.88);
 
   --primary: rgba(255, 255, 255, 0.88);
-  --primary-foreground: #1a1a1a;
+  --primary-foreground: #1c1a18;
 
   --secondary: rgba(255, 255, 255, 0.05);
   --secondary-foreground: rgba(255, 255, 255, 0.88);
@@ -162,17 +163,17 @@
   --chart-5: oklch(0.645 0.246 16.439);
 
   /* Sidebar — receded below background */
-  --sidebar: #111111;
+  --sidebar: #121110;
   --sidebar-foreground: rgba(255, 255, 255, 0.88);
   --sidebar-primary: rgba(255, 255, 255, 0.88);
-  --sidebar-primary-foreground: #111111;
+  --sidebar-primary-foreground: #121110;
   --sidebar-accent: rgba(255, 255, 255, 0.06);
   --sidebar-accent-foreground: rgba(255, 255, 255, 0.88);
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: rgba(255, 255, 255, 0.18);
 
   /* App sidebar tokens */
-  --app-sidebar-bg: #111111;
+  --app-sidebar-bg: #121110;
   --app-sidebar-border: rgba(255, 255, 255, 0.06);
   --app-sidebar-hover: rgba(255, 255, 255, 0.05);
   --app-sidebar-active: rgba(255, 255, 255, 0.08);
