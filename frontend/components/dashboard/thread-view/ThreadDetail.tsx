@@ -135,7 +135,7 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
   if (!data.success || emails.length === 0) return <ThreadDetailEmpty />;
 
   return (
-    <div className="flex flex-col h-full bg-gray-50/50 dark:bg-[#191919]">
+    <div className="flex flex-col h-full bg-gray-50/50 dark:bg-[#1a1a1a]">
       {/* ── Toolbar ── */}
       <div className="shrink-0 flex items-center px-3 pt-3 pb-2 gap-1">
         <div className="flex items-center gap-0.5">
@@ -279,7 +279,7 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
 // ─── Skeleton ──────────────────────────────────────────────────────────────────
 function ThreadDetailSkeleton() {
   return (
-    <div className="flex flex-col h-full bg-gray-50/50 dark:bg-[#191919] p-6 gap-4">
+    <div className="flex flex-col h-full bg-gray-50/50 dark:bg-[#1a1a1a] p-6 gap-4">
       <div className="flex items-center justify-between">
         <div className="flex gap-1">
           {[1, 2, 3].map((i) => (
@@ -304,7 +304,7 @@ function ThreadDetailSkeleton() {
       <Skeleton className="h-12 w-full rounded-2xl" />
       <div className="space-y-2">
         {[1, 2].map((i) => (
-          <div key={i} className="rounded-2xl bg-white dark:bg-[#1e1e1e] p-4">
+          <div key={i} className="rounded-2xl bg-white dark:bg-[#1f1f1f] p-4">
             <div className="flex items-center gap-3">
               <Skeleton className="w-8 h-8 rounded-full shrink-0" />
               <div className="flex-1 space-y-1.5">
@@ -324,7 +324,7 @@ function ThreadDetailEmpty({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex-1 flex flex-col items-center justify-center gap-2 text-center px-8 dark:bg-[#191919]",
+        "flex-1 flex flex-col items-center justify-center gap-2 text-center px-8 dark:bg-[#1a1a1a]",
         className,
       )}
     >

@@ -50,7 +50,7 @@ function OpenCard({
   return (
     <div className={cn(
       "rounded-2xl overflow-hidden",
-      "bg-white dark:bg-[#1e1e1e]",
+      "bg-white dark:bg-[#1f1f1f]",
       "ring-1 ring-black/4 dark:ring-white/[0.07]",
       "shadow-[0_2px_8px_rgba(0,0,0,0.04)]",
       "dark:shadow-[0_2px_20px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.04)]",

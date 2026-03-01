@@ -312,7 +312,7 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
       {groups.map(({ label, items }) => (
         <div key={label}>
           {/* Fixed sticky header — matches body bg, no jarring banding */}
-          <div className="sticky top-0 z-10 px-4 py-1.5 bg-white/90 dark:bg-[#191919]/92 backdrop-blur-sm border-b border-black/[0.04] dark:border-white/[0.04]">
+          <div className="sticky top-0 z-10 px-4 py-1.5 bg-white/90 dark:bg-[#18181b]/90 backdrop-blur-sm border-b border-black/[0.04] dark:border-white/[0.04]">
             <span className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-white/22 select-none">
               {label}
             </span>

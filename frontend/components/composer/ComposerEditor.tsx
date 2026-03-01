@@ -135,7 +135,7 @@ export function ComposerEditor({
         options={{ placement: "top-start", offset: 6 }}
         className={cn(
           "flex items-center gap-0.5 p-1 rounded-xl z-50",
-          "bg-white dark:bg-[#1c1c1c]",
+          "bg-white dark:bg-[#252525]",
           "shadow-[0_4px_20px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)]",
           "dark:shadow-[0_4px_20px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.07)]",
         )}

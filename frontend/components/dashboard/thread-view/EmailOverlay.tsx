@@ -241,7 +241,7 @@ export function ThreadSideSheet() {
           "w-full sm:w-[520px] lg:w-[580px]",
           "flex flex-col",
           // Surface
-          "bg-white dark:bg-[#191919]",
+          "bg-white dark:bg-[#18181b]",
           "border-l border-black/[0.06] dark:border-white/[0.07]",
           // Shadow — only on the left edge
           "shadow-[-16px_0_48px_rgba(0,0,0,0.06)] dark:shadow-[-16px_0_48px_rgba(0,0,0,0.5)]",

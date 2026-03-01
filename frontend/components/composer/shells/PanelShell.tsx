@@ -39,7 +39,7 @@ export function PanelShell({ instance }: { instance: ComposerInstance }) {
       className={cn(
         "shrink-0 flex flex-col",
         "border-t border-black/[0.07] dark:border-white/[0.07]",
-        "bg-white dark:bg-[#1a1a1a]",
+        "bg-white dark:bg-[#252525]",
         "animate-in slide-in-from-bottom-2 duration-200",
       )}
       data-instance={instance.id}

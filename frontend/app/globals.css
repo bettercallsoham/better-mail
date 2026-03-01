@@ -62,7 +62,6 @@
   font-family: var(--font-geist-sans), serif;
 }
 
-
 /* ─────────────────────────────────────────────────────────────────────────────
    LIGHT MODE
 ───────────────────────────────────────────────────────────────────────────── */
@@ -100,63 +99,60 @@
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
 
-  --app-sidebar-bg:     #f4f4f4;
+  --app-sidebar-bg: #f4f4f4;
   --app-sidebar-border: #e5e5e5;
-  --app-sidebar-hover:  #ebebeb;
+  --app-sidebar-hover: #ebebeb;
   --app-sidebar-active: #e0e0e0;
-  --app-sidebar-muted:  #d4d4d4;
+  --app-sidebar-muted: #d4d4d4;
 }
-
 
 /* ─────────────────────────────────────────────────────────────────────────────
    DARK MODE
-   Strategy: single warm-dark family rooted at #18181b (zinc-900 equivalent
-   with a very slight warm tint). All elevation steps use rgba white overlays
-   on this base — never independent color values.
-   
-   Elevation ladder:
-     base body:      #18181b              (main content area)
-     sidebar:        #131315              (slightly receded)
-     card/surface:   rgba(255,255,255,0.035) over base
-     border:         rgba(255,255,255,0.07)
-     hover row:      rgba(255,255,255,0.04)
-     focused row:    rgba(255,255,255,0.055)
-     active row:     rgba(255,255,255,0.07)
-     
-   Text opacity ladder (4 levels):
+   Strategy: Cursor IDE–sourced pure neutral grays. Zero color tint — no warm,
+   no cool bias. All surfaces are perfect rgb(n,n,n) grays so every piece of
+   content reads against a truly neutral canvas.
+
+   Elevation ladder (darker = further back):
+     sidebar:        #111111              (receded, deepest)
+     base body:      #1a1a1a              (main canvas — Cursor dark exact)
+     card/surface:   #1f1f1f              (slightly raised — Cursor darkBlack)
+     popover:        #252525              (floating surfaces — clear step up)
+     hover/select:   rgba(255,255,255,0.055) over base
+     active:         rgba(255,255,255,0.08)  over base
+
+   Text opacity ladder:
      primary/unread: white/88
-     secondary:      white/60
-     tertiary/read:  white/32
-     muted/dates:    white/20
+     secondary:      white/55
+     tertiary/read:  white/38
+     muted/dates:    white/22
 ───────────────────────────────────────────────────────────────────────────── */
 .dark {
-  /* Body / page background — warm dark, not pure black */
-  --background: #18181b;
+  /* Body / page background */
+  --background: #1a1a1a;
   --foreground: rgba(255, 255, 255, 0.88);
 
-  --card: #1f1f22;
+  --card: #1f1f1f;
   --card-foreground: rgba(255, 255, 255, 0.88);
 
-  --popover: #1c1c1f;
+  --popover: #252525;
   --popover-foreground: rgba(255, 255, 255, 0.88);
 
   --primary: rgba(255, 255, 255, 0.88);
-  --primary-foreground: #18181b;
+  --primary-foreground: #1a1a1a;
 
   --secondary: rgba(255, 255, 255, 0.05);
   --secondary-foreground: rgba(255, 255, 255, 0.88);
 
   --muted: rgba(255, 255, 255, 0.05);
-  --muted-foreground: rgba(255, 255, 255, 0.40);
+  --muted-foreground: rgba(255, 255, 255, 0.4);
 
   --accent: rgba(255, 255, 255, 0.06);
   --accent-foreground: rgba(255, 255, 255, 0.88);
 
   --destructive: oklch(0.704 0.191 22.216);
 
-  /* Borders: barely-there, consistent hue */
   --border: rgba(255, 255, 255, 0.07);
-  --input: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.1);
   --ring: rgba(255, 255, 255, 0.18);
 
   --chart-1: oklch(0.488 0.243 264.376);
@@ -165,22 +161,22 @@
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
 
-  /* Sidebar — noticeably darker than body, clear intent */
-  --sidebar: #131315;
+  /* Sidebar — receded below background */
+  --sidebar: #111111;
   --sidebar-foreground: rgba(255, 255, 255, 0.88);
   --sidebar-primary: rgba(255, 255, 255, 0.88);
-  --sidebar-primary-foreground: #131315;
+  --sidebar-primary-foreground: #111111;
   --sidebar-accent: rgba(255, 255, 255, 0.06);
   --sidebar-accent-foreground: rgba(255, 255, 255, 0.88);
-  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: rgba(255, 255, 255, 0.18);
 
-  /* App sidebar — uses the deeper receded surface */
-  --app-sidebar-bg:     #131315;
-  --app-sidebar-border: rgba(255, 255, 255, 0.07);
-  --app-sidebar-hover:  rgba(255, 255, 255, 0.05);
+  /* App sidebar tokens */
+  --app-sidebar-bg: #111111;
+  --app-sidebar-border: rgba(255, 255, 255, 0.06);
+  --app-sidebar-hover: rgba(255, 255, 255, 0.05);
   --app-sidebar-active: rgba(255, 255, 255, 0.08);
-  --app-sidebar-muted:  rgba(255, 255, 255, 0.04);
+  --app-sidebar-muted: rgba(255, 255, 255, 0.04);
 }
 
 @layer base {
@@ -243,7 +239,7 @@
 
 .light *:hover::-webkit-scrollbar-thumb,
 :root:not(.dark) *:hover::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.10);
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .light *:hover::-webkit-scrollbar-thumb:hover,

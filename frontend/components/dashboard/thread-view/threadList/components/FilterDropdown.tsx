@@ -277,7 +277,7 @@ export function FilterDropdown({
       className={cn(
         "absolute z-50 top-full mt-1.5 left-0",
         "w-[260px] rounded-xl overflow-hidden",
-        "bg-white dark:bg-[#1e1e21]",
+        "bg-white dark:bg-[#1f1f1f]",
         "border border-black/[0.07] dark:border-white/[0.07]",
         "shadow-[0_8px_30px_-4px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.06)]",
         "dark:shadow-[0_8px_40px_-4px_rgba(0,0,0,0.70),0_2px_10px_rgba(0,0,0,0.40)]",

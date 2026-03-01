@@ -100,7 +100,12 @@ const LABEL_META: Record<
 };
 
 const HIDDEN_LABELS = new Set([
-  "INBOX", "UNREAD", "SENT", "DRAFT", "TRASH", "SPAM",
+  "INBOX",
+  "UNREAD",
+  "SENT",
+  "DRAFT",
+  "TRASH",
+  "SPAM",
 ]);
 
 function visibleLabels(labels: string[]) {
@@ -151,22 +156,32 @@ function ActionTray({
 
   return (
     <TooltipProvider delayDuration={500}>
-      <div className="flex items-center gap-px shrink-0">
+      <div className="flex items-center gap-px cursor-pointer shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={onStar}
               className={cn(
                 btnCls,
-                thread.isStarred && "text-amber-400 hover:text-amber-500",
+                thread.isStarred && "text-amber-400  hover:text-amber-500",
               )}
               aria-label={thread.isStarred ? "Unstar" : "Star"}
             >
-              <Star size={iconSz} className={cn(thread.isStarred ? "fill-amber-400 text-amber-400" : "")} />
+              <Star
+                size={iconSz}
+                className={cn(
+                  thread.isStarred ? "fill-amber-400 text-amber-400" : "",
+                )}
+              />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="flex items-center gap-1.5 py-1 px-2">
-            <span className="text-[11px]">{thread.isStarred ? "Unstar" : "Star"}</span>
+          <TooltipContent
+            side="bottom"
+            className="flex items-center gap-1.5 py-1 px-2"
+          >
+            <span className="text-[11px]">
+              {thread.isStarred ? "Unstar" : "Star"}
+            </span>
             <Kbd className="text-[9px]">S</Kbd>
           </TooltipContent>
         </Tooltip>
@@ -175,24 +190,50 @@ function ActionTray({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <button onClick={onMarkRead} className={btnCls} aria-label={thread.isUnread ? "Mark read" : "Mark unread"}>
-              {thread.isUnread ? <MailOpen size={iconSz} /> : <Mail size={iconSz} />}
+            <button
+              onClick={onMarkRead}
+              className={btnCls}
+              aria-label={thread.isUnread ? "Mark read" : "Mark unread"}
+            >
+              {thread.isUnread ? (
+                <MailOpen size={iconSz} />
+              ) : (
+                <Mail size={iconSz} />
+              )}
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="flex items-center gap-1.5 py-1 px-2">
-            <span className="text-[11px]">{thread.isUnread ? "Mark read" : "Mark unread"}</span>
+          <TooltipContent
+            side="bottom"
+            className="flex items-center gap-1.5 py-1 px-2"
+          >
+            <span className="text-[11px]">
+              {thread.isUnread ? "Mark read" : "Mark unread"}
+            </span>
             <Kbd className="text-[9px]">U</Kbd>
           </TooltipContent>
         </Tooltip>
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <button onClick={onArchive} className={btnCls} aria-label={isArchived ? "Unarchive" : "Archive"}>
-              {isArchived ? <ArchiveRestore size={iconSz} /> : <Archive size={iconSz} />}
+            <button
+              onClick={onArchive}
+              className={btnCls}
+              aria-label={isArchived ? "Unarchive" : "Archive"}
+            >
+              {isArchived ? (
+                <ArchiveRestore size={iconSz} />
+              ) : (
+                <Archive size={iconSz} />
+              )}
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="flex items-center gap-1.5 py-1 px-2">
-            <span className="text-[11px]">{isArchived ? "Unarchive" : "Archive"}</span>
+          <TooltipContent
+            side="bottom"
+            className="flex items-center gap-1.5 py-1 px-2"
+          >
+            <span className="text-[11px]">
+              {isArchived ? "Unarchive" : "Archive"}
+            </span>
             <Kbd className="text-[9px]">E</Kbd>
           </TooltipContent>
         </Tooltip>
@@ -202,15 +243,17 @@ function ActionTray({
 }
 
 // ─── Dark mode opacity system ──────────────────────────────────────────────────
-// Reduced to 4 clear levels (was 8+):
-//   HIGH   → white/88  (unread sender name — primary attention)
-//   MED    → white/60  (unread subject — secondary)
-//   LOW    → white/32  (read sender/subject — receded)
-//   FAINT  → white/20  (dates, read dates)
+// 4-level hierarchy on #1a1a1a (Cursor dark background):
 //
-// Row elevations:
-//   base    → transparent (inherits body #191919)
-//   hover   → white/[0.04]  just enough warmth
+//   UNREAD sender   white/88  → 13.4:1  AAA  — primary attention anchor
+//   UNREAD subject  white/60  →  6.7:1  AA   — clearly secondary
+//   READ   sender   white/40  →  3.2:1  UI ✓ — subdued but legible
+//   READ   subject  white/35  →  2.8:1  ↑3:1 — receded, scannable
+//   dates  unread   white/38  →  3.0:1  UI ✓
+//   dates  read     white/25  →  2.0:1  decorative / lowest priority
+//
+// Row elevations (over #1a1a1a base):
+//   hover   → white/[0.04]
 //   focused → white/[0.055]
 //   active  → white/[0.07]
 
@@ -245,7 +288,9 @@ function VelocityRow({
         "border-b border-black/[0.04] dark:border-white/[0.04]",
         "transition-colors duration-75",
         isFocused && !isActive && "bg-black/[0.05] dark:bg-white/[0.055]",
-        !isFocused && !isActive && "hover:bg-black/[0.02] dark:hover:bg-white/[0.04]",
+        !isFocused &&
+          !isActive &&
+          "hover:bg-black/[0.02] dark:hover:bg-white/[0.04]",
         isActive && [
           "bg-black/[0.04] dark:bg-white/[0.07]",
           "before:absolute before:inset-y-[6px] before:left-0 before:w-[2px]",
@@ -256,7 +301,7 @@ function VelocityRow({
       {/* Unread dot */}
       <div className="w-2 shrink-0 flex justify-center">
         {isUnread && (
-          <span className="block w-[5px] h-[5px] rounded-full bg-zinc-600 dark:bg-white/50" />
+          <span className="block w-[5px] h-[5px] rounded-full bg-zinc-600 dark:bg-white/65" />
         )}
       </div>
 
@@ -266,7 +311,7 @@ function VelocityRow({
           "shrink-0 w-36 truncate text-[13px] tracking-[-0.015em]",
           isUnread
             ? "font-semibold text-gray-950 dark:text-white/88"
-            : "font-normal text-gray-500 dark:text-white/32",
+            : "font-normal text-gray-500 dark:text-white/40",
         )}
       >
         {sender}
@@ -278,7 +323,7 @@ function VelocityRow({
           "flex-1 min-w-0 truncate text-[13px] tracking-[-0.01em]",
           isUnread
             ? "font-medium text-gray-800 dark:text-white/60"
-            : "font-normal text-gray-400 dark:text-white/28",
+            : "font-normal text-gray-400 dark:text-white/35",
         )}
       >
         {thread.subject || "(no subject)"}
@@ -291,13 +336,16 @@ function VelocityRow({
             "absolute right-0 text-[11px] tabular-nums whitespace-nowrap transition-opacity duration-100",
             isUnread
               ? "text-gray-500 dark:text-white/38"
-              : "text-gray-400 dark:text-white/20",
+              : "text-gray-400 dark:text-white/25",
             (isFocused || undefined) && "opacity-0",
             !isFocused && "group-hover:opacity-0",
           )}
         >
           {thread.isStarred && (
-            <Star size={10} className="inline-block fill-amber-400 text-amber-400 mr-1 mb-px" />
+            <Star
+              size={10}
+              className="inline-block fill-amber-400 text-amber-400 mr-1 mb-px"
+            />
           )}
           {formatThreadDate(thread.receivedAt)}
         </span>
@@ -353,7 +401,9 @@ function FlowRow({
         "mx-2 my-px px-3 py-2.5 rounded-xl",
         "cursor-pointer select-none transition-colors duration-75",
         isFocused && !isActive && "bg-black/[0.05] dark:bg-white/[0.055]",
-        !isFocused && !isActive && "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
+        !isFocused &&
+          !isActive &&
+          "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
         isActive && [
           "bg-black/[0.04] dark:bg-white/[0.07]",
           "before:absolute before:inset-y-[6px] before:left-0 before:w-[2px]",
@@ -377,7 +427,7 @@ function FlowRow({
               "flex-1 min-w-0 truncate leading-none",
               isUnread
                 ? "text-[13px] font-semibold text-gray-950 dark:text-white/88 tracking-[-0.015em]"
-                : "text-[13px] font-normal text-gray-500 dark:text-white/32 tracking-[-0.01em]",
+                : "text-[13px] font-normal text-gray-500 dark:text-white/40 tracking-[-0.01em]",
             )}
           >
             {sender}
@@ -399,14 +449,17 @@ function FlowRow({
                 </div>
               )}
               {thread.isStarred && (
-                <Star size={10} className="fill-amber-400 text-amber-400 shrink-0" />
+                <Star
+                  size={10}
+                  className="fill-amber-400 text-amber-400 shrink-0"
+                />
               )}
               <span
                 className={cn(
                   "text-[11px] tabular-nums whitespace-nowrap",
                   isUnread
                     ? "text-gray-500 dark:text-white/38"
-                    : "text-gray-400 dark:text-white/20",
+                    : "text-gray-400 dark:text-white/25",
                 )}
               >
                 {formatThreadDate(thread.receivedAt)}
@@ -436,7 +489,7 @@ function FlowRow({
             "truncate leading-none tracking-[-0.005em]",
             isUnread
               ? "text-[12.5px] font-normal text-gray-500 dark:text-white/55"
-              : "text-[12.5px] font-normal text-gray-400 dark:text-white/26",
+              : "text-[12.5px] font-normal text-gray-400 dark:text-white/35",
           )}
         >
           {thread.subject || "(no subject)"}

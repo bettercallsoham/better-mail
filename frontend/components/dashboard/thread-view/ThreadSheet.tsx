@@ -244,7 +244,7 @@ export function ThreadSideSheet() {
         className={cn(
           "fixed top-0 right-0 bottom-0 z-50",
           "w-full sm:w-[520px] lg:w-[580px] flex flex-col",
-          "bg-white dark:bg-[#191919]",
+          "bg-white dark:bg-[#18181b]",
           "border-l border-black/[0.06] dark:border-white/[0.07]",
           "shadow-[-16px_0_48px_rgba(0,0,0,0.06)] dark:shadow-[-16px_0_48px_rgba(0,0,0,0.5)]",
           "transition-transform duration-200 ease-out will-change-transform",

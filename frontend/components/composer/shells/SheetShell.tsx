@@ -20,7 +20,7 @@ export function SheetShell({ instance }: { instance: ComposerInstance }) {
     <div
       className={cn(
         "flex flex-col border-t border-black/[0.07] dark:border-white/[0.07]",
-        "bg-white dark:bg-[#18181b]",
+        "bg-white dark:bg-[#1a1a1a]",
         "animate-in slide-in-from-bottom-2 duration-150",
       )}
       data-instance={instance.id}

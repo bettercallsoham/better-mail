@@ -113,7 +113,7 @@ export function NotesDropdown({ threadId, emailAddress, onClose }: NotesDropdown
       className={cn(
         "absolute top-full right-0 mt-1.5 z-50 w-80",
         "rounded-2xl overflow-hidden",
-        "bg-white dark:bg-[#222222]",
+        "bg-white dark:bg-[#252525]",
         "shadow-[0_8px_32px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)]",
         "dark:shadow-[0_16px_48px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.10)]",
         "animate-in fade-in-0 zoom-in-95 duration-100",
