@@ -4,7 +4,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import {
   IconStar, IconStarFilled, IconChevronDown,
-  IconArrowBackUp, IconArrowForwardUp, IconPaperclip,
+  IconArrowBackUp, IconArrowBackUpDouble, IconArrowForwardUp, IconPaperclip,
 } from "@tabler/icons-react";
 import { EmailAvatar } from "./EmailAvatar";
 import { EmailIframe } from "./EmailIframe";
@@ -34,13 +34,14 @@ function CollapsedRow({ email, onClick }: { email: FullEmail; onClick: () => voi
 
 // ─── Open ──────────────────────────────────────────────────────────────────────
 function OpenCard({
-  email, onCollapse, onReply, onForward, onStar,
+  email, onCollapse, onReply, onReplyAll, onForward, onStar,
 }: {
-  email:      FullEmail;
-  onCollapse: () => void;
-  onReply:    () => void;
-  onForward:  () => void;
-  onStar:     () => void;
+  email:       FullEmail;
+  onCollapse:  () => void;
+  onReply:     () => void;
+  onReplyAll?: () => void;
+  onForward:   () => void;
+  onStar:      () => void;
 }) {
   const date    = format(new Date(email.receivedAt), "MMM d, h:mm a");
   const toNames = email.to.map(r => r.name || r.email).join(", ");
@@ -114,6 +115,15 @@ function OpenCard({
           <IconArrowBackUp size={14} />
           Reply
         </button>
+        {onReplyAll && (
+          <button
+            onClick={onReplyAll}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium text-gray-500 dark:text-white/42 hover:text-gray-800 dark:hover:text-white/80 hover:bg-black/4 dark:hover:bg-white/6 transition-colors"
+          >
+            <IconArrowBackUpDouble size={14} />
+            Reply All
+          </button>
+        )}
         <button
           onClick={onForward}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium text-gray-500 dark:text-white/42 hover:text-gray-800 dark:hover:text-white/80 hover:bg-black/4 dark:hover:bg-white/6 transition-colors"
@@ -128,14 +138,15 @@ function OpenCard({
 
 // ─── Public wrapper ─────────────────────────────────────────────────────────────
 interface EmailCardProps {
-  email:       FullEmail;
-  defaultOpen: boolean;
-  onReply:     () => void;
-  onForward:   () => void;
-  onStar:      () => void;
+  email:        FullEmail;
+  defaultOpen:  boolean;
+  onReply:      () => void;
+  onReplyAll?:  () => void;
+  onForward:    () => void;
+  onStar:       () => void;
 }
 
-export function EmailCard({ email, defaultOpen, onReply, onForward, onStar }: EmailCardProps) {
+export function EmailCard({ email, defaultOpen, onReply, onReplyAll, onForward, onStar }: EmailCardProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   if (!open) {
@@ -147,6 +158,7 @@ export function EmailCard({ email, defaultOpen, onReply, onForward, onStar }: Em
       email={email}
       onCollapse={() => setOpen(false)}
       onReply={onReply}
+      onReplyAll={onReplyAll}
       onForward={onForward}
       onStar={onStar}
     />

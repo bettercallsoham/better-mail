@@ -40,6 +40,13 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
     if (isSending || !canSend) return;
     store.setStatus(instance.id, "sending");
 
+    // Compose the full outgoing HTML body: user-typed content + quoted block.
+    // The quoted block is rendered separately in the UI (QuotedThread) but MUST
+    // be appended to the sent body so recipients see the forwarded/quoted content.
+    const fullHtml = instance.quotedHtml
+      ? `${instance.html}${instance.quotedHtml}`
+      : instance.html;
+
     try {
       if (instance.mode === "new") {
         await sendEmail.mutateAsync({
@@ -49,7 +56,7 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
           cc:       instance.cc.map((r) => r.email),
           bcc:      instance.bcc.map((r) => r.email),
           subject:  instance.subject,
-          html:     instance.html,
+          html:     fullHtml,
         });
       } else {
         if (!instance.replyToMessageId) throw new Error("Missing replyToMessageId");
@@ -58,7 +65,7 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
           from:             instance.from,
           provider:         instance.provider,
           replyToMessageId: instance.replyToMessageId,
-          html:             instance.html,
+          html:             fullHtml,
           mode:             instance.mode === "reply_all" ? "reply_all" : instance.mode,
           to:               instance.to.map((r) => r.email),
           cc:               instance.cc.map((r) => r.email),
@@ -76,12 +83,12 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
             provider:          instance.provider === "GOOGLE" ? "gmail" : "outlook",
             subject:           instance.subject,
             isArchived:        false,
-            bodyHtml:          instance.html,
+            bodyHtml:          fullHtml,
             bodyText:          "",
             snippet:           stripHtml(instance.html).slice(0, 120),
             from:              { email: instance.from, name: instance.from },
-            to:                instance.to,
-            cc:                instance.cc ?? [],
+            to:                instance.to.map((r) => ({ email: r.email, name: r.name ?? r.email })),
+            cc:                instance.cc.map((r) => ({ email: r.email, name: r.name ?? r.email })),
             receivedAt:        new Date().toISOString(),
             isRead:            true,
             hasAttachments:    false,
@@ -124,7 +131,7 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
     <div
       className={cn(
         "shrink-0 flex items-center gap-2 px-3 py-2.5",
-        "border-t border-black/[0.06] dark:border-white/[0.06]",
+        "border-t border-black/6 dark:border-white/6",
         className,
       )}
     >

@@ -63,24 +63,33 @@ function SheetContent({ threadId }: { threadId: string }) {
     [emailAction],
   );
 
-  const handleDelete   = useCallback(() => { if (emails[0]) act(emails[0], "delete"); }, [emails, act]);
+  const handleDelete   = useCallback(() => { if (emails[0]) act(emails[0], "delete");                          }, [emails, act]);
+  const handleStar     = useCallback(() => { if (emails[0]) act(emails[0], emails[0].isStarred ? "unstar" : "star");   }, [emails, act]);
+  const handleArchive  = useCallback(() => { if (emails[0]) act(emails[0], emails[0].isArchived ? "unarchive" : "archive"); }, [emails, act]);
   // Always replyTo the last real (non-draft) message — its providerMessageId is the
   // correct thread anchor for the Gmail/Outlook reply API.
   const handleReply    = useCallback(() => { if (lastReal) replyTo(lastReal, "sheet", "reply");     }, [lastReal, replyTo]);
   const handleReplyAll = useCallback(() => { if (lastReal) replyTo(lastReal, "sheet", "reply_all"); }, [lastReal, replyTo]);
   const handleForward  = useCallback(() => { if (lastReal) forward(lastReal, "sheet");              }, [lastReal, forward]);
 
-  // R — reply, F — forward keyboard shortcuts (only when not typing in an input)
+  // Keyboard shortcuts — only when not typing
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA") return;
-      if (e.key === "r") { e.preventDefault(); handleReply(); }
-      if (e.key === "f") { e.preventDefault(); handleForward(); }
+      switch (e.key) {
+        case "r": e.preventDefault(); handleReply();                         break;
+        case "f": e.preventDefault(); handleForward();                       break;
+        case "s": e.preventDefault(); handleStar();                          break;
+        case "e": e.preventDefault(); handleArchive();                       break;
+        case "#": e.preventDefault(); handleDelete();                        break;
+        case "j": e.preventDefault(); if (nextId) setActive(nextId);        break;
+        case "k": e.preventDefault(); if (prevId) setActive(prevId);        break;
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleReply, handleForward]);
+  }, [handleReply, handleForward, handleStar, handleArchive, handleDelete, nextId, prevId, setActive]);
 
   if (!data.success || emails.length === 0) {
     return (
@@ -187,6 +196,7 @@ export function ThreadSideSheet() {
   const setActive      = useUIStore((s) => s.setActiveThread);
 
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
   const isOpen = !!activeThreadId && (layoutMode === "velocity" || layoutMode === "zen");

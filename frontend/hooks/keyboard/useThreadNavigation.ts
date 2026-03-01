@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useUIStore } from "@/lib/store/ui.store";
+import { useComposerStore } from "@/lib/store/composer.store";
 import type { ThreadActions } from "./useThreadActions";
 
 export function useThreadNavigation(
@@ -22,6 +23,10 @@ export function useThreadNavigation(
         target.tagName === "TEXTAREA"  ||
         target.isContentEditable
       ) return;
+
+      // Don't steal keypresses while a compose dialog is open — the user is
+      // actively composing, so J/K/Enter/S/E/U should not fire list shortcuts.
+      if (useComposerStore.getState().instances.some((i) => i.shell === "dialog")) return;
 
       const idx = focusedThreadId ? threadIds.indexOf(focusedThreadId) : -1;
 

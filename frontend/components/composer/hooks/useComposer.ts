@@ -18,6 +18,12 @@ function escHtml(s: string): string {
     .replace(/'/g, "&#039;");
 }
 
+// Strip ALL leading Re:/Fwd: chains — "Re: Re: Fwd: Hello" → "Hello"
+// Handles Re, RE, re, Fwd, FWD, fwd, Fw, FW, fw (case-insensitive)
+function stripSubjectPrefix(subject: string): string {
+  return subject.replace(/^((?:Re|Fwd?):\s*)*/i, "").trim();
+}
+
 export function useComposer() {
   const store         = useComposerStore();
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
@@ -58,25 +64,33 @@ export function useComposer() {
 
       if (mode === "reply") {
         if (email.from.email === from) {
-          // We sent this email — reply goes to the original recipients, not back to ourselves
+          // We sent this email — reply goes back to the original recipients, not ourselves
           to = (email.to ?? []).filter((r) => r.email !== from);
         } else {
-          // We received this email — reply goes to the sender
+          // We received it — reply goes to the sender only
           to = [{ email: email.from.email, name: email.from.name }];
         }
         cc = [];
       } else if (mode === "reply_all") {
-        // reply_all: sender + original TO (minus self); original CC (minus self)
+        const sentByUs = email.from.email === from;
+        // reply_all:
+        //   To  = sender (skip if that's us) + all original To recipients (minus self)
+        //   Cc  = all original Cc recipients (minus self)
         to = [
-          { email: email.from.email, name: email.from.name },
-          ...(email.to  ?? []).filter((r) => r.email !== from),
+          ...(sentByUs ? [] : [{ email: email.from.email, name: email.from.name }]),
+          ...(email.to ?? []).filter((r) => r.email !== from),
         ];
         cc = (email.cc ?? []).filter((r) => r.email !== from);
       } else {
-        // forward: empty TO/CC — user fills manually
+        // forward: empty To/Cc — user fills manually
         to = [];
         cc = [];
       }
+
+      // Normalise subject: strip any existing Re:/Fwd: chains before adding ours
+      // so "Re: Re: Hello" never stacks up (matches Gmail behaviour).
+      const bare = stripSubjectPrefix(email.subject);
+      const subject = mode === "forward" ? `Fwd: ${bare}` : `Re: ${bare}`;
 
       return store.open({
         shell,
@@ -88,7 +102,7 @@ export function useComposer() {
         quotedHtml,
         to,
         cc,
-        subject: mode === "forward" ? `Fwd: ${email.subject}` : `Re: ${email.subject}`,
+        subject,
       });
     },
     [store, selectedEmail],

@@ -34,7 +34,9 @@ export function PanelShell({ instance }: { instance: ComposerInstance }) {
       "border-t border-black/[0.07] dark:border-white/[0.07]",
       "bg-white dark:bg-[#1a1a1a]",
       "animate-in slide-in-from-bottom-2 duration-200",
-    )}>
+    )}
+      data-instance={instance.id}
+    >
       {/* Header row */}
       <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
         <span className="text-[12px] font-medium text-gray-500 dark:text-white/40">

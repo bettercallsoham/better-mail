@@ -18,7 +18,7 @@ import { ComposerFooter } from "./ComposerFooter";
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 const POPUP_W = 580;
-const POPUP_H = 520;
+const POPUP_H = 460;
 const MARGIN = 16;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
@@ -51,45 +51,45 @@ function ComposeDialogInner({
   const defaultFrom = selectedEmail ?? accounts[0]?.email ?? "";
   const defaultProvider = deriveProvider(defaultFrom, accounts);
 
-  // Lazy-init: create exactly one store instance per mount of this component.
-  const [instanceId] = useState<string>(() =>
-    useComposerStore.getState().open({
+  // Use a ref + state to create the store instance in an effect.
+  // This is StrictMode-safe: the effect's cleanup closes the instance,
+  // and on remount the effect re-creates it. The lazy-init approach
+  // doesn't work because StrictMode's cleanup closes the instance while
+  // the useState ID still points to the deleted entry → component returns null.
+  const [instanceId, setInstanceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = useComposerStore.getState().open({
       shell: "dialog",
       mode: "new",
       from: defaultFrom,
       provider: defaultProvider,
-    }),
-  );
-
-  // Clean up the store instance when dialog unmounts.
-  useEffect(() => {
+    });
+    setInstanceId(id);
     return () => {
-      useComposerStore.getState().close(instanceId);
+      useComposerStore.getState().close(id);
     };
-  }, [instanceId]);
+    // defaultFrom / defaultProvider are derived from accounts which load once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const instance = useComposerStore((s) =>
-    s.instances.find((i) => i.id === instanceId),
+    instanceId ? s.instances.find((i) => i.id === instanceId) : undefined,
   );
 
   if (!instance) return null;
 
   return (
-    <>
+    <div className="flex flex-col flex-1 min-h-0">
       <ComposerHeader instance={instance} />
-      <div
-        className={cn(
-          "px-4 py-3 overflow-y-auto",
-          isFullscreen ? "flex-1" : "max-h-[360px]",
-        )}
-      >
+      <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto">
         <ComposerEditor
           instance={instance}
-          minHeight={isFullscreen ? 400 : 200}
+          minHeight={isFullscreen ? 300 : 140}
         />
       </div>
       <ComposerFooter instance={instance} onClose={onClose} />
-    </>
+    </div>
   );
 }
 

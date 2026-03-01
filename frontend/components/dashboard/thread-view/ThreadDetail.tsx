@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef, useState, useCallback, useMemo } from "react";
+import { Suspense, useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import {
   IconX,
@@ -104,12 +104,33 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
     if (emails[0]) act(emails[0], isRead ? "mark_unread" : "mark_read");
   }, [emails, isRead, act]);
   const handleToggleNotes = useCallback(() => setNotesOpen((v) => !v), []);
-  const handleReply = useCallback(() => {
-    if (lastEmail) replyTo(lastEmail, "panel", "reply");
-  }, [lastEmail, replyTo]);
-  const handleForward = useCallback(() => {
-    if (lastEmail) forward(lastEmail, "panel");
-  }, [lastEmail, forward]);
+  const handleReply    = useCallback(() => { if (lastEmail) replyTo(lastEmail, "panel", "reply");     }, [lastEmail, replyTo]);
+  const handleReplyAll = useCallback(() => { if (lastEmail) replyTo(lastEmail, "panel", "reply_all"); }, [lastEmail, replyTo]);
+  const handleForward  = useCallback(() => { if (lastEmail) forward(lastEmail, "panel");               }, [lastEmail, forward]);
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT"    ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) return;
+      switch (e.key) {
+        case "r": e.preventDefault(); handleReply();                               break;
+        case "f": e.preventDefault(); handleForward();                             break;
+        case "s": e.preventDefault(); handleStar();                                break;
+        case "e": e.preventDefault(); handleArchive();                             break;
+        case "#": e.preventDefault(); handleDelete();                              break;
+        case "u": e.preventDefault(); handleRead();                                break;
+        case "j": e.preventDefault(); if (nextId) setActiveThread(nextId);        break;
+        case "k": e.preventDefault(); if (prevId) setActiveThread(prevId);        break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleReply, handleForward, handleStar, handleArchive, handleDelete, handleRead, nextId, prevId, setActiveThread]);
 
   if (!data.success || emails.length === 0) return <ThreadDetailEmpty />;
 
@@ -229,6 +250,7 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
               email={email}
               defaultOpen={i === emails.length - 1}
               onReply={handleReply}
+              onReplyAll={handleReplyAll}
               onForward={handleForward}
               onStar={() => act(email, email.isStarred ? "unstar" : "star")}
             />
