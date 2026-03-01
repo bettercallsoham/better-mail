@@ -15,8 +15,22 @@ export const EmailIframe = memo(function EmailIframe({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(0);
   const [ready, setReady] = useState(false);
+  const [isDark, setIsDark] = useState(false);
 
-  const srcDoc = buildSrcDoc(html);
+  // Mirror the app's class-based dark mode (same pattern as AnimatedThemeToggler)
+  useEffect(() => {
+    const update = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const srcDoc = buildSrcDoc(html, isDark);
 
   const measure = useCallback((iframe: HTMLIFrameElement) => {
     try {
@@ -59,8 +73,9 @@ export const EmailIframe = memo(function EmailIframe({
   }, [measure, patchLinks]);
 
   useEffect(() => {
-    return () => {};
-  }, []);
+    setReady(false);
+    setHeight(0);
+  }, [isDark]);
 
   return (
     <div
@@ -99,24 +114,32 @@ export const EmailIframe = memo(function EmailIframe({
   );
 });
 
-function buildSrcDoc(html: string): string {
+function buildSrcDoc(html: string, isDark: boolean): string {
+  const bg = isDark ? "#1a1a1a" : "#ffffff";
+  const color = isDark ? "rgba(255,255,255,0.88)" : "#1f2937";
+  const linkColor = isDark ? "#60a5fa" : "#2563eb";
+  const bqBorder = isDark ? "rgba(255,255,255,0.10)" : "#e5e7eb";
+  const bqColor = isDark ? "rgba(255,255,255,0.42)" : "#6b7280";
+  const colorScheme = isDark ? "dark" : "light";
+
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="${colorScheme}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
 
   html {
     overflow-x: hidden;
+    color-scheme: ${colorScheme};
   }
 
   body {
     margin: 0;
     padding: 16px 20px 24px;
 
-    /* THE IMPORTANT FIX */
     max-width: 720px;
     margin-left: auto;
     margin-right: auto;
@@ -124,8 +147,10 @@ function buildSrcDoc(html: string): string {
     font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
     font-size: 14px;
     line-height: 1.6;
-    color: #1f2937;
-    background: #ffffff;
+
+    /* Theme-aware defaults — only apply to emails that don't set their own colors */
+    color: ${color};
+    background: ${bg};
 
     word-break: break-word;
     -webkit-font-smoothing: antialiased;
@@ -153,7 +178,7 @@ function buildSrcDoc(html: string): string {
   }
 
   a {
-    color: #2563eb;
+    color: ${linkColor};
     text-underline-offset: 2px;
   }
 
@@ -164,10 +189,10 @@ function buildSrcDoc(html: string): string {
   }
 
   blockquote {
-    border-left: 3px solid #e5e7eb;
+    border-left: 3px solid ${bqBorder};
     margin: 8px 0;
     padding: 2px 12px;
-    color: #6b7280;
+    color: ${bqColor};
   }
 </style>
 </head>

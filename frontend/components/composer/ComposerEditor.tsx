@@ -23,6 +23,8 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { QuotedThread } from "./QuotedThread";
+import { VariablesBanner } from "./VariablesBanner";
+import { TemplateSlashExtension } from "./TemplateSlashExtension";
 
 interface Props {
   instance:    ComposerInstance;
@@ -53,6 +55,7 @@ export function ComposerEditor({
         openOnClick: false,
         HTMLAttributes: { class: "text-blue-500 underline cursor-pointer" },
       }),
+      TemplateSlashExtension.configure({ instanceId: instance.id }),
     ],
     content: instance.html || "",
     onUpdate: ({ editor }) => {
@@ -76,6 +79,28 @@ export function ComposerEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
+
+  // Apply pendingTemplate when the footer sets one via the store bridge
+  useEffect(() => {
+    if (!editor || !instance.pendingTemplate) return;
+    const template = instance.pendingTemplate;
+
+    // Clear immediately to prevent re-runs
+    store.clearPendingTemplate(instance.id);
+
+    const body = template.body ?? "";
+    editor.commands.setContent(body);
+
+    const patch: Partial<ComposerInstance> = { html: body };
+    if (instance.mode === "new") patch.subject = template.subject;
+    store.update(instance.id, patch);
+
+    if (template.variables && template.variables.length > 0) {
+      store.setPendingVariables(instance.id, template.variables);
+    }
+  // editor identity doesn't change; only react to pendingTemplate changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instance.pendingTemplate]);
 
   // Pre-fill URL input when editing an existing link
   const openLinkInput = useCallback(() => {
@@ -111,6 +136,21 @@ export function ComposerEditor({
       if (e.key === "Escape") { e.preventDefault(); cancelLink(); }
     },
     [commitLink, cancelLink],
+  );
+
+  // Resolve {{var}} placeholders from VariablesBanner
+  const handleApplyVariables = useCallback(
+    (vals: Record<string, string>) => {
+      if (!editor) return;
+      let html = editor.getHTML();
+      for (const [name, value] of Object.entries(vals)) {
+        html = html.replace(new RegExp(`\\{\\{${name}\\}\\}`, "g"), value);
+      }
+      editor.commands.setContent(html);
+      store.update(instance.id, { html });
+      store.clearPendingVariables(instance.id);
+    },
+    [editor, store, instance.id],
   );
 
   // v3 requires useEditorState for reactive isActive()
@@ -187,6 +227,15 @@ export function ComposerEditor({
           </>
         )}
       </BubbleMenu>
+
+      {/* Variable fill-in banner — shown when a template with {{vars}} was inserted */}
+      {instance.pendingVariables && instance.pendingVariables.length > 0 && (
+        <VariablesBanner
+          variables={instance.pendingVariables}
+          onApply={handleApplyVariables}
+          onDismiss={() => store.clearPendingVariables(instance.id)}
+        />
+      )}
 
       {/* Clicking empty space below the editor text focuses it */}
       <div

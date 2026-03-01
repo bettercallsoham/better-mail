@@ -129,7 +129,7 @@
 ───────────────────────────────────────────────────────────────────────────── */
 .dark {
   /* Body / page background */
-  --background: #1c1a18;
+  --background: #1a1a1a;
   --foreground: rgba(255, 255, 255, 0.88);
 
   --card: #201e1b;

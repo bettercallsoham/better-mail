@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
-import { IconSend2, IconTrash, IconLoader2 } from "@tabler/icons-react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
+import {
+  IconSend2,
+  IconTrash,
+  IconLoader2,
+  // Layout,
+  IconBookmark,
+} from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
   useComposerStore,
@@ -13,6 +19,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { stripHtml } from "@/lib/utils/stripHtml";
 import { useDraftSync } from "./hooks/useDraftSync";
+import { TemplatePicker } from "./TemplatePicker";
+import type { Template } from "@/features/templates/templates.types";
+import { useCreateTemplate } from "@/features/templates/templates.query";
 
 interface Props {
   instance:   ComposerInstance;
@@ -29,6 +38,23 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
   const sendEmail   = useSendEmail();
   const deleteDraft = useDeleteDraft();
   const { discard } = useDraftSync(instance);
+  const createTemplate = useCreateTemplate();
+
+  // ── Template picker state ─────────────────────────────────────────────────
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // ── Save-as-template state ────────────────────────────────────────────────
+  const [saveAsOpen, setSaveAsOpen]     = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the name input when save-as dialog opens
+  useEffect(() => {
+    if (saveAsOpen) {
+      setTemplateName(instance.subject || "");
+      setTimeout(() => nameInputRef.current?.focus(), 50);
+    }
+  }, [saveAsOpen, instance.subject]);
 
   const isSending = instance.status === "sending";
   const canSend =
@@ -127,6 +153,27 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
     onClose();
   }, [instance.html, discard, onDiscard, onClose]);
 
+  const handleTemplateSelect = useCallback((template: Template) => {
+    store.setPendingTemplate(instance.id, template);
+    setPickerOpen(false);
+  }, [store, instance.id]);
+
+  const handleSaveAsTemplate = useCallback(async () => {
+    const name = templateName.trim();
+    if (!name) return;
+    try {
+      await createTemplate.mutateAsync({
+        name,
+        subject: instance.subject || "",
+        body: instance.html || "",
+      });
+      toast.success("Template saved");
+      setSaveAsOpen(false);
+    } catch {
+      toast.error("Failed to save template");
+    }
+  }, [templateName, instance.subject, instance.html, createTemplate]);
+
   // ── Composer-scoped keyboard shortcuts ────────────────────────────────────
   // Fire only when focus is inside this specific composer instance container.
   useEffect(() => {
@@ -167,6 +214,117 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
       >
         <IconTrash size={15} />
       </button>
+
+      {/* Template picker button */}
+      <div className="relative">
+        <button
+          onClick={() => setPickerOpen((o) => !o)}
+          title="Insert template"
+          className={cn(
+            "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+            pickerOpen
+              ? "bg-black/[0.06] dark:bg-white/[0.1] text-gray-700 dark:text-white/75"
+              : "text-gray-400 dark:text-white/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/60",
+          )}
+        >
+          <IconBookmark size={15} />
+        </button>
+
+        {pickerOpen && (
+          <>
+            {/* Backdrop to close picker on outside click */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setPickerOpen(false)}
+            />
+            <div className="absolute bottom-full left-0 mb-2 z-50">
+              <Suspense fallback={null}>
+                <TemplatePicker
+                  onClose={() => setPickerOpen(false)}
+                  onSelect={handleTemplateSelect}
+                />
+              </Suspense>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Save as template button */}
+      <div className="relative">
+        <button
+          onClick={() => setSaveAsOpen((o) => !o)}
+          title="Save as template"
+          className={cn(
+            "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+            saveAsOpen
+              ? "bg-black/[0.06] dark:bg-white/[0.1] text-gray-700 dark:text-white/75"
+              : "text-gray-400 dark:text-white/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/60",
+          )}
+        >
+          <IconBookmark size={15} />
+        </button>
+
+        {saveAsOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setSaveAsOpen(false)}
+            />
+            <div
+              className={cn(
+                "absolute bottom-full left-0 mb-2 z-50 w-72 p-3 rounded-xl",
+                "bg-white dark:bg-[#1f1f1f]",
+                "border border-black/[0.07] dark:border-white/[0.08]",
+                "shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-[11.5px] font-semibold text-gray-500 dark:text-white/45 mb-2 uppercase tracking-wide">
+                Save as template
+              </p>
+              <input
+                ref={nameInputRef}
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); handleSaveAsTemplate(); }
+                  if (e.key === "Escape") setSaveAsOpen(false);
+                }}
+                placeholder="Template name…"
+                className={cn(
+                  "w-full h-8 px-2.5 rounded-lg text-[12.5px] outline-none mb-2.5",
+                  "bg-gray-50 dark:bg-white/[0.06]",
+                  "border border-black/[0.08] dark:border-white/[0.1]",
+                  "text-gray-800 dark:text-white/80",
+                  "placeholder:text-gray-300 dark:placeholder:text-white/25",
+                  "focus:border-gray-300 dark:focus:border-white/20",
+                  "transition-colors",
+                )}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setSaveAsOpen(false)}
+                  className="h-7 px-3 rounded-lg text-[12px] text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/60 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveAsTemplate}
+                  disabled={!templateName.trim() || createTemplate.isPending}
+                  className={cn(
+                    "h-7 px-3 rounded-lg text-[12px] font-semibold transition-colors",
+                    "bg-gray-900 dark:bg-white text-white dark:text-gray-950",
+                    "hover:bg-gray-700 dark:hover:bg-gray-100",
+                    "disabled:opacity-40 disabled:cursor-not-allowed",
+                  )}
+                >
+                  {createTemplate.isPending ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
 
       <div className="flex-1" />
 

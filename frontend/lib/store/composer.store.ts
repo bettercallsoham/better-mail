@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import type { TemplateVariable, Template } from "@/features/templates/templates.types";
 
 export type ComposerMode   = "reply" | "reply_all" | "forward" | "new";
 export type ComposerStatus = "idle" | "sending" | "sent" | "error";
@@ -42,6 +43,11 @@ export interface ComposerInstance {
   isMinimized:   boolean;
   status:        ComposerStatus;
   errorMessage?: string;
+
+  // template variable resolution — set after inserting a template with variables
+  pendingVariables?: TemplateVariable[];
+  // bridge: footer sets this, editor watches + applies, then clears
+  pendingTemplate?: Template;
 }
 
 export interface OpenComposerParams {
@@ -78,6 +84,10 @@ interface ComposerStore {
   removeCc:  (id: string, email: string) => void;
   addBcc:    (id: string, r: ComposerRecipient) => void;
   removeBcc: (id: string, email: string) => void;
+  setPendingVariables:   (id: string, vars: TemplateVariable[]) => void;
+  clearPendingVariables: (id: string) => void;
+  setPendingTemplate:    (id: string, template: Template) => void;
+  clearPendingTemplate:  (id: string) => void;
 }
 
 function makeInstance(params: OpenComposerParams): ComposerInstance {
@@ -214,6 +224,32 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     set((s) => ({
       instances: s.instances.map((i) =>
         i.id === id ? { ...i, bcc: i.bcc.filter((x) => x.email !== email), isDirty: true } : i,
+      ),
+    })),
+
+  setPendingVariables: (id, vars) =>
+    set((s) => ({
+      instances: s.instances.map((i) =>
+        i.id === id ? { ...i, pendingVariables: vars } : i,
+      ),
+    })),
+  clearPendingVariables: (id) =>
+    set((s) => ({
+      instances: s.instances.map((i) =>
+        i.id === id ? { ...i, pendingVariables: undefined } : i,
+      ),
+    })),
+
+  setPendingTemplate: (id, template) =>
+    set((s) => ({
+      instances: s.instances.map((i) =>
+        i.id === id ? { ...i, pendingTemplate: template } : i,
+      ),
+    })),
+  clearPendingTemplate: (id) =>
+    set((s) => ({
+      instances: s.instances.map((i) =>
+        i.id === id ? { ...i, pendingTemplate: undefined } : i,
       ),
     })),
 }));

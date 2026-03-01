@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useCallback, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar, SidebarBody } from "@/components/ui/sidebar";
 import { useUIStore } from "@/lib/store/ui.store";
 import { useFolders } from "@/features/mailbox/mailbox.query";
-import { IconMenu2, IconX, IconEdit } from "@tabler/icons-react";
+import { IconMenu2, IconX, IconEdit, IconPlus,  } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
@@ -134,10 +135,12 @@ function FolderList({
   activeFolder,
   compact,
   onSelect,
+  onNavigate,
 }: SidebarDataChildProps & {
   activeFolder: string;
   compact: boolean;
   onSelect: (f: string) => void;
+  onNavigate: (path: string) => void;
 }) {
   return (
     <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden min-h-0">
@@ -169,11 +172,30 @@ function FolderList({
           </div>
         </>
       )}
+      {/* Tools section */}
+      {!compact && (
+        <>
+          <SectionHeader label="Tools" />
+          <div className="flex flex-col gap-0.5 py-1">
+            <FolderRow
+              item={{
+                icon: <IconPlus size={16} />,
+                label: "Templates",
+                folder: "tools_templates",
+              }}
+              isActive={false}
+              compact={false}
+              onClick={() => onNavigate("/app/settings/templates")}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 export function DashboardSidebar() {
+  const router = useRouter();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const activeFolder = useUIStore((s) => s.activeFolder);
   const setActiveFolder = useUIStore((s) => s.setActiveFolder);
@@ -278,6 +300,10 @@ export function DashboardSidebar() {
                           setActiveFolder(f);
                           setMobileOpen(false);
                         }}
+                        onNavigate={(path) => {
+                          router.push(path);
+                          setMobileOpen(false);
+                        }}
                       />
                     )}
                   </FolderData>
@@ -363,6 +389,7 @@ export function DashboardSidebar() {
                       activeFolder={activeFolder}
                       compact={!isOpen}
                       onSelect={setActiveFolder}
+                      onNavigate={(path) => router.push(path)}
                     />
                   )}
                 </FolderData>
