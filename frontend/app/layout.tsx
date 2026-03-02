@@ -4,10 +4,10 @@ import "./globals.css";
 import { PostHogProvider } from "@/lib/analytics/PosthogProvider";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://bettermail.tech"),
+  metadataBase: new URL("https://mail.abhisharma.app"),
 
   title: {
-    default: "BetterMail — The AI-First Email Client",
+    default: "BetterMail | The AI-First Email Client",
     template: "%s | BetterMail",
   },
 
@@ -44,13 +44,13 @@ export const metadata: Metadata = {
 
   openGraph: {
     type: "website",
-    url: "https://bettermail.tech",
+    url: "https://mail.abhisharma.app",
     title: "BetterMail - Fastest Email Experience Ever Made",
     description: "A faster, smarter email experience built for modern teams.",
     siteName: "BetterMail",
     images: [
       {
-        url: "/og-image.png",
+        url: "/dashboardImage.png",
         width: 1200,
         height: 630,
         alt: "BetterMail Preview",
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BetterMail - The AI-First Email Client",
     description: "A faster, smarter email experience built for modern teams.",
-    images: ["/og-image.png"],
+    images: ["/dashboardImage.png"],
   },
 
   robots: {
@@ -71,8 +71,8 @@ export const metadata: Metadata = {
   },
 
   icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
+    icon: "/betterMailLogo.png",
+    apple: "/betterMailLogo.png",
   },
 };
 

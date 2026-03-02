@@ -62,6 +62,27 @@
   font-family: var(--font-geist-sans), serif;
 }
 
+/* ── Orbiting circles animation ── */
+@keyframes orbit {
+  0% {
+    transform: rotate(calc(var(--angle) * 1deg))
+      translateX(calc(var(--radius) * 1px)) rotate(calc(var(--angle) * -1deg));
+  }
+  100% {
+    transform: rotate(calc(360deg + var(--angle) * 1deg))
+      translateX(calc(var(--radius) * 1px))
+      rotate(calc(-360deg + var(--angle) * -1deg));
+  }
+}
+
+.animate-orbit {
+  animation: orbit calc(var(--duration) * 1s) linear infinite;
+}
+
+.direction-\[reverse\] {
+  animation-direction: reverse;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    LIGHT MODE
 ───────────────────────────────────────────────────────────────────────────── */

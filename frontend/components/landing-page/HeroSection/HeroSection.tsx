@@ -37,9 +37,9 @@ export default function HeroSection() {
             {/* Main Heading */}
             <h1 className="relative z-20 flex flex-col gap-0 font-sans text-4xl sm:text-5xl lg:text-7xl font-semibold tracking-tight text-white drop-shadow-lg leading-tight">
               <span>The best way to</span>
-              <span className="font-instrument font-medium text-blue-700 ">
+              <span className="font-instrument font-medium">
                 manage emails{"  "}
-                <span className="not-italic font-sans text-white">with AI</span>
+                <span className="not-italic font-sans font-instrument text-white">with AI</span>
               </span>
             </h1>
 
