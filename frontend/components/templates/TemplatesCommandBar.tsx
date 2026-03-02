@@ -15,8 +15,10 @@ import {
   IconItalic,
   IconList,
   IconListNumbers,
+  IconLoader2,
   IconMinus,
   IconPlus,
+  IconSparkles,
   IconTrash,
   IconUnderline,
   IconX,
@@ -43,6 +45,8 @@ import type {
 } from "@/features/templates/templates.types";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
+import { useSuggestEmail } from "@/features/ai/ai.query";
+import type { SuggestEmailTone } from "@/features/ai/ai.type";
 
 // ─── Variable decoration extension ─────────────────────────────────────────────
 // ProseMirror plugin that adds an amber chip class to any {{varname}} found in
@@ -115,26 +119,94 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
   if (!editor) return null;
   return (
     <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-black/[0.06] dark:border-white/[0.07] overflow-x-auto">
-      <ToolbarBtn active={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}><IconH1 size={12} /></ToolbarBtn>
-      <ToolbarBtn active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}><IconH2 size={12} /></ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive("heading", { level: 1 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+      >
+        <IconH1 size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive("heading", { level: 2 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+      >
+        <IconH2 size={12} />
+      </ToolbarBtn>
       <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
-      <ToolbarBtn active={editor.isActive("bold")}      onClick={() => editor.chain().focus().toggleBold().run()}>      <IconBold      size={12} /></ToolbarBtn>
-      <ToolbarBtn active={editor.isActive("italic")}    onClick={() => editor.chain().focus().toggleItalic().run()}>    <IconItalic    size={12} /></ToolbarBtn>
-      <ToolbarBtn active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()}><IconUnderline size={12} /></ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive("bold")}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      >
+        {" "}
+        <IconBold size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive("italic")}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      >
+        {" "}
+        <IconItalic size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive("underline")}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+      >
+        <IconUnderline size={12} />
+      </ToolbarBtn>
       <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
-      <ToolbarBtn active={editor.isActive("bulletList")}  onClick={() => editor.chain().focus().toggleBulletList().run()}>  <IconList        size={12} /></ToolbarBtn>
-      <ToolbarBtn active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()}><IconListNumbers size={12} /></ToolbarBtn>
-      <ToolbarBtn active={editor.isActive("blockquote")}  onClick={() => editor.chain().focus().toggleBlockquote().run()}><IconBlockquote  size={12} /></ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive("bulletList")}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      >
+        {" "}
+        <IconList size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive("orderedList")}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      >
+        <IconListNumbers size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive("blockquote")}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      >
+        <IconBlockquote size={12} />
+      </ToolbarBtn>
       <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
-      <ToolbarBtn active={editor.isActive({ textAlign: "left" })}   onClick={() => editor.chain().focus().setTextAlign("left").run()}>  <IconAlignLeft   size={12} /></ToolbarBtn>
-      <ToolbarBtn active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()}><IconAlignCenter size={12} /></ToolbarBtn>
-      <ToolbarBtn active={editor.isActive({ textAlign: "right" })}  onClick={() => editor.chain().focus().setTextAlign("right").run()}> <IconAlignRight  size={12} /></ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive({ textAlign: "left" })}
+        onClick={() => editor.chain().focus().setTextAlign("left").run()}
+      >
+        {" "}
+        <IconAlignLeft size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive({ textAlign: "center" })}
+        onClick={() => editor.chain().focus().setTextAlign("center").run()}
+      >
+        <IconAlignCenter size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        active={editor.isActive({ textAlign: "right" })}
+        onClick={() => editor.chain().focus().setTextAlign("right").run()}
+      >
+        {" "}
+        <IconAlignRight size={12} />
+      </ToolbarBtn>
       <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
-      <ToolbarBtn onClick={() => editor.chain().focus().setHorizontalRule().run()}><IconMinus size={12} /></ToolbarBtn>
+      <ToolbarBtn
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+      >
+        <IconMinus size={12} />
+      </ToolbarBtn>
       {/* Undo / Redo pushed to the right */}
       <div className="ml-auto flex items-center gap-0.5">
-        <ToolbarBtn onClick={() => editor.chain().focus().undo().run()}><IconArrowBackUp    size={12} /></ToolbarBtn>
-        <ToolbarBtn onClick={() => editor.chain().focus().redo().run()}><IconArrowForwardUp size={12} /></ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().undo().run()}>
+          <IconArrowBackUp size={12} />
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().redo().run()}>
+          <IconArrowForwardUp size={12} />
+        </ToolbarBtn>
       </div>
     </div>
   );
@@ -373,6 +445,13 @@ function TemplateForm({
   const [tagInput, setTagInput] = useState("");
   const detectedVars = detectVariables(body);
 
+  // ── AI generate state ─────────────────────────────────────────────────────
+  const suggestEmail = useSuggestEmail();
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiTone, setAiTone] = useState<SuggestEmailTone | undefined>(undefined);
+  const aiTopicRef = useRef<HTMLTextAreaElement>(null);
+
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
     if (t && !tags.includes(t)) setTags((p) => [...p, t]);
@@ -446,6 +525,142 @@ function TemplateForm({
           )}
         </div>
         <BodyEditor value={body} onChange={setBody} />
+
+        {/* AI generate — toggle button or inline expand */}
+        {!aiOpen ? (
+          <button
+            type="button"
+            onClick={() => {
+              setAiTopic(name);
+              setAiOpen(true);
+              setTimeout(() => aiTopicRef.current?.focus(), 50);
+            }}
+            className="flex items-center gap-1.5 mt-2 text-[12px] text-gray-400 dark:text-white/30 hover:text-violet-500 dark:hover:text-violet-400 transition-colors"
+          >
+            <IconSparkles size={12} />
+            Generate with AI
+          </button>
+        ) : (
+          <div
+            className={cn(
+              "mt-2 rounded-xl overflow-hidden",
+              "bg-white dark:bg-[#1e1e1e]",
+              "border border-black/[0.07] dark:border-white/[0.08]",
+              "shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.3)]",
+            )}
+          >
+            {/* Violet accent bar */}
+            <div className="h-[3px] bg-gradient-to-r from-violet-500 via-violet-400 to-indigo-400" />
+
+            <div className="p-3">
+              {/* Header */}
+              <div className="flex items-center gap-2 mb-2.5">
+                <div className="w-5 h-5 rounded-md bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center shrink-0">
+                  <IconSparkles
+                    size={11}
+                    className="text-violet-500 dark:text-violet-400"
+                  />
+                </div>
+                <p className="text-[12px] font-semibold text-gray-700 dark:text-white/70">
+                  Generate with AI
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAiOpen(false)}
+                  className="ml-auto w-5 h-5 flex items-center justify-center rounded-md text-gray-300 dark:text-white/25 hover:text-gray-500 dark:hover:text-white/45 transition-colors"
+                >
+                  <IconX size={12} />
+                </button>
+              </div>
+
+              <textarea
+                ref={aiTopicRef}
+                value={aiTopic}
+                onChange={(e) => setAiTopic(e.target.value)}
+                placeholder="What should this template cover?"
+                rows={2}
+                className={cn(
+                  "w-full px-2.5 py-2 rounded-lg text-[12.5px] outline-none mb-2.5 resize-none",
+                  "bg-gray-50 dark:bg-white/[0.04]",
+                  "border border-black/[0.08] dark:border-white/[0.1]",
+                  "text-gray-800 dark:text-white/80",
+                  "placeholder:text-gray-300 dark:placeholder:text-white/25",
+                  "focus:border-violet-300 dark:focus:border-violet-700/50",
+                  "transition-colors",
+                )}
+              />
+
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-white/25 mb-1.5">
+                Tone
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {(
+                  [
+                    "formal",
+                    "friendly",
+                    "concise",
+                    "professional",
+                    "empathetic",
+                  ] as SuggestEmailTone[]
+                ).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setAiTone(aiTone === t ? undefined : t)}
+                    className={cn(
+                      "h-6 px-2.5 rounded-lg text-[11.5px] font-medium transition-all capitalize",
+                      aiTone === t
+                        ? "bg-violet-500 text-white shadow-sm"
+                        : "bg-black/[0.04] dark:bg-white/[0.06] text-gray-500 dark:text-white/40 hover:bg-black/[0.07] dark:hover:bg-white/[0.1]",
+                    )}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!aiTopic.trim() || suggestEmail.isPending) return;
+                    try {
+                      const result = await suggestEmail.mutateAsync({
+                        mode: "compose",
+                        topic: aiTopic.trim(),
+                        tone: aiTone,
+                        subjectHint: subject || name || undefined,
+                      });
+                      setBody(result.body);
+                      if (!subject.trim() && result.subject)
+                        setSubject(result.subject);
+                      setAiOpen(false);
+                    } catch {
+                      toast.error("Failed to generate template");
+                    }
+                  }}
+                  disabled={!aiTopic.trim() || suggestEmail.isPending}
+                  className={cn(
+                    "h-7 px-3.5 rounded-lg text-[12px] font-semibold transition-all flex items-center gap-1.5",
+                    "bg-violet-500 hover:bg-violet-600 text-white shadow-sm",
+                    "disabled:opacity-40 disabled:cursor-not-allowed",
+                  )}
+                >
+                  {suggestEmail.isPending ? (
+                    <>
+                      <IconLoader2 size={12} className="animate-spin" />{" "}
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <IconSparkles size={12} /> Generate
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Category + Tags — collapsible row */}

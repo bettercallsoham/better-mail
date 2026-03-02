@@ -7,13 +7,19 @@ import {
   IconLoader2,
   IconBookmark,
   IconTemplate,
+  IconSparkles,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
   useComposerStore,
   type ComposerInstance,
 } from "@/lib/store/composer.store";
-import { useReplyEmail, useSendEmail, useDeleteDraft, mailboxKeys } from "@/features/mailbox/mailbox.query";
+import {
+  useReplyEmail,
+  useSendEmail,
+  useDeleteDraft,
+  mailboxKeys,
+} from "@/features/mailbox/mailbox.query";
 import type { FullEmail } from "@/features/mailbox/mailbox.type";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -24,18 +30,23 @@ import type { Template } from "@/features/templates/templates.types";
 import { useCreateTemplate } from "@/features/templates/templates.query";
 
 interface Props {
-  instance:   ComposerInstance;
-  onClose:    () => void;
+  instance: ComposerInstance;
+  onClose: () => void;
   /** Optional: called after discard so parent can do optimistic cache updates */
   onDiscard?: () => void;
   className?: string;
 }
 
-export function ComposerFooter({ instance, onClose, onDiscard, className }: Props) {
-  const store       = useComposerStore();
+export function ComposerFooter({
+  instance,
+  onClose,
+  onDiscard,
+  className,
+}: Props) {
+  const store = useComposerStore();
   const queryClient = useQueryClient();
-  const replyEmail  = useReplyEmail();
-  const sendEmail   = useSendEmail();
+  const replyEmail = useReplyEmail();
+  const sendEmail = useSendEmail();
   const deleteDraft = useDeleteDraft();
   const { discard } = useDraftSync(instance);
   const createTemplate = useCreateTemplate();
@@ -44,7 +55,7 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // ── Save-as-template state ────────────────────────────────────────────────
-  const [saveAsOpen, setSaveAsOpen]     = useState(false);
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +70,9 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
   const isSending = instance.status === "sending";
   const canSend =
     instance.mode === "new"
-      ? instance.to.length > 0 && !!instance.subject && !!stripHtml(instance.html)
+      ? instance.to.length > 0 &&
+        !!instance.subject &&
+        !!stripHtml(instance.html)
       : !!stripHtml(instance.html);
 
   const handleSend = useCallback(async () => {
@@ -76,59 +89,72 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
     try {
       if (instance.mode === "new") {
         await sendEmail.mutateAsync({
-          from:     instance.from,
+          from: instance.from,
           provider: instance.provider,
-          to:       instance.to.map((r) => r.email),
-          cc:       instance.cc.map((r) => r.email),
-          bcc:      instance.bcc.map((r) => r.email),
-          subject:  instance.subject,
-          html:     fullHtml,
+          to: instance.to.map((r) => r.email),
+          cc: instance.cc.map((r) => r.email),
+          bcc: instance.bcc.map((r) => r.email),
+          subject: instance.subject,
+          html: fullHtml,
         });
       } else {
-        if (!instance.replyToMessageId) throw new Error("Missing replyToMessageId");
+        if (!instance.replyToMessageId)
+          throw new Error("Missing replyToMessageId");
 
         const res = await replyEmail.mutateAsync({
-          from:             instance.from,
-          provider:         instance.provider,
+          from: instance.from,
+          provider: instance.provider,
           replyToMessageId: instance.replyToMessageId,
-          html:             fullHtml,
-          mode:             instance.mode === "reply_all" ? "reply_all" : instance.mode,
-          to:               instance.to.map((r) => r.email),
-          cc:               instance.cc.map((r) => r.email),
-          bcc:              instance.bcc.map((r) => r.email),
-          subject:          instance.subject,
+          html: fullHtml,
+          mode: instance.mode === "reply_all" ? "reply_all" : instance.mode,
+          to: instance.to.map((r) => r.email),
+          cc: instance.cc.map((r) => r.email),
+          bcc: instance.bcc.map((r) => r.email),
+          subject: instance.subject,
         });
 
         // Optimistically append the sent email to the thread cache so it appears
         // instantly without waiting for the server invalidation re-fetch.
         if (instance.threadId) {
           const optimistic: FullEmail = {
-            id:                `optimistic_${Date.now()}`,
+            id: `optimistic_${Date.now()}`,
             providerMessageId: res.data.messageId,
-            emailAddress:      instance.from,
-            provider:          instance.provider === "GOOGLE" ? "gmail" : "outlook",
-            subject:           instance.subject,
-            isArchived:        false,
-            bodyHtml:          fullHtml,
-            bodyText:          "",
-            snippet:           stripHtml(instance.html).slice(0, 120),
-            from:              { email: instance.from, name: instance.from },
-            to:                instance.to.map((r) => ({ email: r.email, name: r.name ?? r.email })),
-            cc:                instance.cc.map((r) => ({ email: r.email, name: r.name ?? r.email })),
-            receivedAt:        new Date().toISOString(),
-            isRead:            true,
-            hasAttachments:    false,
-            threadId:          instance.threadId,
-            isStarred:         false,
-            isDraft:           false,
-            labels:            [],
+            emailAddress: instance.from,
+            provider: instance.provider === "GOOGLE" ? "gmail" : "outlook",
+            subject: instance.subject,
+            isArchived: false,
+            bodyHtml: fullHtml,
+            bodyText: "",
+            snippet: stripHtml(instance.html).slice(0, 120),
+            from: { email: instance.from, name: instance.from },
+            to: instance.to.map((r) => ({
+              email: r.email,
+              name: r.name ?? r.email,
+            })),
+            cc: instance.cc.map((r) => ({
+              email: r.email,
+              name: r.name ?? r.email,
+            })),
+            receivedAt: new Date().toISOString(),
+            isRead: true,
+            hasAttachments: false,
+            threadId: instance.threadId,
+            isStarred: false,
+            isDraft: false,
+            labels: [],
           };
           queryClient.setQueryData(
             mailboxKeys.thread(instance.threadId),
-            (old: any) => !old?.data?.emails ? old : {
-              ...old,
-              data: { ...old.data, emails: [...old.data.emails, optimistic] },
-            },
+            (old: any) =>
+              !old?.data?.emails
+                ? old
+                : {
+                    ...old,
+                    data: {
+                      ...old.data,
+                      emails: [...old.data.emails, optimistic],
+                    },
+                  },
           );
         }
       }
@@ -143,7 +169,17 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
       store.setStatus(instance.id, "error", (err as Error)?.message);
       toast.error("Failed to send", { description: "Please try again." });
     }
-  }, [instance, isSending, canSend, store, queryClient, sendEmail, replyEmail, deleteDraft, onClose]);
+  }, [
+    instance,
+    isSending,
+    canSend,
+    store,
+    queryClient,
+    sendEmail,
+    replyEmail,
+    deleteDraft,
+    onClose,
+  ]);
 
   const handleDiscard = useCallback(() => {
     const hasTypedContent = !!stripHtml(instance.html);
@@ -153,10 +189,13 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
     onClose();
   }, [instance.html, discard, onDiscard, onClose]);
 
-  const handleTemplateSelect = useCallback((template: Template) => {
-    store.setPendingTemplate(instance.id, template);
-    setPickerOpen(false);
-  }, [store, instance.id]);
+  const handleTemplateSelect = useCallback(
+    (template: Template) => {
+      store.setPendingTemplate(instance.id, template);
+      setPickerOpen(false);
+    },
+    [store, instance.id],
+  );
 
   const handleSaveAsTemplate = useCallback(async () => {
     const name = templateName.trim();
@@ -292,7 +331,10 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); handleSaveAsTemplate(); }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSaveAsTemplate();
+                  }
                   if (e.key === "Escape") setSaveAsOpen(false);
                 }}
                 placeholder="Template name…"
@@ -331,6 +373,20 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
         )}
       </div>
 
+      {/* AI compose / rewrite button */}
+      <button
+        onClick={() => store.update(instance.id, { aiPanelOpen: !instance.aiPanelOpen })}
+        title="Write or rewrite with AI"
+        className={cn(
+          "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+          instance.aiPanelOpen
+            ? "bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400"
+            : "text-gray-400 dark:text-white/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/60",
+        )}
+      >
+        <IconSparkles size={15} />
+      </button>
+
       <div className="flex-1" />
 
       <span className="hidden sm:block text-[10px] text-gray-300 dark:text-white/20 font-mono">
@@ -348,9 +404,13 @@ export function ComposerFooter({ instance, onClose, onDiscard, className }: Prop
         )}
       >
         {isSending ? (
-          <><IconLoader2 size={14} className="animate-spin" /> Sending…</>
+          <>
+            <IconLoader2 size={14} className="animate-spin" /> Sending…
+          </>
         ) : (
-          <><IconSend2 size={14} /> Send</>
+          <>
+            <IconSend2 size={14} /> Send
+          </>
         )}
       </button>
     </div>

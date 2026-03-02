@@ -11,6 +11,7 @@ interface QuickReplyProps {
   lastEmail?: FullEmail; // the last email in the thread — what we're replying to
   variant?: "float" | "inline";
   shell?: "panel" | "sheet";
+  children?: React.ReactNode; // slot rendered above reply/forward row (float variant only)
 }
 
 export function QuickReply({
@@ -18,6 +19,7 @@ export function QuickReply({
   lastEmail,
   variant = "float",
   shell = "panel",
+  children,
 }: QuickReplyProps) {
   const { replyTo, forward } = useComposer();
 
@@ -39,30 +41,40 @@ export function QuickReply({
       <div className="absolute bottom-0 inset-x-0 pointer-events-none pb-4 px-5">
         <div
           className={cn(
-            "pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-2xl",
+            "pointer-events-auto rounded-2xl overflow-hidden",
             "bg-white/70 dark:bg-[#27241f]/90 backdrop-blur-3xl",
             "shadow-[0_2px_20px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.05)]",
             "dark:shadow-[0_-1px_0_rgba(255,255,255,0.06),0_4px_32px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.07)]",
           )}
         >
-          <button
-            onClick={onReply}
-            disabled={!lastEmail}
-            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-xl bg-gray-950 dark:bg-white text-white dark:text-gray-950 text-[13px] font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-40"
-          >
-            <IconArrowBackUp size={15} />
-            Reply
-            <kbd className="text-[10px] font-mono opacity-40 ml-0.5">R</kbd>
-          </button>
-          <button
-            onClick={onForward}
-            disabled={!lastEmail}
-            className="flex items-center justify-center gap-2 h-9 px-4 rounded-xl text-[13px] font-medium text-gray-500 dark:text-white/45 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] transition-colors disabled:opacity-40"
-          >
-            <IconArrowForwardUp size={15} />
-            Forward
-            <kbd className="text-[10px] font-mono opacity-40 ml-0.5">F</kbd>
-          </button>
+          {/* Optional slot — SmartReplies renders here when suggestions are ready */}
+          {children && (
+            <div className="border-b border-black/[0.05] dark:border-white/[0.05]">
+              {children}
+            </div>
+          )}
+
+          {/* Reply / Forward row */}
+          <div className="flex items-center gap-1.5 p-1.5">
+            <button
+              onClick={onReply}
+              disabled={!lastEmail}
+              className="flex-1 flex items-center justify-center gap-2 h-9 rounded-xl bg-gray-950 dark:bg-white text-white dark:text-gray-950 text-[13px] font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-40"
+            >
+              <IconArrowBackUp size={15} />
+              Reply
+              <kbd className="text-[10px] font-mono opacity-40 ml-0.5">R</kbd>
+            </button>
+            <button
+              onClick={onForward}
+              disabled={!lastEmail}
+              className="flex items-center justify-center gap-2 h-9 px-4 rounded-xl text-[13px] font-medium text-gray-500 dark:text-white/45 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] transition-colors disabled:opacity-40"
+            >
+              <IconArrowForwardUp size={15} />
+              Forward
+              <kbd className="text-[10px] font-mono opacity-40 ml-0.5">F</kbd>
+            </button>
+          </div>
         </div>
       </div>
     );

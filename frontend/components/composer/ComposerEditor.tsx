@@ -30,10 +30,24 @@ import {
   IconUnlink,
   IconCheck,
   IconX,
+  IconSparkles,
+  IconLoader2,
+  IconWand,
 } from "@tabler/icons-react";
 import { QuotedThread } from "./QuotedThread";
 import { VariablesBanner } from "./VariablesBanner";
 import { TemplateSlashExtension } from "./TemplateSlashExtension";
+import { useSuggestEmail } from "@/features/ai/ai.query";
+import { stripHtml } from "@/lib/utils/stripHtml";
+import type { SuggestEmailTone } from "@/features/ai/ai.type";
+
+const AI_TONES: Array<{ value: SuggestEmailTone; label: string }> = [
+  { value: "formal", label: "Formal" },
+  { value: "friendly", label: "Friendly" },
+  { value: "concise", label: "Concise" },
+  { value: "professional", label: "Professional" },
+  { value: "empathetic", label: "Empathetic" },
+];
 
 interface Props {
   instance:    ComposerInstance;
@@ -261,6 +275,14 @@ export function ComposerEditor({
         />
       )}
 
+      {/* Inline AI bar — shown when sparkle button in footer is active */}
+      {instance.aiPanelOpen && (
+        <InlineAIBar
+          instance={instance}
+          onClose={() => store.update(instance.id, { aiPanelOpen: false })}
+        />
+      )}
+
       {/* Clicking empty space below the editor text focuses it */}
       <div
         style={{ minHeight }}
@@ -273,6 +295,181 @@ export function ComposerEditor({
       </div>
 
       {instance.quotedHtml && <QuotedThread html={instance.quotedHtml} />}
+    </div>
+  );
+}
+
+// ─── Inline AI bar ─────────────────────────────────────────────────────────────
+function InlineAIBar({
+  instance,
+  onClose,
+}: {
+  instance: ComposerInstance;
+  onClose: () => void;
+}) {
+  const store = useComposerStore();
+  const { mutateAsync, isPending } = useSuggestEmail();
+
+  const draftText = stripHtml(instance.html).trim();
+  const hasContent = !!draftText;
+  const mode = hasContent ? "rewrite" : "compose";
+
+  const [topic, setTopic] = useState("");
+  const [tone, setTone] = useState<SuggestEmailTone | undefined>(undefined);
+  const topicRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (mode === "compose") setTimeout(() => topicRef.current?.focus(), 50);
+  }, [mode]);
+
+  const canSubmit = mode === "rewrite" || topic.trim().length > 0;
+
+  const handleGenerate = async () => {
+    if (!canSubmit || isPending) return;
+    try {
+      const result = await mutateAsync({
+        mode,
+        topic: mode === "compose" ? topic.trim() : undefined,
+        draft: mode === "rewrite" ? draftText : undefined,
+        tone,
+        subjectHint: instance.subject || undefined,
+      });
+      store.setPendingTemplate(instance.id, {
+        id: -1,
+        userId: "",
+        name: "",
+        subject: result.subject || instance.subject,
+        body: result.body,
+        variables: [],
+        category: null,
+        tags: [],
+        usageCount: 0,
+        version: 1,
+        createdAt: "",
+        updatedAt: "",
+      });
+      if (mode === "compose" && result.subject) {
+        store.update(instance.id, { subject: result.subject });
+      }
+      onClose();
+    } catch {
+      // silent — user can retry
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "shrink-0 border-b border-black/[0.06] dark:border-white/[0.06]",
+        "bg-white dark:bg-[#1a1a1a]",
+      )}
+    >
+      {/* Violet accent line */}
+      <div className="h-[2px] bg-gradient-to-r from-violet-500 via-violet-400 to-indigo-400" />
+
+      <div className="p-3">
+        {/* Header */}
+        <div className="flex items-center gap-2 mb-2.5">
+          <div className="w-5 h-5 rounded-md bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center shrink-0">
+            {mode === "compose" ? (
+              <IconSparkles size={11} className="text-violet-500 dark:text-violet-400" />
+            ) : (
+              <IconWand size={11} className="text-violet-500 dark:text-violet-400" />
+            )}
+          </div>
+          <div className="flex-1">
+            <p className="text-[12px] font-semibold text-gray-700 dark:text-white/70 leading-none">
+              {mode === "compose" ? "Write with AI" : "Rewrite with AI"}
+            </p>
+            {mode === "rewrite" && (
+              <p className="text-[10.5px] text-gray-400 dark:text-white/28 mt-0.5">
+                Rewrites your current draft
+              </p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 flex items-center justify-center rounded-md text-gray-300 dark:text-white/22 hover:text-gray-500 dark:hover:text-white/45 transition-colors"
+          >
+            <IconX size={13} />
+          </button>
+        </div>
+
+        {/* Topic textarea — compose mode only */}
+        {mode === "compose" && (
+          <textarea
+            ref={topicRef}
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                handleGenerate();
+              }
+              if (e.key === "Escape") onClose();
+            }}
+            placeholder="What's this email about?"
+            rows={2}
+            className={cn(
+              "w-full px-3 py-2 rounded-xl text-[12.5px] outline-none mb-2.5 resize-none",
+              "bg-gray-50 dark:bg-white/[0.04]",
+              "border border-black/[0.07] dark:border-white/[0.08]",
+              "text-gray-800 dark:text-white/80",
+              "placeholder:text-gray-300 dark:placeholder:text-white/22",
+              "focus:border-violet-300 dark:focus:border-violet-700/50",
+              "transition-colors",
+            )}
+          />
+        )}
+
+        {/* Tone pills */}
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          {AI_TONES.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setTone(tone === value ? undefined : value)}
+              className={cn(
+                "h-6 px-2.5 rounded-lg text-[11.5px] font-medium transition-all",
+                tone === value
+                  ? "bg-violet-500 text-white shadow-sm"
+                  : "bg-black/[0.04] dark:bg-white/[0.06] text-gray-500 dark:text-white/40 hover:bg-black/[0.07] dark:hover:bg-white/[0.1] hover:text-gray-700 dark:hover:text-white/60",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="h-7 px-3 rounded-lg text-[12px] text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={!canSubmit || isPending}
+            className={cn(
+              "h-7 px-3.5 rounded-lg text-[12px] font-semibold transition-all flex items-center gap-1.5",
+              "bg-violet-500 hover:bg-violet-600 text-white shadow-sm",
+              "disabled:opacity-40 disabled:cursor-not-allowed",
+            )}
+          >
+            {isPending ? (
+              <>
+                <IconLoader2 size={12} className="animate-spin" /> Generating…
+              </>
+            ) : (
+              <>
+                <IconSparkles size={12} />{" "}
+                {mode === "compose" ? "Generate" : "Rewrite"}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

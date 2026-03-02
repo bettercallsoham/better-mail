@@ -7,6 +7,8 @@ export const aiKeys = {
   all: ["ai"] as const,
   summary: (threadId: string, emailAddress: string) =>
     [...aiKeys.all, "summary", threadId, emailAddress] as const,
+  replies: (threadId: string, emailAddress: string) =>
+    [...aiKeys.all, "replies", threadId, emailAddress] as const,
 };
 
 export function useThreadSummary(threadId: string, fallbackEmail: string) {
@@ -22,11 +24,18 @@ export function useThreadSummary(threadId: string, fallbackEmail: string) {
   });
 }
 
-export function useReplySuggestions() {
-  return useMutation({
-    mutationFn: (params: SuggestReplyParams) => aiService.suggestReply(params),
+export function useReplySuggestionsQuery(threadId: string, emailAddress: string) {
+  return useQuery({
+    queryKey: aiKeys.replies(threadId, emailAddress),
+    queryFn: () => aiService.suggestReply({ threadId, emailAddress }),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    enabled: !!threadId && !!emailAddress,
   });
 }
+
+
 
 export function useSuggestEmail() {
   return useMutation({

@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useRef, useState, useCallback, useMemo, useEffect } from "react";
+import {
+  Suspense,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+} from "react";
 import { format } from "date-fns";
 import {
   IconX,
@@ -28,11 +35,11 @@ import { usePanelInstance } from "@/lib/store/composer.store";
 import { TipBtn } from "./components/TipBtn";
 import { AISummary } from "./components/AISummary";
 import { EmailCard } from "./components/EmailCard";
-// import { QuickReply }      from "@/components/composer/QuickReply";
 import { ThreadMeta } from "./components/ThreadMeta";
 import { NotesDropdown } from "./components/NotesDropdown";
 import { PanelShell } from "@/components/composer/shells/PanelShell";
 import { useComposer } from "@/components/composer/hooks/useComposer";
+import { SmartReplies } from "@/components/composer/SmartReplies";
 import { QuickReply } from "./components/QuickReply";
 
 // ─── Thread detail content ─────────────────────────────────────────────────────
@@ -104,33 +111,74 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
     if (emails[0]) act(emails[0], isRead ? "mark_unread" : "mark_read");
   }, [emails, isRead, act]);
   const handleToggleNotes = useCallback(() => setNotesOpen((v) => !v), []);
-  const handleReply    = useCallback(() => { if (lastEmail) replyTo(lastEmail, "panel", "reply");     }, [lastEmail, replyTo]);
-  const handleReplyAll = useCallback(() => { if (lastEmail) replyTo(lastEmail, "panel", "reply_all"); }, [lastEmail, replyTo]);
-  const handleForward  = useCallback(() => { if (lastEmail) forward(lastEmail, "panel");               }, [lastEmail, forward]);
+  const handleReply = useCallback(() => {
+    if (lastEmail) replyTo(lastEmail, "panel", "reply");
+  }, [lastEmail, replyTo]);
+  const handleReplyAll = useCallback(() => {
+    if (lastEmail) replyTo(lastEmail, "panel", "reply_all");
+  }, [lastEmail, replyTo]);
+  const handleForward = useCallback(() => {
+    if (lastEmail) forward(lastEmail, "panel");
+  }, [lastEmail, forward]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (
-        target.tagName === "INPUT"    ||
+        target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable
-      ) return;
+      )
+        return;
       switch (e.key) {
-        case "r": e.preventDefault(); handleReply();                               break;
-        case "f": e.preventDefault(); handleForward();                             break;
-        case "s": e.preventDefault(); handleStar();                                break;
-        case "e": e.preventDefault(); handleArchive();                             break;
-        case "#": e.preventDefault(); handleDelete();                              break;
-        case "u": e.preventDefault(); handleRead();                                break;
-        case "j": e.preventDefault(); if (nextId) setActiveThread(nextId);        break;
-        case "k": e.preventDefault(); if (prevId) setActiveThread(prevId);        break;
+        case "r":
+          e.preventDefault();
+          handleReply();
+          break;
+        case "f":
+          e.preventDefault();
+          handleForward();
+          break;
+        case "s":
+          e.preventDefault();
+          handleStar();
+          break;
+        case "e":
+          e.preventDefault();
+          handleArchive();
+          break;
+        case "#":
+          e.preventDefault();
+          handleDelete();
+          break;
+        case "u":
+          e.preventDefault();
+          handleRead();
+          break;
+        case "j":
+          e.preventDefault();
+          if (nextId) setActiveThread(nextId);
+          break;
+        case "k":
+          e.preventDefault();
+          if (prevId) setActiveThread(prevId);
+          break;
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleReply, handleForward, handleStar, handleArchive, handleDelete, handleRead, nextId, prevId, setActiveThread]);
+  }, [
+    handleReply,
+    handleForward,
+    handleStar,
+    handleArchive,
+    handleDelete,
+    handleRead,
+    nextId,
+    prevId,
+    setActiveThread,
+  ]);
 
   if (!data.success || emails.length === 0) return <ThreadDetailEmpty />;
 
@@ -258,16 +306,27 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
         </div>
 
         {/* Spacer — only when panel is closed so last card clears the float bar */}
-        {!panelInstance && <div className="h-24" />}
+        {!panelInstance && <div className="h-16" />}
       </div>
 
-      {/* ── Float bar — hidden when panel composer is open ── */}
+      {/* Floating QuickReply card with AI reply suggestions */}
       {!panelInstance && (
         <QuickReply
           userEmail={emailAddr}
           lastEmail={lastEmail}
           variant="float"
-        />
+          shell="panel"
+        >
+          {lastEmail && (
+            <SmartReplies
+              threadId={threadId}
+              emailAddress={emailAddr}
+              lastEmail={lastEmail}
+              shell="panel"
+              variant="rows"
+            />
+          )}
+        </QuickReply>
       )}
 
       {/* ── Composer panel — slides up from bottom ── */}
