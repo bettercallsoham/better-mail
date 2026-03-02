@@ -64,22 +64,6 @@ export function useThreadNavigation(
           setActiveThread(null);
           break;
         }
-        // ── Per-thread action shortcuts (delegate to focusedActionsRef) ──────
-        case "s": {
-          e.preventDefault();
-          focusedActionsRef.current?.star();
-          break;
-        }
-        case "e": {
-          e.preventDefault();
-          focusedActionsRef.current?.archiveToggle();
-          break;
-        }
-        case "u": {
-          e.preventDefault();
-          focusedActionsRef.current?.markRead();
-          break;
-        }
         default:
           break;
       }

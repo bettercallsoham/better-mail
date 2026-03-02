@@ -16,6 +16,7 @@ import {
 } from "@/features/mailbox/mailbox.query";
 import { useThreadNavigation } from "@/hooks/keyboard/useThreadNavigation";
 import { useThreadActions } from "@/hooks/keyboard/useThreadActions";
+import { useComposerStore } from "@/lib/store/composer.store";
 import type { ThreadActions } from "@/hooks/keyboard/useThreadActions";
 import { ThreadRow } from "../ThreadRow";
 import { ThreadListToolbar } from "./ThreadListToolbar";
@@ -38,7 +39,9 @@ function useInfiniteScroll(
       observerRef.current?.disconnect();
       if (!node || !enabled) return;
       observerRef.current = new IntersectionObserver(
-        ([entry]) => { if (entry.isIntersecting) onIntersect(); },
+        ([entry]) => {
+          if (entry.isIntersecting) onIntersect();
+        },
         { threshold: 0.1 },
       );
       observerRef.current.observe(node);
@@ -64,13 +67,17 @@ export function ThreadList({ className }: { className?: string }) {
 
 // ─── Inner ────────────────────────────────────────────────────────────────────
 function ThreadListInner({ email }: { email?: string }) {
-  const searchQuery   = useUIStore((s) => s.searchQuery);
+  const searchQuery = useUIStore((s) => s.searchQuery);
   const searchFilters = useUIStore((s) => s.searchFilters);
 
   if (searchQuery || searchFilters) {
     return (
       <Suspense fallback={<ThreadListSkeleton />}>
-        <SearchResultsList query={searchQuery ?? ""} filters={searchFilters} email={email} />
+        <SearchResultsList
+          query={searchQuery ?? ""}
+          filters={searchFilters}
+          email={email}
+        />
       </Suspense>
     );
   }
@@ -80,21 +87,23 @@ function ThreadListInner({ email }: { email?: string }) {
 
 // ─── Search results ───────────────────────────────────────────────────────────
 function SearchResultsList({
-  query, filters, email,
+  query,
+  filters,
+  email,
 }: {
   query: string;
   filters: SearchFilters | null;
   email?: string;
 }) {
   const setActiveThread = useUIStore((s) => s.setActiveThread);
-  const activeThreadId  = useUIStore((s) => s.activeThreadId);
+  const activeThreadId = useUIStore((s) => s.activeThreadId);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useSearchEmails({
-      query:   query.trim() || " ",
-      size:    20,
+      query: query.trim() || " ",
+      size: 20,
       ...filters,
-      labels:  filters?.labels?.join(","),
+      labels: filters?.labels?.join(","),
     });
 
   const allEmails = data.pages.flatMap((p) => p.emails);
@@ -103,14 +112,19 @@ function SearchResultsList({
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const sentinelRef = useInfiniteScroll(loadMore, hasNextPage && !isFetchingNextPage);
+  const sentinelRef = useInfiniteScroll(
+    loadMore,
+    hasNextPage && !isFetchingNextPage,
+  );
 
   if (!allEmails.length) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center px-6">
         <span className="text-2xl opacity-20 select-none">◎</span>
         <p className="text-[13px] font-medium text-gray-500 dark:text-white/40">
-          {query ? `No results for "${query}"` : "No results for the selected filters"}
+          {query
+            ? `No results for "${query}"`
+            : "No results for the selected filters"}
         </p>
         <p className="text-[12px] text-gray-400 dark:text-white/25">
           Try adjusting your search or filters
@@ -142,13 +156,15 @@ function SearchResultsList({
 
 // ─── Search row ───────────────────────────────────────────────────────────────
 const SearchResultRow = memo(function SearchResultRow({
-  email, isActive, onSelect,
+  email,
+  isActive,
+  onSelect,
 }: {
   email: SearchEmail;
   isActive: boolean;
   onSelect: () => void;
 }) {
-  const date    = new Date(email.receivedAt);
+  const date = new Date(email.receivedAt);
   const isToday = new Date().toDateString() === date.toDateString();
   const dateStr = isToday
     ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -164,26 +180,33 @@ const SearchResultRow = memo(function SearchResultRow({
       onClick={onSelect}
       className={cn(
         "w-full flex items-start gap-3 px-4 py-3 border-b border-black/4 dark:border-white/3 text-left transition-colors",
-        isActive ? "bg-black/4 dark:bg-white/5" : "hover:bg-black/2 dark:hover:bg-white/2",
+        isActive
+          ? "bg-black/4 dark:bg-white/5"
+          : "hover:bg-black/2 dark:hover:bg-white/2",
       )}
     >
       <div className="mt-1.5 shrink-0">
-        {!email.isRead
-          ? <span className="w-1.5 h-1.5 rounded-full bg-blue-500 block" />
-          : <span className="w-1.5 h-1.5 block" />
-        }
+        {!email.isRead ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 block" />
+        ) : (
+          <span className="w-1.5 h-1.5 block" />
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
-          <span className={cn(
-            "text-[12.5px] truncate",
-            !email.isRead
-              ? "font-semibold text-gray-900 dark:text-white/90"
-              : "font-medium text-gray-600 dark:text-white/50",
-          )}>
+          <span
+            className={cn(
+              "text-[12.5px] truncate",
+              !email.isRead
+                ? "font-semibold text-gray-900 dark:text-white/90"
+                : "font-medium text-gray-600 dark:text-white/50",
+            )}
+          >
             {email.from.name || email.from.email}
           </span>
-          <span className="text-[11px] text-gray-400 dark:text-white/22 shrink-0">{dateStr}</span>
+          <span className="text-[11px] text-gray-400 dark:text-white/22 shrink-0">
+            {dateStr}
+          </span>
         </div>
         <p
           className={cn(
@@ -212,13 +235,13 @@ const ThreadRowWithActions = memo(function ThreadRowWithActions({
   onSelect,
   onHover,
 }: {
-  thread:            ThreadEmail;
-  isActive:          boolean;
-  isFocused:         boolean;
-  isFlow:            boolean;
+  thread: ThreadEmail;
+  isActive: boolean;
+  isFocused: boolean;
+  isFlow: boolean;
   focusedActionsRef: React.MutableRefObject<ThreadActions | null>;
-  onSelect:          () => void;
-  onHover:           () => void;
+  onSelect: () => void;
+  onHover: () => void;
 }) {
   const actions = useThreadActions(thread);
 
@@ -251,13 +274,13 @@ const ThreadRowWithActions = memo(function ThreadRowWithActions({
 
 // ─── Normal thread list ───────────────────────────────────────────────────────
 function ThreadListContent({ email: emailAddress }: { email?: string }) {
-  const activeThreadId   = useUIStore((s) => s.activeThreadId);
-  const focusedThreadId  = useUIStore((s) => s.focusedThreadId);
-  const layoutMode       = useUIStore((s) => s.layoutMode);
-  const setActiveThread  = useUIStore((s) => s.setActiveThread);
+  const activeThreadId = useUIStore((s) => s.activeThreadId);
+  const focusedThreadId = useUIStore((s) => s.focusedThreadId);
+  const layoutMode = useUIStore((s) => s.layoutMode);
+  const setActiveThread = useUIStore((s) => s.setActiveThread);
   const setFocusedThread = useUIStore((s) => s.setFocusedThread);
-  const setThreadIds     = useUIStore((s) => s.setThreadIds);
-  const activeFolder     = useUIStore((s) => s.activeFolder);
+  const setThreadIds = useUIStore((s) => s.setThreadIds);
+  const activeFolder = useUIStore((s) => s.activeFolder);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useThreadEmails(emailAddress, activeFolder);
@@ -281,15 +304,31 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable
-      ) return;
+      )
+        return;
+
+      // Don't fire while a compose dialog is open
+      if (
+        useComposerStore.getState().instances.some((i) => i.shell === "dialog")
+      )
+        return;
 
       const actions = focusedActionsRef.current;
       if (!actions) return;
 
       switch (e.key.toLowerCase()) {
-        case "s": e.preventDefault(); actions.star();     break;
-        case "u": e.preventDefault(); actions.markRead(); break;
-        case "e": e.preventDefault(); actions.archiveToggle();  break;
+        case "s":
+          e.preventDefault();
+          actions.star();
+          break;
+        case "u":
+          e.preventDefault();
+          actions.markRead();
+          break;
+        case "e":
+          e.preventDefault();
+          actions.archiveToggle();
+          break;
       }
     };
     window.addEventListener("keydown", handler);
@@ -300,7 +339,10 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const sentinelRef = useInfiniteScroll(loadMore, hasNextPage && !isFetchingNextPage);
+  const sentinelRef = useInfiniteScroll(
+    loadMore,
+    hasNextPage && !isFetchingNextPage,
+  );
 
   if (!data.threads.length) return <ThreadListEmpty />;
 
@@ -308,7 +350,12 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
   const isFlow = layoutMode === "flow";
 
   return (
-    <div className={cn("flex-1 overflow-y-auto overscroll-contain", isFlow && "py-1")}>
+    <div
+      className={cn(
+        "flex-1 overflow-y-auto overscroll-contain",
+        isFlow && "py-1",
+      )}
+    >
       {groups.map(({ label, items }) => (
         <div key={label}>
           {/* Fixed sticky header — matches body bg, no jarring banding */}
@@ -356,7 +403,10 @@ function ThreadListSkeleton() {
   return (
     <div className="flex-1 overflow-hidden">
       {Array.from({ length: 12 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 px-4 h-12 border-b border-black/[0.04] dark:border-white/[0.04]">
+        <div
+          key={i}
+          className="flex items-center gap-3 px-4 h-12 border-b border-black/[0.04] dark:border-white/[0.04]"
+        >
           <Skeleton className="w-1.5 h-1.5 rounded-full" />
           <Skeleton className="w-32 h-3 rounded" />
           <Skeleton className="flex-1 h-3 rounded" />

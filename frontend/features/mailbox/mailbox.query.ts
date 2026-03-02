@@ -42,6 +42,14 @@ type RawThreadCache = {
   pageParams: unknown[];
 };
 
+type RawThreadDetailCache = {
+  success: boolean;
+  data: {
+    total: { value: number; relation: string };
+    emails: import("./mailbox.type").FullEmail[];
+  };
+};
+
 // ─── Query keys ───────────────────────────────────────────────────────────────
 export const mailboxKeys = {
   all: ["mailboxes"] as const,
@@ -204,7 +212,6 @@ export function useRecentSearches() {
   });
 }
 
-
 import type { SavedSearch } from "./mailbox.type";
 
 type SavedSearchCache = { success: boolean; data: SavedSearch[] };
@@ -242,7 +249,9 @@ export function useUpdateSavedSearch() {
 
     onMutate: async (params) => {
       // Cancel any in-flight refetches so they don't overwrite our patch
-      await queryClient.cancelQueries({ queryKey: mailboxKeys.savedSearches() });
+      await queryClient.cancelQueries({
+        queryKey: mailboxKeys.savedSearches(),
+      });
       await queryClient.cancelQueries({
         queryKey: mailboxKeys.savedSearch(params.id),
       });
@@ -264,7 +273,7 @@ export function useUpdateSavedSearch() {
                 ? s
                 : {
                     ...s,
-                    ...(params.name  !== undefined && { name:  params.name  }),
+                    ...(params.name !== undefined && { name: params.name }),
                     ...(params.color !== undefined && { color: params.color }),
                     ...(params.query !== undefined && { query: params.query }),
                   },
@@ -305,7 +314,9 @@ export function useDeleteSavedSearch() {
     mutationFn: (id: string) => mailboxService.deleteSavedSearch(id),
 
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: mailboxKeys.savedSearches() });
+      await queryClient.cancelQueries({
+        queryKey: mailboxKeys.savedSearches(),
+      });
 
       // Snapshot before removal
       const previous = queryClient.getQueryData<SavedSearchCache>(
@@ -316,9 +327,7 @@ export function useDeleteSavedSearch() {
       queryClient.setQueryData<SavedSearchCache>(
         mailboxKeys.savedSearches(),
         (old) =>
-          old
-            ? { ...old, data: old.data.filter((s) => s.id !== id) }
-            : old,
+          old ? { ...old, data: old.data.filter((s) => s.id !== id) } : old,
       );
 
       return { previous };
@@ -341,7 +350,7 @@ export function useDeleteSavedSearch() {
   });
 }
 
-export function useThreadNote(threadId: string , emailAddress:string) {
+export function useThreadNote(threadId: string, emailAddress: string) {
   return useSuspenseQuery({
     queryKey: mailboxKeys.threadNote(threadId),
     queryFn: () => mailboxService.getThreadNote(threadId, emailAddress),
@@ -359,10 +368,9 @@ export function useUpsertThreadNote() {
       mailboxService.upsertThreadNote(params),
 
     onSuccess: (response, { threadId }) => {
-   
       queryClient.setQueryData(mailboxKeys.threadNote(threadId), {
         success: true,
-        data:    response.data,
+        data: response.data,
       });
     },
 
@@ -374,7 +382,6 @@ export function useUpsertThreadNote() {
     },
   });
 }
-
 
 export function useInboxZero(params?: InboxZeroParams) {
   return useSuspenseInfiniteQuery({
@@ -470,6 +477,10 @@ export function useEmailAction() {
 
     onMutate: async (params) => {
       await queryClient.cancelQueries({ queryKey: ["threads"], exact: false });
+      await queryClient.cancelQueries({
+        queryKey: [...mailboxKeys.all, "thread"],
+        exact: false,
+      });
 
       const applyToThread = (thread: ThreadEmail): ThreadEmail | null => {
         if (!params.messageIds.includes(thread.lastMessageId)) return thread;
@@ -516,12 +527,54 @@ export function useEmailAction() {
         },
       );
 
-      return { prevThreads };
+      // ── Also patch the open thread detail cache ────────────────────────────
+      const prevDetails = queryClient.getQueriesData<RawThreadDetailCache>({
+        queryKey: [...mailboxKeys.all, "thread"],
+        exact: false,
+      });
+
+      queryClient.setQueriesData<RawThreadDetailCache>(
+        { queryKey: [...mailboxKeys.all, "thread"], exact: false },
+        (old) => {
+          if (!old?.data?.emails) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              emails: old.data.emails.map((email) => {
+                if (!params.messageIds.includes(email.providerMessageId))
+                  return email;
+                switch (params.action) {
+                  case "star":
+                    return { ...email, isStarred: true };
+                  case "unstar":
+                    return { ...email, isStarred: false };
+                  case "mark_read":
+                    return { ...email, isRead: true };
+                  case "mark_unread":
+                    return { ...email, isRead: false };
+                  case "archive":
+                    return { ...email, isArchived: true };
+                  case "unarchive":
+                    return { ...email, isArchived: false };
+                  default:
+                    return email;
+                }
+              }),
+            },
+          };
+        },
+      );
+
+      return { prevThreads, prevDetails };
     },
 
     onError: (_err, params, context) => {
-      // Roll back optimistic patch
+      // Roll back optimistic patches
       context?.prevThreads?.forEach(([key, data]) =>
+        queryClient.setQueryData(key, data),
+      );
+      context?.prevDetails?.forEach(([key, data]) =>
         queryClient.setQueryData(key, data),
       );
 
@@ -544,6 +597,10 @@ export function useEmailAction() {
     onSettled: () => {
       // Resync from server after mutation settles
       queryClient.invalidateQueries({ queryKey: ["threads"], exact: false });
+      queryClient.invalidateQueries({
+        queryKey: [...mailboxKeys.all, "thread"],
+        exact: false,
+      });
     },
   });
 }
@@ -555,8 +612,6 @@ export function useExecuteSavedSearch(id: string) {
     select: (data) => data.data,
   });
 }
-
-
 
 export function useEmailSuggestions(query?: string, limit = 10) {
   return useQuery({

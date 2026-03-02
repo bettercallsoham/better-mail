@@ -89,10 +89,10 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
       action: Parameters<typeof emailAction.mutate>[0]["action"],
     ) =>
       emailAction.mutate({
-        from: email.from.email,
+        from: email.emailAddress,
         provider:
           email.provider?.toLowerCase() === "outlook" ? "OUTLOOK" : "GOOGLE",
-        messageIds: [email.id],
+        messageIds: [email.providerMessageId],
         action,
       }),
     [emailAction],
