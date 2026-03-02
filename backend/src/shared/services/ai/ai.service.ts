@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { azureClient4o_mini, GPT_4O_MINI_MODEL } from "../../config/llm";
+import {
+  azureClient4o_mini,
+  azureClient41,
+  GPT_4O_MINI_MODEL,
+  GPT_41_MODEL,
+} from "../../config/llm";
 import { logger } from "../../utils/logger";
 import { RAGService } from "./rag.service";
 
@@ -178,8 +183,14 @@ ${emailsText}`;
 // Email composer / rewriter — pure stateless LLM, no agent, no RAG
 // ---------------------------------------------------------------------------
 
-export const SUGGEST_EMAIL_TONES = ["formal", "friendly", "concise", "professional", "empathetic"] as const;
-export type SuggestEmailTone = typeof SUGGEST_EMAIL_TONES[number];
+export const SUGGEST_EMAIL_TONES = [
+  "formal",
+  "friendly",
+  "concise",
+  "professional",
+  "empathetic",
+] as const;
+export type SuggestEmailTone = (typeof SUGGEST_EMAIL_TONES)[number];
 
 export const SuggestEmailOutputSchema = z.object({
   subject: z.string(),
@@ -188,20 +199,38 @@ export const SuggestEmailOutputSchema = z.object({
 export type SuggestEmailOutput = z.infer<typeof SuggestEmailOutputSchema>;
 
 interface SuggestEmailInput {
-  mode: "compose" | "rewrite";
+  mode: "compose" | "rewrite" | "refine";
   /** compose mode: what the email should be about */
   topic?: string;
-  /** rewrite mode: the existing draft to improve */
+  /** rewrite / refine mode: the existing draft HTML to improve */
   draft?: string;
+  /** refine mode: specific instruction to apply to the draft */
+  refineInstruction?: string;
   tone?: SuggestEmailTone;
   /** optional hints for richer output */
   recipientName?: string;
   subjectHint?: string;
 }
 
+const HTML_BODY_RULES = `
+- Return the body as semantic HTML using only: <p>, <strong>, <em>, <u>, <h2>, <h3>, <ul>, <li>, <ol>, <blockquote>
+- Use <p> for paragraphs — every line of text must be wrapped in a tag
+- Use <strong> for key terms or emphasis
+- Use <ul><li> for bullet lists, <ol><li> for numbered lists
+- Do NOT use <html>, <head>, <body>, <div>, <span>, <br>, <style>, inline styles, or markdown
+- Do NOT include a greeting or sign-off as plain strings outside tags — wrap them in <p> tags`;
+
 export class AISuggestEmailService {
   async suggestEmail(input: SuggestEmailInput): Promise<SuggestEmailOutput> {
-    const { mode, topic, draft, tone = "professional", recipientName, subjectHint } = input;
+    const {
+      mode,
+      topic,
+      draft,
+      refineInstruction,
+      tone = "professional",
+      recipientName,
+      subjectHint,
+    } = input;
 
     const toneInstruction = `Tone: ${tone}.`;
     const recipientLine = recipientName ? `Recipient: ${recipientName}.` : "";
@@ -209,27 +238,33 @@ export class AISuggestEmailService {
 
     const systemPrompt = `You are an expert email writing assistant for BetterMail.
 Output ONLY a pure JSON object (no markdown, no code blocks):
-{ "subject": "<email subject>", "body": "<full email body>" }
+{ "subject": "<email subject>", "body": "<full email HTML body>" }
 Rules:
 - ${toneInstruction}
 - ${recipientLine}
 - ${subjectLine}
-- Body must be ready-to-send (proper greeting, content, sign-off).
-- Do NOT include any text outside the JSON object.`;
+- Body must be a complete, ready-to-send email (proper greeting, content, sign-off).
+- Do NOT include any text outside the JSON object.
+${HTML_BODY_RULES}`;
 
-    const userPrompt =
-      mode === "compose"
-        ? `Compose a new email about the following topic:\n${topic}`
-        : `Rewrite the following email draft to be more ${tone}. Preserve the intent but improve clarity, structure, and ${tone === "concise" ? "brevity" : "tone"}:\n\n${draft}`;
+    let userPrompt: string;
+    if (mode === "compose") {
+      userPrompt = `Compose a new email about the following topic:\n${topic}`;
+    } else if (mode === "rewrite") {
+      userPrompt = `Rewrite the following email draft to be more ${tone}. Preserve the intent but improve clarity, structure, and ${tone === "concise" ? "brevity" : "tone"}.\nReturn the improved version as semantic HTML body.\n\nDraft:\n${draft}`;
+    } else {
+      // refine
+      userPrompt = `Apply the following instruction to the email draft below. Preserve everything not affected by the instruction. Return the updated email as semantic HTML body.\n\nInstruction: ${refineInstruction}\n\nCurrent draft (HTML):\n${draft}`;
+    }
 
-    const response = await azureClient4o_mini.chat.completions.create({
-      model: GPT_4O_MINI_MODEL!,
+    const response = await azureClient41.chat.completions.create({
+      model: GPT_41_MODEL!,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.6,
-      max_tokens: 1500,
+      temperature: 0.7,
+      max_tokens: 2000,
       response_format: { type: "json_object" },
     });
 

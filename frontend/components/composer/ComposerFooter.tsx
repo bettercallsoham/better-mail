@@ -8,6 +8,8 @@ import {
   IconBookmark,
   IconTemplate,
   IconSparkles,
+  IconArrowLeft,
+  IconCheck,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +30,8 @@ import { useDraftSync } from "./hooks/useDraftSync";
 import { TemplatePicker } from "./TemplatePicker";
 import type { Template } from "@/features/templates/templates.types";
 import { useCreateTemplate } from "@/features/templates/templates.query";
+import { useSuggestEmail } from "@/features/ai/ai.query";
+import type { SuggestEmailTone } from "@/features/ai/ai.type";
 
 interface Props {
   instance: ComposerInstance;
@@ -233,15 +237,20 @@ export function ComposerFooter({
         e.preventDefault();
         handleDiscard();
       }
+      // ⌘. — toggle AI draft popover
+      if (e.key === ".") {
+        e.preventDefault();
+        store.update(instance.id, { aiPanelOpen: !instance.aiPanelOpen });
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [instance.id, handleSend, handleDiscard]);
+  }, [instance.id, handleSend, handleDiscard, store, instance.aiPanelOpen]);
 
   return (
     <div
       className={cn(
-        "shrink-0 flex items-center gap-2 px-3 py-2.5",
+        "relative shrink-0 flex items-center gap-2 px-3 py-2.5",
         "border-t border-black/6 dark:border-white/6",
         className,
       )}
@@ -374,18 +383,45 @@ export function ComposerFooter({
       </div>
 
       {/* AI compose / rewrite button */}
-      <button
-        onClick={() => store.update(instance.id, { aiPanelOpen: !instance.aiPanelOpen })}
-        title="Write or rewrite with AI"
-        className={cn(
-          "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
-          instance.aiPanelOpen
-            ? "bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400"
-            : "text-gray-400 dark:text-white/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/60",
-        )}
-      >
-        <IconSparkles size={15} />
-      </button>
+      <div>
+        <button
+          onClick={() =>
+            store.update(instance.id, { aiPanelOpen: !instance.aiPanelOpen })
+          }
+          title="Write with AI(⌘.)"
+          className={cn(
+            "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+            instance.aiPanelOpen
+              ? "bg-gray-100 dark:bg-white/[0.1] text-gray-700 dark:text-white/70"
+              : "text-gray-400 dark:text-white/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/60",
+          )}
+        >
+          <IconSparkles size={15} />
+        </button>
+      </div>
+
+      {/* AI popover — centered over the composer body */}
+      {instance.aiPanelOpen && (
+        <AIPopover
+          instance={instance}
+          onClose={() => store.update(instance.id, { aiPanelOpen: false })}
+          onApply={(html, subject) => {
+            store.update(instance.id, {
+              pendingTemplate: {
+                id: 0,
+                name: "AI Draft",
+                body: html,
+                subject,
+                variables: [],
+              },
+              aiPanelOpen: false,
+            });
+            if (instance.mode === "new" && subject) {
+              store.update(instance.id, { subject });
+            }
+          }}
+        />
+      )}
 
       <div className="flex-1" />
 
@@ -413,6 +449,445 @@ export function ComposerFooter({
           </>
         )}
       </button>
+    </div>
+  );
+}
+
+// ─── AI Popover ───────────────────────────────────────────────────────────────
+// One-line compact input: [✦ topic input] [Tone ▾] [↑]
+// Quick chips for fix-grammar / fix-spelling etc. (when has content)
+// After generation → preview + Replace + refine list
+
+type AIPhase = "idle" | "loading" | "result";
+
+const AI_TONES: Array<{ value: SuggestEmailTone; label: string }> = [
+  { value: "formal", label: "Formal" },
+  { value: "friendly", label: "Friendly" },
+  { value: "concise", label: "Concise" },
+  { value: "professional", label: "Professional" },
+  { value: "empathetic", label: "Empathetic" },
+];
+
+const QUICK_ACTIONS = [
+  { label: "Fix grammar", instruction: "Fix all grammar and spelling errors" },
+  { label: "Fix spelling", instruction: "Fix all spelling mistakes" },
+  { label: "Shorten", instruction: "Make it shorter and more concise" },
+  {
+    label: "More formal",
+    instruction: "Rewrite in a more formal, professional tone",
+  },
+  {
+    label: "Add bullets",
+    instruction: "Convert the main points into a bullet list",
+  },
+];
+
+const REFINE_ACTIONS = [
+  { label: "Shorter", instruction: "Make it shorter and more concise" },
+  { label: "Longer", instruction: "Make it more detailed and elaborate" },
+  {
+    label: "More formal",
+    instruction: "Make the tone more formal and professional",
+  },
+  {
+    label: "Add bullets",
+    instruction: "Convert the main points into bullet lists",
+  },
+];
+
+function AIPopover({
+  instance,
+  onClose,
+  onApply,
+}: {
+  instance: ComposerInstance;
+  onClose: () => void;
+  onApply: (html: string, subject: string) => void;
+}) {
+  const { mutateAsync } = useSuggestEmail();
+
+  const draftHtml = instance.html || "";
+  const hasContent = !!stripHtml(draftHtml).trim();
+  const recipientName =
+    instance.to?.[0]?.name ||
+    (instance.to?.[0]?.email ? instance.to[0].email.split("@")[0] : undefined);
+
+  const [phase, setPhase] = useState<AIPhase>("idle");
+  const [topic, setTopic] = useState("");
+  const [tone, setTone] = useState<SuggestEmailTone | undefined>(undefined);
+  const [toneOpen, setToneOpen] = useState(false);
+  const [preview, setPreview] = useState<{
+    html: string;
+    subject: string;
+  } | null>(null);
+  const [refineInput, setRefineInput] = useState("");
+  const [isWorking, setIsWorking] = useState(false);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const refineRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 60);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  const runGenerate = async (params: Parameters<typeof mutateAsync>[0]) => {
+    setIsWorking(true);
+    setPhase("loading");
+    setToneOpen(false);
+    try {
+      const result = await mutateAsync(params);
+      setPreview({ html: result.body, subject: result.subject });
+      setPhase("result");
+      setRefineInput("");
+    } catch {
+      toast.error("Failed to generate — please try again");
+      setPhase(preview ? "result" : "idle");
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const handleGenerate = () => {
+    if (isWorking) return;
+    if (hasContent) {
+      runGenerate({
+        mode: "rewrite",
+        draft: draftHtml,
+        refineInstruction: topic.trim() || undefined,
+        tone,
+        recipientName,
+        subjectHint: instance.subject || undefined,
+      });
+    } else {
+      if (!topic.trim()) return;
+      runGenerate({
+        mode: "compose",
+        topic: topic.trim(),
+        tone,
+        recipientName,
+        subjectHint: instance.subject || undefined,
+      });
+    }
+  };
+
+  const handleQuickAction = (instruction: string) => {
+    const draft = preview?.html ?? draftHtml;
+    if (!draft) return;
+    runGenerate({
+      mode: "refine",
+      draft,
+      refineInstruction: instruction,
+      tone,
+      subjectHint: preview?.subject ?? instance.subject ?? undefined,
+    });
+  };
+
+  const handleRefine = (instruction?: string) => {
+    const instr = instruction ?? refineInput.trim();
+    if (!instr || isWorking || !preview) return;
+    runGenerate({
+      mode: "refine",
+      draft: preview.html,
+      refineInstruction: instr,
+      tone,
+      subjectHint: preview.subject || instance.subject || undefined,
+    });
+  };
+
+  const toneLabel = AI_TONES.find((t) => t.value === tone)?.label ?? "Tone";
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "absolute z-50 bottom-full left-2 right-2 mx-auto max-w-[300px] mb-2",
+        "bg-white dark:bg-[#1f1f1f]",
+        "rounded-xl overflow-visible",
+        "border border-black/[0.08] dark:border-white/[0.09]",
+        "shadow-[0_8px_30px_rgba(0,0,0,0.1),0_2px_8px_rgba(0,0,0,0.05)]",
+        "dark:shadow-[0_8px_30px_rgba(0,0,0,0.45)]",
+      )}
+    >
+      {/* ─── LOADING ──────────────────────────────────────────────────────── */}
+      {phase === "loading" && (
+        <div className="px-4 py-4 rounded-xl">
+          <div className="space-y-2">
+            {[78, 55, 68, 40].map((w, i) => (
+              <div
+                key={i}
+                className="h-[7px] rounded-full bg-gray-100 dark:bg-white/[0.07] animate-pulse"
+                style={{ width: `${w}%`, animationDelay: `${i * 70}ms` }}
+              />
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] text-gray-300 dark:text-white/20 flex items-center gap-1.5">
+            <IconLoader2 size={11} className="animate-spin" /> Writing…
+          </p>
+        </div>
+      )}
+
+      {/* ─── RESULT ───────────────────────────────────────────────────────── */}
+      {phase === "result" && preview && (
+        <>
+          {/* Preview */}
+          <div
+            className={cn(
+              "px-4 pt-3.5 pb-3 max-h-[140px] overflow-y-auto",
+              "border-b border-black/[0.05] dark:border-white/[0.06]",
+              "text-[12.5px] leading-relaxed text-gray-700 dark:text-white/70",
+              "[&_p]:mb-1.5 [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:mb-0.5",
+            )}
+            dangerouslySetInnerHTML={{ __html: preview.html }}
+          />
+
+          {/* Replace / Start over */}
+          <div className="flex items-center gap-1.5 px-3 py-2 border-b border-black/[0.05] dark:border-white/[0.06]">
+            <button
+              onClick={() => onApply(preview.html, preview.subject)}
+              className={cn(
+                "flex items-center gap-1.5 h-7 px-3 rounded-lg text-[12px] font-medium transition-colors",
+                "bg-gray-900 dark:bg-white text-white dark:text-gray-900",
+                "hover:bg-gray-700 dark:hover:bg-gray-200",
+              )}
+            >
+              <IconCheck size={12} /> Replace
+            </button>
+            <button
+              onClick={() => {
+                setPreview(null);
+                setPhase("idle");
+                setTopic("");
+              }}
+              className="flex items-center gap-1 h-7 px-2.5 rounded-lg text-[12px] text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+            >
+              <IconArrowLeft size={12} /> Start over
+            </button>
+          </div>
+
+          {/* Refine list */}
+          <div className="py-1">
+            {REFINE_ACTIONS.map((chip) => (
+              <button
+                key={chip.label}
+                onClick={() => handleRefine(chip.instruction)}
+                disabled={isWorking}
+                className={cn(
+                  "w-full text-left px-4 py-1.5 text-[12.5px] transition-colors",
+                  "text-gray-600 dark:text-white/55",
+                  "hover:bg-gray-50 dark:hover:bg-white/[0.05] hover:text-gray-900 dark:hover:text-white/80",
+                  "disabled:opacity-40 disabled:cursor-not-allowed",
+                )}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom refine */}
+          <div className="flex items-center gap-2 px-3 py-2 border-t border-black/[0.04] dark:border-white/[0.05]">
+            <input
+              ref={refineRef}
+              value={refineInput}
+              onChange={(e) => setRefineInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleRefine();
+                }
+              }}
+              placeholder="Or describe a change…"
+              className="flex-1 text-[12px] outline-none bg-transparent text-gray-700 dark:text-white/70 placeholder:text-gray-300 dark:placeholder:text-white/20"
+            />
+            {refineInput.trim() && (
+              <button
+                onClick={() => handleRefine()}
+                disabled={isWorking}
+                className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-200 disabled:opacity-30 transition-colors"
+              >
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                  <path
+                    d="M6 10V2M2 5.5L6 2L10 5.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ─── IDLE: single-line input row ──────────────────────────────────── */}
+      {phase === "idle" && (
+        <>
+          <div className="flex items-center gap-1.5 px-3 py-2.5">
+            <IconSparkles
+              size={13}
+              className="shrink-0 text-gray-300 dark:text-white/22"
+            />
+
+            {/* Input — compose topic or rewrite instruction */}
+            <input
+              ref={inputRef}
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleGenerate();
+                }
+                if (e.key === "Escape") onClose();
+              }}
+              placeholder={
+                hasContent
+                  ? "Rewrite draft… (optional instructions)"
+                  : "What's this email about?"
+              }
+              className="flex-1 min-w-0 text-[13px] outline-none bg-transparent text-gray-800 dark:text-white/85 placeholder:text-gray-300 dark:placeholder:text-white/22"
+            />
+
+            {/* Tone dropdown */}
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setToneOpen((v) => !v)}
+                className={cn(
+                  "flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium transition-colors",
+                  tone
+                    ? "bg-gray-100 dark:bg-white/[0.1] text-gray-700 dark:text-white/70"
+                    : "text-gray-400 dark:text-white/28 hover:bg-gray-100 dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/55",
+                )}
+              >
+                {toneLabel}
+                <svg
+                  width="8"
+                  height="8"
+                  viewBox="0 0 8 8"
+                  className={cn(
+                    "transition-transform duration-150 text-current",
+                    toneOpen && "rotate-180",
+                  )}
+                >
+                  <path
+                    d="M1 2.5L4 5.5L7 2.5"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </svg>
+              </button>
+
+              {toneOpen && (
+                <div
+                  className={cn(
+                    "absolute z-[60] bottom-[calc(100%+4px)] right-0",
+                    "bg-white dark:bg-[#282828]",
+                    "rounded-lg overflow-hidden",
+                    "border border-black/[0.08] dark:border-white/[0.09]",
+                    "shadow-[0_4px_16px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)]",
+                    "py-1 min-w-[110px]",
+                  )}
+                >
+                  {tone && (
+                    <button
+                      onClick={() => {
+                        setTone(undefined);
+                        setToneOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-[12px] text-gray-400 dark:text-white/30 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
+                    >
+                      No tone
+                    </button>
+                  )}
+                  {AI_TONES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={() => {
+                        setTone(value);
+                        setToneOpen(false);
+                      }}
+                      className={cn(
+                        "w-full text-left px-3 py-1.5 text-[12.5px] transition-colors flex items-center justify-between",
+                        tone === value
+                          ? "text-gray-900 dark:text-white font-medium bg-gray-50 dark:bg-white/[0.06]"
+                          : "text-gray-600 dark:text-white/60 hover:bg-gray-50 dark:hover:bg-white/[0.05]",
+                      )}
+                    >
+                      {label}
+                      {tone === value && (
+                        <IconCheck
+                          size={11}
+                          className="shrink-0 text-gray-400 dark:text-white/40"
+                        />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Send / generate arrow button */}
+            <button
+              onClick={handleGenerate}
+              disabled={!hasContent && !topic.trim()}
+              className={cn(
+                "shrink-0 w-6 h-6 flex items-center justify-center rounded-md transition-colors",
+                "bg-gray-900 dark:bg-white text-white dark:text-gray-900",
+                "hover:bg-gray-700 dark:hover:bg-gray-200",
+                "disabled:opacity-25 disabled:cursor-not-allowed",
+              )}
+            >
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M6 10V2M2 5.5L6 2L10 5.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Quick action chips — only visible when draft has content */}
+          {hasContent && (
+            <div className="px-3 pb-2.5 border-t border-black/[0.04] dark:border-white/[0.05] pt-2 flex flex-wrap gap-1">
+              {QUICK_ACTIONS.map((action) => (
+                <button
+                  key={action.label}
+                  onClick={() => handleQuickAction(action.instruction)}
+                  disabled={isWorking}
+                  className={cn(
+                    "h-[22px] px-2 rounded-md text-[11px] font-medium transition-colors",
+                    "text-gray-500 dark:text-white/38",
+                    "hover:bg-gray-100 dark:hover:bg-white/[0.07] hover:text-gray-800 dark:hover:text-white/70",
+                    "disabled:opacity-40 disabled:cursor-not-allowed",
+                  )}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

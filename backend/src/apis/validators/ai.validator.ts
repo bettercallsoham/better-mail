@@ -115,8 +115,8 @@ export const validateSuggestEmail = [
   body("mode")
     .exists()
     .withMessage("mode is required")
-    .isIn(["compose", "rewrite"])
-    .withMessage("mode must be one of: compose, rewrite"),
+    .isIn(["compose", "rewrite", "refine"])
+    .withMessage("mode must be one of: compose, rewrite, refine"),
 
   body("topic")
     .if(body("mode").equals("compose"))
@@ -130,20 +130,35 @@ export const validateSuggestEmail = [
     .withMessage("topic must be at most 1000 characters"),
 
   body("draft")
-    .if(body("mode").equals("rewrite"))
+    .if((req: import("express").Request) =>
+      ["rewrite", "refine"].includes(req.body?.mode),
+    )
     .exists()
-    .withMessage("draft is required when mode is rewrite")
+    .withMessage("draft is required when mode is rewrite or refine")
     .isString()
     .withMessage("draft must be a string")
     .notEmpty()
     .withMessage("draft cannot be empty")
-    .isLength({ max: 5000 })
-    .withMessage("draft must be at most 5000 characters"),
+    .isLength({ max: 10000 })
+    .withMessage("draft must be at most 10000 characters"),
+
+  body("refineInstruction")
+    .if(body("mode").equals("refine"))
+    .exists()
+    .withMessage("refineInstruction is required when mode is refine")
+    .isString()
+    .withMessage("refineInstruction must be a string")
+    .notEmpty()
+    .withMessage("refineInstruction cannot be empty")
+    .isLength({ max: 500 })
+    .withMessage("refineInstruction must be at most 500 characters"),
 
   body("tone")
     .optional()
     .isIn(["formal", "friendly", "concise", "professional", "empathetic"])
-    .withMessage("tone must be one of: formal, friendly, concise, professional, empathetic"),
+    .withMessage(
+      "tone must be one of: formal, friendly, concise, professional, empathetic",
+    ),
 
   body("recipientName")
     .optional()

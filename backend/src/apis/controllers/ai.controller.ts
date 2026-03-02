@@ -272,7 +272,15 @@ export const suggestEmail = asyncHandler(
       });
     }
 
-    const { mode, topic, draft, tone, recipientName, subjectHint } = req.body;
+    const {
+      mode,
+      topic,
+      draft,
+      tone,
+      recipientName,
+      subjectHint,
+      refineInstruction,
+    } = req.body;
 
     try {
       logger.info(`Suggest email (${mode}) for user ${userId}`);
@@ -284,6 +292,7 @@ export const suggestEmail = asyncHandler(
         tone,
         recipientName,
         subjectHint,
+        refineInstruction,
       });
 
       return res.json({

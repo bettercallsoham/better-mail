@@ -41,7 +41,7 @@ export interface SuggestReplyResponse {
 // Email compose / rewrite
 // ---------------------------------------------------------------------------
 
-export type SuggestEmailMode = "compose" | "rewrite";
+export type SuggestEmailMode = "compose" | "rewrite" | "refine";
 export type SuggestEmailTone =
   | "formal"
   | "friendly"
@@ -56,6 +56,8 @@ export interface SuggestEmailParams {
   tone?: SuggestEmailTone;
   recipientName?: string;
   subjectHint?: string;
+  /** refine mode: specific instruction to apply to the current draft */
+  refineInstruction?: string;
 }
 
 export interface SuggestEmailResponse {

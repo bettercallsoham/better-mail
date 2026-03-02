@@ -32,6 +32,7 @@ export function createApp() {
       "http://localhost:3000",
       "https://staging.abhisharma.app",
       "https://abhisharma.app",
+      "https://mail.abhisharma.app",
     ],
     credentials: true,
   };

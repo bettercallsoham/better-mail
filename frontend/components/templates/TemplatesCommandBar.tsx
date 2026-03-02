@@ -10,6 +10,8 @@ import {
   IconAlignRight,
   IconBlockquote,
   IconBold,
+  IconCheck,
+  IconChevronDown,
   IconH1,
   IconH2,
   IconItalic,
@@ -21,6 +23,7 @@ import {
   IconSparkles,
   IconTrash,
   IconUnderline,
+  IconWand,
   IconX,
 } from "@tabler/icons-react";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -424,6 +427,314 @@ function detectVariables(html: string): TemplateVariable[] {
   return out;
 }
 
+// ─── Template AI Panel ─────────────────────────────────────────────────────────
+// Inline panel shown below the body editor — Canva-style minimal design.
+// phases: prompt → loading → result (use / refine)
+
+type TAIPhase = "prompt" | "loading" | "result";
+
+const T_REFINE_CHIPS = [
+  { label: "Make it shorter", instruction: "Make it shorter and more concise" },
+  {
+    label: "Make it longer",
+    instruction: "Make it more detailed and elaborate",
+  },
+  {
+    label: "More formal",
+    instruction: "Make the tone more formal and professional",
+  },
+  {
+    label: "Add bullet points",
+    instruction: "Convert the main points into bullet lists",
+  },
+  {
+    label: "Add variable {name}",
+    instruction: "Add a {{name}} placeholder for personalisation",
+  },
+];
+
+const T_TONES: Array<{ value: SuggestEmailTone; label: string }> = [
+  { value: "formal", label: "Formal" },
+  { value: "friendly", label: "Friendly" },
+  { value: "concise", label: "Concise" },
+  { value: "professional", label: "Professional" },
+  { value: "empathetic", label: "Empathetic" },
+];
+
+function TemplateAIPanel({
+  subject,
+  currentBody,
+  onGenerated,
+  onClose,
+}: {
+  subject: string;
+  currentBody: string;
+  onGenerated: (html: string, subject: string) => void;
+  onClose: () => void;
+}) {
+  const { mutateAsync } = useSuggestEmail();
+  const hasExistingBody = !!currentBody.replace(/<[^>]*>/g, "").trim();
+
+  const [phase, setPhase] = useState<TAIPhase>(
+    hasExistingBody ? "result" : "prompt",
+  );
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [topic, setTopic] = useState("");
+  const [tone, setTone] = useState<SuggestEmailTone | undefined>(undefined);
+  const [preview, setPreview] = useState<{
+    html: string;
+    subject: string;
+  } | null>(hasExistingBody ? { html: currentBody, subject } : null);
+  const [refineInput, setRefineInput] = useState("");
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const refineRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (phase === "prompt") setTimeout(() => inputRef.current?.focus(), 50);
+  }, [phase]);
+
+  const runGenerate = async (params: Parameters<typeof mutateAsync>[0]) => {
+    setIsGenerating(true);
+    setPhase("loading");
+    try {
+      const result = await mutateAsync(params);
+      setPreview({ html: result.body, subject: result.subject });
+      setPhase("result");
+      setRefineInput("");
+    } catch {
+      toast.error("Failed to generate — please try again");
+      setPhase(preview ? "result" : "prompt");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGenerate = () => {
+    if (!topic.trim() || isGenerating) return;
+    runGenerate({
+      mode: "compose",
+      topic: topic.trim(),
+      tone,
+      subjectHint: subject || undefined,
+    });
+  };
+
+  const handleRefine = (instruction?: string) => {
+    const instr = instruction ?? refineInput.trim();
+    if (!instr || isGenerating || !preview) return;
+    runGenerate({
+      mode: "refine",
+      draft: preview.html,
+      refineInstruction: instr,
+      tone,
+      subjectHint: preview.subject || subject || undefined,
+    });
+  };
+
+  const handleUse = () => {
+    if (!preview) return;
+    onGenerated(preview.html, preview.subject);
+    onClose();
+  };
+
+  return (
+    <div
+      className={cn(
+        "mt-2 rounded-xl overflow-hidden",
+        "bg-white dark:bg-[#1c1c1c]",
+        "border border-black/[0.07] dark:border-white/[0.08]",
+        "shadow-[0_4px_16px_rgba(0,0,0,0.07)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]",
+      )}
+    >
+      {/* ── PROMPT ──────────────────────────────────────────────────────── */}
+      {phase === "prompt" && (
+        <>
+          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-black/[0.05] dark:border-white/[0.06]">
+            <IconSparkles
+              size={13}
+              className="text-gray-300 dark:text-white/25 shrink-0"
+            />
+            <input
+              ref={inputRef}
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleGenerate();
+                }
+                if (e.key === "Escape") onClose();
+              }}
+              placeholder="What should this template cover?"
+              className="flex-1 text-[13px] outline-none bg-transparent text-gray-800 dark:text-white/85 placeholder:text-gray-300 dark:placeholder:text-white/22"
+            />
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={!topic.trim()}
+              className={cn(
+                "shrink-0 h-6 px-2.5 rounded-md text-[11.5px] font-medium transition-colors",
+                "bg-gray-900 dark:bg-white text-white dark:text-gray-900",
+                "hover:bg-gray-700 dark:hover:bg-gray-200",
+                "disabled:opacity-30 disabled:cursor-not-allowed",
+              )}
+            >
+              Generate
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-5 h-5 flex items-center justify-center shrink-0 text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/45 transition-colors"
+            >
+              <IconX size={12} />
+            </button>
+          </div>
+          <div className="px-3 py-2.5">
+            <p className="text-[10.5px] text-gray-400 dark:text-white/25 mb-1.5 font-medium">
+              Tone
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {T_TONES.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTone(tone === value ? undefined : value)}
+                  className={cn(
+                    "h-6 px-2.5 rounded-md text-[11px] font-medium transition-colors",
+                    tone === value
+                      ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                      : "text-gray-400 dark:text-white/35 hover:bg-gray-100 dark:hover:bg-white/[0.07] hover:text-gray-700 dark:hover:text-white/55",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── LOADING ─────────────────────────────────────────────────────── */}
+      {phase === "loading" && (
+        <div className="px-4 py-5">
+          <div className="space-y-2.5">
+            {[82, 63, 71, 44].map((w, i) => (
+              <div
+                key={i}
+                className="h-2 rounded-full bg-gray-100 dark:bg-white/[0.06] animate-pulse"
+                style={{ width: `${w}%`, animationDelay: `${i * 80}ms` }}
+              />
+            ))}
+          </div>
+          <p className="text-[11px] text-gray-300 dark:text-white/20 mt-4 flex items-center gap-1.5">
+            <IconLoader2 size={11} className="animate-spin" /> Writing…
+          </p>
+        </div>
+      )}
+
+      {/* ── RESULT ──────────────────────────────────────────────────────── */}
+      {phase === "result" && preview && (
+        <>
+          {/* Preview */}
+          <div
+            className={cn(
+              "px-4 py-3 max-h-[160px] overflow-y-auto border-b border-black/[0.05] dark:border-white/[0.06]",
+              "text-[12.5px] text-gray-700 dark:text-white/70 leading-relaxed",
+              "[&_p]:mb-1.5 [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:mb-0.5",
+            )}
+            dangerouslySetInnerHTML={{ __html: preview.html }}
+          />
+          {/* Action row */}
+          <div className="flex items-center gap-1.5 px-3 py-2 border-b border-black/[0.05] dark:border-white/[0.06]">
+            <button
+              type="button"
+              onClick={handleUse}
+              className={cn(
+                "flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium transition-colors",
+                "bg-gray-900 dark:bg-white text-white dark:text-gray-900",
+                "hover:bg-gray-700 dark:hover:bg-gray-200",
+              )}
+            >
+              <IconCheck size={12} /> Use this
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPreview(null);
+                setPhase("prompt");
+              }}
+              className="flex items-center gap-1 h-7 px-2.5 rounded-md text-[12px] text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+            >
+              <IconArrowLeft size={12} /> Start over
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="ml-auto w-5 h-5 flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/45 transition-colors"
+            >
+              <IconX size={12} />
+            </button>
+          </div>
+          {/* Refine chips */}
+          <div className="px-3 py-2.5">
+            <p className="text-[10.5px] text-gray-400 dark:text-white/25 mb-1.5 font-medium">
+              Refine
+            </p>
+            <div className="space-y-px">
+              {T_REFINE_CHIPS.map((chip) => (
+                <button
+                  key={chip.label}
+                  type="button"
+                  onClick={() => handleRefine(chip.instruction)}
+                  disabled={isGenerating}
+                  className={cn(
+                    "w-full text-left px-2 py-1.5 rounded-md text-[12.5px] transition-colors",
+                    "text-gray-600 dark:text-white/55",
+                    "hover:bg-gray-100 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white/80",
+                    "disabled:opacity-40 disabled:cursor-not-allowed",
+                  )}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-black/[0.04] dark:border-white/[0.05]">
+              <input
+                ref={refineRef}
+                value={refineInput}
+                onChange={(e) => setRefineInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleRefine();
+                  }
+                }}
+                placeholder="Custom instruction…"
+                className="flex-1 text-[12px] outline-none bg-transparent text-gray-700 dark:text-white/70 placeholder:text-gray-300 dark:placeholder:text-white/20"
+              />
+              {refineInput.trim() && (
+                <button
+                  type="button"
+                  onClick={() => handleRefine()}
+                  disabled={isGenerating}
+                  className={cn(
+                    "shrink-0 h-6 px-2.5 rounded-md text-[11px] font-medium transition-colors",
+                    "bg-gray-900 dark:bg-white text-white dark:text-gray-900",
+                    "hover:bg-gray-700 dark:hover:bg-gray-200 disabled:opacity-30",
+                  )}
+                >
+                  Apply
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TemplateForm({
   template,
   onBack,
@@ -446,11 +757,7 @@ function TemplateForm({
   const detectedVars = detectVariables(body);
 
   // ── AI generate state ─────────────────────────────────────────────────────
-  const suggestEmail = useSuggestEmail();
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiTopic, setAiTopic] = useState("");
-  const [aiTone, setAiTone] = useState<SuggestEmailTone | undefined>(undefined);
-  const aiTopicRef = useRef<HTMLTextAreaElement>(null);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -526,140 +833,29 @@ function TemplateForm({
         </div>
         <BodyEditor value={body} onChange={setBody} />
 
-        {/* AI generate — toggle button or inline expand */}
-        {!aiOpen ? (
+        {/* AI generate — toggle button or inline panel */}
+        {!aiPanelOpen ? (
           <button
             type="button"
-            onClick={() => {
-              setAiTopic(name);
-              setAiOpen(true);
-              setTimeout(() => aiTopicRef.current?.focus(), 50);
-            }}
-            className="flex items-center gap-1.5 mt-2 text-[12px] text-gray-400 dark:text-white/30 hover:text-violet-500 dark:hover:text-violet-400 transition-colors"
+            onClick={() => setAiPanelOpen(true)}
+            className="flex items-center gap-1.5 mt-2 text-[12px] text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55 transition-colors"
           >
             <IconSparkles size={12} />
-            Generate with AI
+            {body.replace(/<[^>]*>/g, "").trim()
+              ? "Refine / Rewrite with AI"
+              : "Generate with AI"}
           </button>
         ) : (
-          <div
-            className={cn(
-              "mt-2 rounded-xl overflow-hidden",
-              "bg-white dark:bg-[#1e1e1e]",
-              "border border-black/[0.07] dark:border-white/[0.08]",
-              "shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.3)]",
-            )}
-          >
-            {/* Violet accent bar */}
-            <div className="h-[3px] bg-gradient-to-r from-violet-500 via-violet-400 to-indigo-400" />
-
-            <div className="p-3">
-              {/* Header */}
-              <div className="flex items-center gap-2 mb-2.5">
-                <div className="w-5 h-5 rounded-md bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center shrink-0">
-                  <IconSparkles
-                    size={11}
-                    className="text-violet-500 dark:text-violet-400"
-                  />
-                </div>
-                <p className="text-[12px] font-semibold text-gray-700 dark:text-white/70">
-                  Generate with AI
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setAiOpen(false)}
-                  className="ml-auto w-5 h-5 flex items-center justify-center rounded-md text-gray-300 dark:text-white/25 hover:text-gray-500 dark:hover:text-white/45 transition-colors"
-                >
-                  <IconX size={12} />
-                </button>
-              </div>
-
-              <textarea
-                ref={aiTopicRef}
-                value={aiTopic}
-                onChange={(e) => setAiTopic(e.target.value)}
-                placeholder="What should this template cover?"
-                rows={2}
-                className={cn(
-                  "w-full px-2.5 py-2 rounded-lg text-[12.5px] outline-none mb-2.5 resize-none",
-                  "bg-gray-50 dark:bg-white/[0.04]",
-                  "border border-black/[0.08] dark:border-white/[0.1]",
-                  "text-gray-800 dark:text-white/80",
-                  "placeholder:text-gray-300 dark:placeholder:text-white/25",
-                  "focus:border-violet-300 dark:focus:border-violet-700/50",
-                  "transition-colors",
-                )}
-              />
-
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-white/25 mb-1.5">
-                Tone
-              </p>
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {(
-                  [
-                    "formal",
-                    "friendly",
-                    "concise",
-                    "professional",
-                    "empathetic",
-                  ] as SuggestEmailTone[]
-                ).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setAiTone(aiTone === t ? undefined : t)}
-                    className={cn(
-                      "h-6 px-2.5 rounded-lg text-[11.5px] font-medium transition-all capitalize",
-                      aiTone === t
-                        ? "bg-violet-500 text-white shadow-sm"
-                        : "bg-black/[0.04] dark:bg-white/[0.06] text-gray-500 dark:text-white/40 hover:bg-black/[0.07] dark:hover:bg-white/[0.1]",
-                    )}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!aiTopic.trim() || suggestEmail.isPending) return;
-                    try {
-                      const result = await suggestEmail.mutateAsync({
-                        mode: "compose",
-                        topic: aiTopic.trim(),
-                        tone: aiTone,
-                        subjectHint: subject || name || undefined,
-                      });
-                      setBody(result.body);
-                      if (!subject.trim() && result.subject)
-                        setSubject(result.subject);
-                      setAiOpen(false);
-                    } catch {
-                      toast.error("Failed to generate template");
-                    }
-                  }}
-                  disabled={!aiTopic.trim() || suggestEmail.isPending}
-                  className={cn(
-                    "h-7 px-3.5 rounded-lg text-[12px] font-semibold transition-all flex items-center gap-1.5",
-                    "bg-violet-500 hover:bg-violet-600 text-white shadow-sm",
-                    "disabled:opacity-40 disabled:cursor-not-allowed",
-                  )}
-                >
-                  {suggestEmail.isPending ? (
-                    <>
-                      <IconLoader2 size={12} className="animate-spin" />{" "}
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <IconSparkles size={12} /> Generate
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
+          <TemplateAIPanel
+            subject={subject}
+            currentBody={body}
+            onGenerated={(html, generatedSubject) => {
+              setBody(html);
+              if (!subject.trim() && generatedSubject)
+                setSubject(generatedSubject);
+            }}
+            onClose={() => setAiPanelOpen(false)}
+          />
         )}
       </div>
 
