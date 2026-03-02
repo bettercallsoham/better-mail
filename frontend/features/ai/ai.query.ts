@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { aiService } from "./ai.api";
 import { useUIStore } from "@/lib/store/ui.store";
+import { SuggestEmailParams, SuggestReplyParams } from "./ai.type";
 
 export const aiKeys = {
   all: ["ai"] as const,
@@ -18,5 +19,17 @@ export function useThreadSummary(threadId: string, fallbackEmail: string) {
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     retry: 1,
+  });
+}
+
+export function useReplySuggestions() {
+  return useMutation({
+    mutationFn: (params: SuggestReplyParams) => aiService.suggestReply(params),
+  });
+}
+
+export function useSuggestEmail() {
+  return useMutation({
+    mutationFn: (params: SuggestEmailParams) => aiService.suggestEmail(params),
   });
 }
