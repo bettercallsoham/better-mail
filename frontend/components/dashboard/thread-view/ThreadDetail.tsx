@@ -64,6 +64,18 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
   const subject = emails[0]?.subject || "(no subject)";
   const emailAddr = selectedEmail ?? emails[0]?.emailAddress ?? "";
   const lastEmail = emails[emails.length - 1];
+
+  // For the reply target: use the last email NOT sent by the current user,
+  // so the "To:" field in the composer is always pre-populated with the
+  // other person's address (not our own).
+  const lastIncomingEmail = useMemo(
+    () =>
+      emails.length > 0
+        ? ([...emails].reverse().find((e) => e.from.email !== emailAddr) ??
+          lastEmail)
+        : lastEmail,
+    [emails, emailAddr, lastEmail],
+  );
   const anyStarred = useMemo(() => emails.some((e) => e.isStarred), [emails]);
   const isArchived = emails[0]?.isArchived ?? false;
   const isRead = useMemo(
@@ -313,15 +325,15 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
       {!panelInstance && (
         <QuickReply
           userEmail={emailAddr}
-          lastEmail={lastEmail}
+          lastEmail={lastIncomingEmail}
           variant="float"
           shell="panel"
         >
-          {lastEmail && (
+          {lastIncomingEmail && (
             <SmartReplies
               threadId={threadId}
               emailAddress={emailAddr}
-              lastEmail={lastEmail}
+              lastEmail={lastIncomingEmail}
               shell="panel"
               variant="rows"
             />

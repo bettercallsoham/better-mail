@@ -341,6 +341,7 @@ function VelocityRow({
               : "text-gray-400 dark:text-white/32",
             (isFocused || undefined) && "opacity-0",
             !isFocused && "group-hover:opacity-0",
+            "max-md:hidden",
           )}
         >
           {thread.isStarred && (
@@ -355,6 +356,7 @@ function VelocityRow({
           className={cn(
             "absolute right-0 transition-opacity duration-100",
             isFocused ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+            "max-md:opacity-100",
           )}
         >
           <ActionTray
@@ -441,6 +443,7 @@ function FlowRow({
               className={cn(
                 "flex items-center gap-1.5 transition-opacity duration-100",
                 isFocused ? "opacity-0" : "group-hover:opacity-0",
+                "max-md:hidden",
               )}
             >
               {labels.length > 0 && (
@@ -472,6 +475,7 @@ function FlowRow({
               className={cn(
                 "absolute right-0 transition-opacity duration-100",
                 isFocused ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                "max-md:opacity-100",
               )}
             >
               <ActionTray

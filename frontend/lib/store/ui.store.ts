@@ -21,6 +21,7 @@ interface LayoutSlice {
   sidebarCollapsed: boolean;
   shortcutsModalOpen: boolean;
   templatesBarOpen: boolean;
+  mailSearchOpen: boolean;
   /** Per-mode panel split percentage (thread list width %) */
   splitPct: Record<string, number>;
   setLayoutMode: (mode: LayoutMode) => void;
@@ -29,6 +30,7 @@ interface LayoutSlice {
   setSplitPct: (mode: string, pct: number) => void;
   setShortcutsModalOpen: (open: boolean) => void;
   setTemplatesBarOpen: (open: boolean) => void;
+  setMailSearchOpen: (open: boolean) => void;
 }
 
 interface MailboxSlice {
@@ -97,6 +99,7 @@ export const useUIStore = create<UIState>()(
       sidebarCollapsed: false,
       shortcutsModalOpen: false,
       templatesBarOpen: false,
+      mailSearchOpen: false,
       splitPct: { ...DEFAULT_SPLIT },
 
       setLayoutMode: (mode) =>
@@ -112,6 +115,7 @@ export const useUIStore = create<UIState>()(
 
       setShortcutsModalOpen: (open) => set({ shortcutsModalOpen: open }),
       setTemplatesBarOpen: (open) => set({ templatesBarOpen: open }),
+      setMailSearchOpen: (open) => set({ mailSearchOpen: open }),
 
       // ── Mailbox ─────────────────────────────────────────────────────────────
       selectedEmailAddress: null,

@@ -30,6 +30,7 @@ const SECTIONS = [
     title: "Compose",
     rows: [
       { keys: ["N"], label: "New email" },
+      { keys: ["⌘", "."], label: "Ask AI" },
       { keys: ["⌘", "↵"], label: "Send" },
       { keys: ["⌘", "⇧", "D"], label: "Discard draft" },
     ],

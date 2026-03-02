@@ -5,6 +5,7 @@ import { Sidebar, SidebarBody } from "@/components/ui/sidebar";
 import { useUIStore } from "@/lib/store/ui.store";
 import { useFolders } from "@/features/mailbox/mailbox.query";
 import { IconMenu2, IconX, IconEdit, IconTemplate } from "@tabler/icons-react";
+import { Search } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
@@ -195,6 +196,7 @@ export function DashboardSidebar() {
   const setActiveFolder    = useUIStore((s) => s.setActiveFolder);
   const selectedEmail      = useUIStore((s) => s.selectedEmailAddress);
   const setTemplatesBarOpen = useUIStore((s) => s.setTemplatesBarOpen);
+  const setMailSearchOpen  = useUIStore((s) => s.setMailSearchOpen);
 
   const [isHovering, setIsHovering] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -214,13 +216,25 @@ export function DashboardSidebar() {
   return (
     <>
       {/* ── MOBILE TOPBAR ── */}
-      <div className="md:hidden flex w-full items-center justify-between px-4 h-14 shrink-0 bg-app-sidebar-bg border-b border-app-sidebar-border">
+      <div className="md:hidden flex w-full items-center gap-2 px-3 h-14 shrink-0 bg-app-sidebar-bg border-b border-app-sidebar-border">
         {/* Hamburger — opens drawer */}
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-1 -ml-1 rounded-md text-neutral-600 dark:text-neutral-300 hover:bg-app-sidebar-hover transition-colors"
+          className="p-2 -ml-1 shrink-0 rounded-xl text-neutral-600 dark:text-neutral-300 hover:bg-app-sidebar-hover transition-colors"
         >
           <IconMenu2 size={20} />
+        </button>
+
+        {/* Inline search bar — opens search modal */}
+        <button
+          onClick={() => setMailSearchOpen(true)}
+          className="flex-1 flex items-center gap-2 h-9 px-3 rounded-xl bg-black/[0.05] dark:bg-white/[0.06] min-w-0 active:opacity-70 transition-opacity"
+          aria-label="Search mail"
+        >
+          <Search size={14} className="text-gray-400 dark:text-white/30 shrink-0" />
+          <span className="flex-1 text-[13px] text-gray-400 dark:text-white/30 text-left truncate">
+            Search mail…
+          </span>
         </button>
 
         {/* User avatar — opens user dropdown directly */}
@@ -270,16 +284,16 @@ export function DashboardSidebar() {
 
               {/* Folders */}
               <div className="flex-1 overflow-y-auto py-2">
-                {/* Compose button */}
+              {/* Compose button */}
                 <div className="px-2 pb-2">
                   <button
                     onClick={() => {
                       openCompose();
                       setMobileOpen(false);
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.97] text-white dark:text-neutral-900 text-[13px] font-semibold transition-all duration-150"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.97] text-white dark:text-neutral-900 text-[13px] font-semibold transition-all duration-150"
                   >
-                    <IconEdit size={15} />
+                    <IconEdit size={14} />
                     Compose
                   </button>
                 </div>

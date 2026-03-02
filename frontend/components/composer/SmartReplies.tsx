@@ -39,7 +39,10 @@ export function SmartReplies({
   variant = "inline",
   className,
 }: SmartRepliesProps) {
-  const { data, isPending, isError } = useReplySuggestionsQuery(threadId, emailAddress);
+  const { data, isPending, isError } = useReplySuggestionsQuery(
+    threadId,
+    emailAddress,
+  );
   const { replyTo } = useComposer();
 
   const handleSelect = useCallback(
@@ -77,40 +80,47 @@ export function SmartReplies({
 
   const suggestions = data?.suggestions.slice(0, 3) ?? [];
 
-  // ── Rows variant — flat list inside QuickReply glass card (ThreadDetail) ──
+  // ── Rows variant — horizontal chip strip inside QuickReply glass card (ThreadDetail) ──
   if (variant === "rows") {
     return (
-      <>
-        {isPending
-          ? [65, 80, 50].map((pct, i) => (
-              <div
-                key={i}
-                className="h-10 px-4 flex items-center border-b border-black/[0.04] dark:border-white/[0.04]"
-              >
+      <div className="flex items-center gap-2 px-3 py-2.5 flex-wrap">
+        <div className="flex items-center gap-1 shrink-0">
+          <IconSparkles
+            size={11}
+            className="text-violet-500 dark:text-violet-400"
+          />
+          <span className="text-[10.5px] font-medium text-gray-400 dark:text-white/28 select-none">
+            Suggest
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+          {isPending
+            ? [1, 2, 3].map((i) => (
                 <div
-                  className="h-2.5 rounded-md bg-black/[0.06] dark:bg-white/[0.06] animate-pulse"
-                  style={{ width: `${pct}%` }}
+                  key={i}
+                  className="h-7 w-28 rounded-full bg-black/5 dark:bg-white/6 animate-pulse shrink-0"
                 />
-              </div>
-            ))
-          : suggestions.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => handleSelect(s)}
-                className={cn(
-                  "w-full h-10 px-4 flex items-center text-left",
-                  "border-b border-black/[0.04] dark:border-white/[0.04] last:border-0",
-                  "hover:bg-black/[0.025] dark:hover:bg-white/[0.03]",
-                  "active:bg-black/[0.05] dark:active:bg-white/[0.05]",
-                  "transition-colors",
-                )}
-              >
-                <span className="text-[13px] text-gray-600 dark:text-white/52 truncate leading-none">
+              ))
+            : suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSelect(s)}
+                  className={cn(
+                    "flex items-center h-7 px-3 rounded-full shrink-0",
+                    "text-[12px] font-medium transition-all duration-100 active:scale-95",
+                    "bg-black/4 dark:bg-white/6",
+                    "text-gray-600 dark:text-white/55",
+                    "hover:bg-violet-50 dark:hover:bg-violet-950/30",
+                    "hover:text-violet-600 dark:hover:text-violet-400",
+                    "border border-transparent hover:border-violet-200/60 dark:hover:border-violet-700/30",
+                    "max-w-40 truncate",
+                  )}
+                >
                   {snippet(s.body)}
-                </span>
-              </button>
-            ))}
-      </>
+                </button>
+              ))}
+        </div>
+      </div>
     );
   }
 
@@ -118,7 +128,10 @@ export function SmartReplies({
   return (
     <div className={cn("flex items-center gap-3 py-2", className)}>
       <div className="flex items-center gap-1 shrink-0">
-        <IconSparkles size={11} className="text-violet-500 dark:text-violet-400" />
+        <IconSparkles
+          size={11}
+          className="text-violet-500 dark:text-violet-400"
+        />
         <span className="text-[10.5px] font-medium text-gray-400 dark:text-white/28 select-none">
           Reply as
         </span>

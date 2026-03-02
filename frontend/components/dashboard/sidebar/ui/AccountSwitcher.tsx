@@ -5,7 +5,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
@@ -120,21 +119,26 @@ function AddAccountMenuItems() {
   const { mutate: connectAccount, isPending } = useConnectAccount();
   return (
     <>
-      <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 font-semibold px-2 py-1.5">
+      <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 font-semibold px-2.5 pt-2 pb-1">
         Add account
       </DropdownMenuLabel>
       <DropdownMenuItem
         onClick={() => connectAccount("gmail")}
         disabled={isPending}
-        className="gap-2.5 py-2 cursor-pointer"
+        className="flex items-center gap-3 py-2.5 px-2.5 rounded-lg cursor-pointer"
       >
         <ProviderIconBox>
           <GoogleIcon />
         </ProviderIconBox>
-        <span className="text-[12px]">Connect Gmail</span>
+        <div className="flex flex-col">
+          <span className="text-[13px] font-medium">Gmail</span>
+          <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+            Connect Google account
+          </span>
+        </div>
         {isPending && (
           <svg
-            className="ml-auto h-3 w-3 animate-spin text-neutral-400"
+            className="ml-auto h-3.5 w-3.5 animate-spin text-neutral-400"
             viewBox="0 0 24 24"
             fill="none"
           >
@@ -157,12 +161,17 @@ function AddAccountMenuItems() {
       <DropdownMenuItem
         onClick={() => connectAccount("outlook")}
         disabled={isPending}
-        className="gap-2.5 py-2 cursor-pointer"
+        className="flex items-center gap-3 py-2.5 px-2.5 rounded-lg cursor-pointer"
       >
         <ProviderIconBox>
           <OutlookIcon />
         </ProviderIconBox>
-        <span className="text-[12px]">Connect Outlook</span>
+        <div className="flex flex-col">
+          <span className="text-[13px] font-medium">Outlook</span>
+          <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+            Connect Microsoft account
+          </span>
+        </div>
       </DropdownMenuItem>
     </>
   );
@@ -211,8 +220,8 @@ function AddAccountDropdown({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        sideOffset={6}
-        className="w-56 text-sm"
+        sideOffset={8}
+        className="w-60 z-9999 rounded-xl shadow-xl border border-black/7 dark:border-white/8 bg-white dark:bg-[#232120] p-1.5"
       >
         {overflowAccounts.length > 0 && (
           <>
@@ -223,10 +232,10 @@ function AddAccountDropdown({
               <DropdownMenuItem
                 key={account.email}
                 onClick={() => onSwitch(account.email)}
-                className="gap-2.5 py-2 cursor-pointer"
+                className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg cursor-pointer"
               >
                 <AccountAvatar email={account.email} size="sm" />
-                <span className="flex-1 truncate text-[12px]">
+                <span className="flex-1 truncate text-[12.5px]">
                   {account.email}
                 </span>
                 {account.email === activeEmail && (
@@ -238,7 +247,7 @@ function AddAccountDropdown({
                 )}
               </DropdownMenuItem>
             ))}
-            <DropdownMenuSeparator />
+            <div className="my-1 h-px bg-neutral-100 dark:bg-white/6 mx-2" />
           </>
         )}
         <AddAccountMenuItems />
@@ -267,17 +276,17 @@ function CollapsedDropdown({
         align="start"
         side="right"
         sideOffset={10}
-        className="w-56 text-sm"
+        className="w-60 z-9999 rounded-xl shadow-xl border border-black/7 dark:border-white/8 bg-white dark:bg-[#232120] p-1.5"
       >
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 font-semibold px-2 py-1.5">
+        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 font-semibold px-2.5 pt-2 pb-1">
           Accounts
         </DropdownMenuLabel>
         <DropdownMenuItem
           onClick={() => onSwitch(null)}
-          className="gap-2.5 py-2 cursor-pointer"
+          className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg cursor-pointer"
         >
           <AllAccountsChip isActive={false} size="sm" />
-          <span className="flex-1 text-[12px]">All accounts</span>
+          <span className="flex-1 text-[12.5px]">All accounts</span>
           {isAllAccounts && (
             <IconCheck
               size={13}
@@ -290,10 +299,12 @@ function CollapsedDropdown({
           <DropdownMenuItem
             key={account.email}
             onClick={() => onSwitch(account.email)}
-            className="gap-2.5 py-2 cursor-pointer"
+            className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg cursor-pointer"
           >
             <AccountAvatar email={account.email} size="sm" />
-            <span className="flex-1 truncate text-[12px]">{account.email}</span>
+            <span className="flex-1 truncate text-[12.5px]">
+              {account.email}
+            </span>
             {account.email === activeEmail && (
               <IconCheck
                 size={13}
@@ -303,7 +314,7 @@ function CollapsedDropdown({
             )}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
+        <div className="my-1 h-px bg-neutral-100 dark:bg-white/6 mx-2" />
         <AddAccountMenuItems />
       </DropdownMenuContent>
     </DropdownMenu>

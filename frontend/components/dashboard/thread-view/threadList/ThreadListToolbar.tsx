@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useUIStore } from "@/lib/store/ui.store";
 import {
@@ -262,28 +262,29 @@ function useToolbarData() {
 
 export function ThreadListToolbar() {
   const layoutMode = useUIStore((s) => s.layoutMode);
-  const [cmdOpen, setCmdOpen] = useState(false);
+  const mailSearchOpen = useUIStore((s) => s.mailSearchOpen);
+  const setMailSearchOpen = useUIStore((s) => s.setMailSearchOpen);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setCmdOpen(true);
+        setMailSearchOpen(true);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [setMailSearchOpen]);
 
   if (layoutMode === "zen") return null;
 
   return (
     <>
-      <MailSearchCommand open={cmdOpen} onOpenChange={setCmdOpen} />
+      <MailSearchCommand open={mailSearchOpen} onOpenChange={setMailSearchOpen} />
       {layoutMode === "flow" ? (
-        <FlowToolbar onOpenSearch={() => setCmdOpen(true)} />
+        <FlowToolbar onOpenSearch={() => setMailSearchOpen(true)} />
       ) : (
-        <VelocityToolbar onOpenSearch={() => setCmdOpen(true)} />
+        <VelocityToolbar onOpenSearch={() => setMailSearchOpen(true)} />
       )}
     </>
   );
@@ -318,8 +319,8 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
 
   return (
     <div className="shrink-0 flex flex-col select-none">
-      {/* Row 1 — search bar */}
-      <div className="flex items-center gap-2 px-4 h-[42px]">
+      {/* Row 1 — search bar (hidden on mobile, search lives in topbar) */}
+      <div className="hidden md:flex items-center gap-2 px-4 h-[42px]">
         <button
           onClick={onOpenSearch}
           className="flex-1 flex items-center gap-2.5 text-left group min-w-0 overflow-hidden"
@@ -430,8 +431,8 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
 
   return (
     <div className="shrink-0 flex flex-col select-none">
-      {/* Row 1 — command bar */}
-      <div className="flex items-stretch h-10 border-b border-black/[0.06] dark:border-white/[0.06]">
+      {/* Row 1 — command bar (hidden on mobile, search lives in topbar) */}
+      <div className="hidden md:flex items-stretch h-10 border-b border-black/[0.06] dark:border-white/[0.06]">
         {/* Folder tabs — hidden on mobile, visible on md+ */}
         <div className="hidden md:flex items-center gap-px px-2 overflow-x-auto no-scrollbar shrink-0">
           {allTabs.map((tab) => {
