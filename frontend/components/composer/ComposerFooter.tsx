@@ -409,10 +409,17 @@ export function ComposerFooter({
             store.update(instance.id, {
               pendingTemplate: {
                 id: 0,
+                userId: "",
                 name: "AI Draft",
                 body: html,
                 subject,
                 variables: [],
+                category: null,
+                tags: [],
+                usageCount: 0,
+                version: 1,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
               },
               aiPanelOpen: false,
             });
