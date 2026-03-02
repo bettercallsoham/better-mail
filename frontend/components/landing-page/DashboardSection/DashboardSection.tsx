@@ -1,14 +1,11 @@
-
 "use client";
 
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-
 export function DashboardSection() {
   return (
     <div className="bg-neutral-50 lg:py-12 ">
-      
       <h1 className=" bg-clip-text text-transparent bg-linear-to-b from-neutral-950 to-neutral-400 lg:block mt-6 text-center px-6 text-3xl md:text-5xl font-instrument py-2">
         Email That
         <span className="block md:inline md:ml-2 font-instrument">
@@ -28,7 +25,7 @@ export function DashboardSection() {
             <Image
               className="h-full w-full  object-contain"
               fill
-              src="/dashboardImage.png"
+              src="/flowModeDashboard.png"
               alt="Dashboard preview"
               priority
               quality={95}

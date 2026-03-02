@@ -13,8 +13,9 @@ export default function CompareDashboard() {
           </span>
         </h1>
         <h3 className="text-neutral-500 dark:text-neutral-400 font-normal tracking-tight leading-tight text-sm sm:text-base md:text-lg mt-3 sm:mt-4 font-sans text-center px-4">
-          Advanced Beautiful looking 
-          <br className="md:hidden"/>Dashboard Awaiting for you
+          Advanced Beautiful looking
+          <br className="md:hidden" />
+          Dashboard Awaiting for you
         </h3>
       </div>
 
@@ -22,7 +23,7 @@ export default function CompareDashboard() {
       <div className="w-full  max-w-[95%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[70%] px-2 sm:px-0">
         <Compare
           firstImage="/gmailDashboard.png"
-          secondImage="/dashboardImage.png"
+          secondImage="/flowModeDashboard.png"
           firstImageClassName="object-contain object-left-top w-full h-full"
           secondImageClassname="object-contain object-left-top w-full h-full"
           className="w-full h-50 md:h-150 z-10"

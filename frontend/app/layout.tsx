@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     siteName: "BetterMail",
     images: [
       {
-        url: "/dashboardImage.png",
+        url: "/flowModeDashboard.png",
         width: 1200,
         height: 630,
         alt: "BetterMail Preview",
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BetterMail - The AI-First Email Client",
     description: "A faster, smarter email experience built for modern teams.",
-    images: ["/dashboardImage.png"],
+    images: ["/flowModeDashboard.png"],
   },
 
   robots: {

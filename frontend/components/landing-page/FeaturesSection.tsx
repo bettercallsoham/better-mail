@@ -22,8 +22,20 @@ function DotPattern() {
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <pattern id="feat-dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-          <circle cx="1.5" cy="1.5" r="1.5" className="fill-neutral-300/60 dark:fill-white/10" />
+        <pattern
+          id="feat-dots"
+          x="0"
+          y="0"
+          width="20"
+          height="20"
+          patternUnits="userSpaceOnUse"
+        >
+          <circle
+            cx="1.5"
+            cy="1.5"
+            r="1.5"
+            className="fill-neutral-300/60 dark:fill-white/10"
+          />
         </pattern>
         <radialGradient id="feat-dot-fade" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="white" stopOpacity="1" />
@@ -34,7 +46,12 @@ function DotPattern() {
           <rect width="100%" height="100%" fill="url(#feat-dot-fade)" />
         </mask>
       </defs>
-      <rect width="100%" height="100%" fill="url(#feat-dots)" mask="url(#feat-dot-mask)" />
+      <rect
+        width="100%"
+        height="100%"
+        fill="url(#feat-dots)"
+        mask="url(#feat-dot-mask)"
+      />
     </svg>
   );
 }
@@ -90,7 +107,7 @@ export default function FeaturesShowCaseBettermail() {
       id: "Flow Mode",
       label: "Flow Mode",
       icon: <Gauge className="w-3.5 h-3.5" />,
-      image: "/dashboardImage.png",
+      image: "/flowModeDashboard.png",
       alt: "BetterMail default inbox view",
     },
     {
@@ -118,11 +135,8 @@ export default function FeaturesShowCaseBettermail() {
   return (
     <section className="w-full px-20 bg-neutral-00 mx-auto sm:px-6 lg:px-30 py-16 lg:py-24">
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.6fr] gap-12 lg:gap-16 items-center">
-
         {/* ── Left: Copy ─────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-6 lg:max-w-sm">
-      
-
           {/* Headline */}
           <div className="space-y-1">
             <h2 className="text-4xl sm:text-5xl  font-semibold tracking-tight leading-[1.05] text-neutral-950 dark:text-white">
@@ -135,7 +149,6 @@ export default function FeaturesShowCaseBettermail() {
 
           {/* Body */}
           <p className="text-[15px] leading-relaxed text-neutral-500 dark:text-white/45">
-         
             Switch between a calm default view or engage{" "}
             <span className="text-neutral-700 dark:text-white/70 font-medium">
               Velocity Mode
@@ -143,14 +156,11 @@ export default function FeaturesShowCaseBettermail() {
             when it's time to hit inbox zero fast.
           </p>
 
-         
-
           {/* CTA */}
           <div className="flex items-center gap-3 pt-1">
             <button className="px-5 py-2.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-[13px] font-semibold tracking-[-0.01em] hover:bg-neutral-700 dark:hover:bg-white/90 transition-colors duration-150 shadow-sm">
-             Get Started
+              Get Started
             </button>
-          
           </div>
         </div>
 
@@ -158,7 +168,11 @@ export default function FeaturesShowCaseBettermail() {
         <div className="flex flex-col gap-4">
           {/* Tab switcher — top right aligned */}
           <div className="flex justify-end">
-            <TabSwitcher tabs={tabs} activeId={activeId} onSelect={handleSelect} />
+            <TabSwitcher
+              tabs={tabs}
+              activeId={activeId}
+              onSelect={handleSelect}
+            />
           </div>
 
           {/* Image container */}
@@ -177,9 +191,17 @@ export default function FeaturesShowCaseBettermail() {
                 key={current.id}
                 custom={direction}
                 variants={{
-                  enter: (dir: number) => ({ opacity: 0, x: dir * 24, scale: 0.98 }),
+                  enter: (dir: number) => ({
+                    opacity: 0,
+                    x: dir * 24,
+                    scale: 0.98,
+                  }),
                   center: { opacity: 1, x: 0, scale: 1 },
-                  exit: (dir: number) => ({ opacity: 0, x: dir * -24, scale: 0.98 }),
+                  exit: (dir: number) => ({
+                    opacity: 0,
+                    x: dir * -24,
+                    scale: 0.98,
+                  }),
                 }}
                 initial="enter"
                 animate="center"
@@ -231,7 +253,6 @@ export default function FeaturesShowCaseBettermail() {
             </div>
           </div>
         </div>
-
       </div>
     </section>
   );
