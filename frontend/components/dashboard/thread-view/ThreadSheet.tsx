@@ -214,9 +214,6 @@ function SheetContent({ threadId }: { threadId: string }) {
             key={email.id}
             email={email}
             defaultOpen={i === emails.length - 1}
-            onReply={handleReply}
-            onReplyAll={handleReplyAll}
-            onForward={handleForward}
             onStar={() => act(email, email.isStarred ? "unstar" : "star")}
           />
         ))}

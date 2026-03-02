@@ -139,13 +139,13 @@ export function ComposerHeader({ instance }: Props) {
         <div className="flex gap-1 pr-3 shrink-0">
           {!instance.showCc && (
             <button onClick={() => store.update(id, { showCc: true })}
-              className="text-[11px] text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55 px-1.5 py-0.5 rounded transition-colors">
+              className="text-[11px] text-gray-400 cursor-pointer dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55 px-1.5 py-0.5 rounded transition-colors">
               Cc
             </button>
           )}
           {!instance.showBcc && (
             <button onClick={() => store.update(id, { showBcc: true })}
-              className="text-[11px] text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55 px-1.5 py-0.5 rounded transition-colors">
+              className="text-[11px] text-gray-400 cursor-pointer dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55 px-1.5 py-0.5 rounded transition-colors">
               Bcc
             </button>
           )}
@@ -154,7 +154,7 @@ export function ComposerHeader({ instance }: Props) {
 
       {/* Cc */}
       {instance.showCc && (
-        <div className="flex items-center">
+        <div className="flex  items-center">
           <RecipientInput
             label="Cc"
             recipients={instance.cc}
@@ -164,7 +164,7 @@ export function ComposerHeader({ instance }: Props) {
           {instance.cc.length === 0 && (
             <button
               onMouseDown={(e) => { e.preventDefault(); store.update(id, { showCc: false }); }}
-              className="shrink-0 mr-3 w-4 h-4 flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors"
+              className="shrink-0 mr-3 w-4 h-4 flex cursor-pointer items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors"
               title="Remove Cc"
             >
               <IconX size={11} />
@@ -185,7 +185,7 @@ export function ComposerHeader({ instance }: Props) {
           {instance.bcc.length === 0 && (
             <button
               onMouseDown={(e) => { e.preventDefault(); store.update(id, { showBcc: false }); }}
-              className="shrink-0 mr-3 w-4 h-4 flex items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors"
+              className="shrink-0 mr-3 w-4 h-4 flex cursor-pointer items-center justify-center text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/50 transition-colors"
               title="Remove Bcc"
             >
               <IconX size={11} />

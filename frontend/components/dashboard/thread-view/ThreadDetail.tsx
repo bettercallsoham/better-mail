@@ -21,6 +21,7 @@ import {
   IconNotes,
   IconMailOpened,
   IconMail,
+  IconDots,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStore } from "@/lib/store/ui.store";
@@ -51,6 +52,8 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
   const emailAction = useEmailAction();
   const [notesOpen, setNotesOpen] = useState(false);
   const notesAnchorRef = useRef<HTMLDivElement>(null);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowAnchorRef = useRef<HTMLDivElement>(null);
 
   const { replyTo, forward } = useComposer();
   const panelInstance = usePanelInstance();
@@ -132,6 +135,18 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
   const handleForward = useCallback(() => {
     if (lastEmail) forward(lastEmail, "panel");
   }, [lastEmail, forward]);
+
+  // ── Close overflow on outside click ───────────────────────────────────────
+  useEffect(() => {
+    if (!overflowOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!overflowAnchorRef.current?.contains(e.target as Node)) {
+        setOverflowOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [overflowOpen]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
@@ -225,13 +240,6 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
 
         <div className="flex items-center gap-0.5">
           <TipBtn
-            tip={isRead ? "Mark unread" : "Mark read"}
-            kbd="U"
-            onClick={handleRead}
-          >
-            {isRead ? <IconMailOpened size={16} /> : <IconMail size={16} />}
-          </TipBtn>
-          <TipBtn
             tip={anyStarred ? "Unstar" : "Star"}
             kbd="S"
             onClick={handleStar}
@@ -256,15 +264,6 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
               <IconArchive size={16} />
             )}
           </TipBtn>
-          <TipBtn
-            tip="Delete"
-            kbd="#"
-            className="hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
-            onClick={handleDelete}
-          >
-            <IconTrash size={16} />
-          </TipBtn>
-          <div className="w-px h-4 bg-black/[0.07] dark:bg-white/[0.07] mx-0.5" />
           <div ref={notesAnchorRef} className="relative">
             <TipBtn
               tip="Notes"
@@ -282,11 +281,41 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
               />
             )}
           </div>
+          <div ref={overflowAnchorRef} className="relative">
+            <TipBtn
+              tip="More"
+              active={overflowOpen}
+              onClick={() => setOverflowOpen((v) => !v)}
+            >
+              <IconDots size={16} />
+            </TipBtn>
+            {overflowOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl overflow-hidden bg-white dark:bg-[#27241f] shadow-[0_4px_20px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.08)] py-1">
+                <button
+                  onClick={() => { handleRead(); setOverflowOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-gray-600 dark:text-white/60 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+                >
+                  {isRead ? <IconMailOpened size={13} /> : <IconMail size={13} />}
+                  {isRead ? "Mark unread" : "Mark read"}
+                  <kbd className="ml-auto text-[10px] font-mono text-gray-300 dark:text-white/20">U</kbd>
+                </button>
+                <div className="mx-2 my-1 border-t border-black/[0.05] dark:border-white/[0.05]" />
+                <button
+                  onClick={() => { handleDelete(); setOverflowOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                >
+                  <IconTrash size={13} />
+                  Delete
+                  <kbd className="ml-auto text-[10px] font-mono text-red-300 dark:text-red-900">#</kbd>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* ── Subject + meta ── */}
-      <div className="shrink-0 px-6 pb-4">
+      <div className="shrink-0 px-5 pb-4">
         <h2 className="text-[18px] font-bold text-gray-950 dark:text-white/90 leading-tight tracking-[-0.03em]">
           {subject}
         </h2>
@@ -303,15 +332,12 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
           />
         </Suspense>
 
-        <div className="px-6 py-4 space-y-2">
+        <div className="px-5 py-3 space-y-2">
           {emails.map((email, i) => (
             <EmailCard
               key={email.id}
               email={email}
               defaultOpen={i === emails.length - 1}
-              onReply={handleReply}
-              onReplyAll={handleReplyAll}
-              onForward={handleForward}
               onStar={() => act(email, email.isStarred ? "unstar" : "star")}
             />
           ))}

@@ -202,7 +202,7 @@ function AddAccountDropdown({
               : "Add account"
           }
           className={cn(
-            "relative h-8 w-8 rounded-lg border border-dashed flex items-center justify-center shrink-0",
+            "relative h-8 w-8 cursor-pointer rounded-lg border border-dashed flex items-center justify-center shrink-0",
             "border-neutral-300 dark:border-app-sidebar-border",
             "text-neutral-400 dark:text-neutral-500",
             "hover:text-neutral-600 dark:hover:text-neutral-300",
@@ -424,7 +424,7 @@ function AccountSwitcherInner({
                       e.stopPropagation();
                       setSidebarCollapsed(!collapsed);
                     }}
-                    className="ml-auto p-1.5 rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-[var(--app-sidebar-hover)]"
+                    className="ml-auto p-1.5  cursor-pointer rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-[var(--app-sidebar-hover)]"
                   >
                     {collapsed ? (
                       <PanelLeftOpen size={15} />

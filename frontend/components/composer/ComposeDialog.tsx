@@ -135,7 +135,7 @@ function TitleBtn({
       onClick={onClick}
       title={title}
       className={cn(
-        "w-6 h-6 flex items-center justify-center rounded-md transition-colors",
+        "w-6 h-6 flex items-center cursor-pointer justify-center rounded-md transition-colors",
         "text-gray-400 dark:text-white/30",
         danger
           ? "hover:bg-red-50 dark:hover:bg-red-950/25 hover:text-red-500 dark:hover:text-red-400"

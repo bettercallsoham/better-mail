@@ -14,8 +14,8 @@ const Footer = () => {
           {/* Brand Section */}
           <div className="lg:col-span-2">
             <Link href="/" className="inline-flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-                <Image src={"/logo.png"} width={32} height={32} alt="BetterMail Logo" />
+              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                <Image src={"/logo.png"} className="" width={100} height={100} alt="BetterMail Logo" />
               </div>
               <span className="text-xl font-bold text-neutral-900">
                 BetterMail
@@ -172,14 +172,8 @@ const Footer = () => {
           </p>
           <p className="text-sm text-neutral-500 flex items-center gap-1">
             Made with <span className="text-red-500">♥</span> by{" "}
-            <a
-              href="https://github.com/nerdyabhi"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-neutral-900 hover:underline font-medium"
-            >
-              Abhi
-            </a>
+           
+            BetterMail Team
           </p>
         </div>
          {/* Faded Background Text */}

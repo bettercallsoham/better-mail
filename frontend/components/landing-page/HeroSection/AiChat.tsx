@@ -112,7 +112,7 @@ export function EmailChatDemo() {
       </span>
 
       <GlassmorphicCard className="w-full lg:w-105 h-87.5 flex  flex-col p-0 overflow-hidden">
-        <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-white/5 backdrop-blur-sm z-10">
+        <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-white/5 z-10">
           <div className="w-8 h-8 rounded bg-white/20 flex items-center justify-center">
             <Brain className="w-4 h-4 text-neutral-800" />
           </div>
@@ -138,7 +138,7 @@ export function EmailChatDemo() {
         </div>
 
         {/* Fixed Input Area */}
-        <div className="shrink-0 px-4 py-3 border-t border-white/10 bg-white/5 backdrop-blur-sm">
+        <div className="shrink-0 px-4 py-3 border-t border-white/10 bg-white/5 ">
           <div className="flex items-center gap-2 bg-black/5 rounded-xl px-3 py-2 border border-white/10 focus-within:border-blue-400/50 transition-all">
             <input
               type="text"

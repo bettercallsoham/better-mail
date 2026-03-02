@@ -258,7 +258,7 @@ export function ComposerFooter({
       <button
         onClick={handleDiscard}
         title="Discard"
-        className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-gray-400 dark:text-white/30 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-500 dark:hover:text-red-400"
+        className="w-8 h-8 cursor-pointer flex items-center justify-center rounded-lg transition-colors text-gray-400 dark:text-white/30 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-500 dark:hover:text-red-400"
       >
         <IconTrash size={15} />
       </button>
@@ -269,7 +269,7 @@ export function ComposerFooter({
           onClick={() => setPickerOpen((o) => !o)}
           title="Insert template"
           className={cn(
-            "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+            "w-8 h-8 flex items-center cursor-pointer justify-center rounded-lg transition-colors",
             pickerOpen
               ? "bg-black/[0.06] dark:bg-white/[0.1] text-gray-700 dark:text-white/75"
               : "text-gray-400 dark:text-white/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/60",
@@ -305,7 +305,7 @@ export function ComposerFooter({
           onClick={() => setSaveAsOpen((o) => !o)}
           title="Save as template"
           className={cn(
-            "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+            "w-8 h-8 flex items-center justify-center cursor-pointer rounded-lg transition-colors",
             saveAsOpen
               ? "bg-black/[0.06] dark:bg-white/[0.1] text-gray-700 dark:text-white/75"
               : "text-gray-400 dark:text-white/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/60",
@@ -390,7 +390,7 @@ export function ComposerFooter({
           }
           title="Write with AI(⌘.)"
           className={cn(
-            "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+            "w-8 h-8 flex items-center cursor-pointer justify-center rounded-lg transition-colors",
             instance.aiPanelOpen
               ? "bg-gray-100 dark:bg-white/[0.1] text-gray-700 dark:text-white/70"
               : "text-gray-400 dark:text-white/30 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-600 dark:hover:text-white/60",
@@ -440,7 +440,7 @@ export function ComposerFooter({
         onClick={handleSend}
         disabled={isSending || !canSend}
         className={cn(
-          "flex items-center gap-1.5 h-8 px-4 rounded-lg text-[12.5px] font-semibold transition-all",
+          "flex items-center gap-1.5 cursor-pointer h-8 px-4 rounded-lg text-[12.5px] font-semibold transition-all",
           "bg-gray-950 dark:bg-white text-white dark:text-gray-950",
           "hover:bg-gray-800 dark:hover:bg-gray-100",
           "disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97]",

@@ -74,7 +74,7 @@ function LayoutModeSwitcher() {
               onClick={() => setLayoutMode(mode.id)}
               title={mode.description}
               className={cn(
-                "flex flex-col items-center gap-1 px-2 py-2 rounded-md text-center transition-all duration-150",
+                "flex flex-col items-center cursor-pointer gap-1 px-2 py-2 rounded-md text-center transition-all duration-150",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
                 isActive
                   ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm"

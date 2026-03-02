@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
-import { IconSparkles } from "@tabler/icons-react";
+import { useState, useCallback } from "react";
+import { IconSparkles, IconChevronDown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useReplySuggestionsQuery } from "@/features/ai/ai.query";
 import { useComposerStore } from "@/lib/store/composer.store";
@@ -30,6 +30,83 @@ const snippet = (body: string) => {
   const words = sentence.split(/\s+/);
   return words.length <= 15 ? sentence : words.slice(0, 15).join(" ") + "…";
 };
+
+// ── Rows variant sub-component (needs its own state) ──────────────────────────
+function RowsVariant({
+  suggestions,
+  isPending,
+  onSelect,
+}: {
+  suggestions: ReplySuggestion[];
+  isPending: boolean;
+  onSelect: (s: ReplySuggestion) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div>
+      {/* Header row — always visible */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        <IconSparkles size={11} className="text-violet-500 dark:text-violet-400 shrink-0" />
+        <span className="text-[10.5px] font-medium text-gray-400 dark:text-white/28 select-none shrink-0">
+          Reply as
+        </span>
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {isPending
+            ? [1, 2, 3].map((i) => (
+                <div key={i} className="h-6 w-14 rounded-lg bg-black/5 dark:bg-white/6 animate-pulse shrink-0" />
+              ))
+            : suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => onSelect(s)}
+                  className={cn(
+                    "h-6 px-2.5 rounded-lg text-[11.5px] font-medium capitalize transition-colors active:scale-95 shrink-0",
+                    "bg-black/[0.04] dark:bg-white/[0.06]",
+                    "text-gray-600 dark:text-white/50",
+                    "hover:bg-violet-50 dark:hover:bg-violet-950/25",
+                    "hover:text-violet-600 dark:hover:text-violet-400",
+                  )}
+                >
+                  {s.tone}
+                </button>
+              ))}
+        </div>
+        {!isPending && suggestions.length > 0 && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-gray-300 dark:text-white/20 hover:text-gray-500 dark:hover:text-white/45 transition-colors"
+          >
+            <IconChevronDown
+              size={12}
+              className={cn("transition-transform duration-150", expanded && "rotate-180")}
+            />
+          </button>
+        )}
+      </div>
+
+      {/* Expanded text previews */}
+      {expanded && !isPending && (
+        <div className="px-3 pb-2.5 space-y-0.5">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => onSelect(s)}
+              className="w-full text-left flex items-baseline gap-2 px-2 py-1 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors group"
+            >
+              <span className="text-[10px] font-semibold capitalize text-gray-400 dark:text-white/28 shrink-0 w-[60px] group-hover:text-violet-500 dark:group-hover:text-violet-400 transition-colors">
+                {s.tone}
+              </span>
+              <span className="text-[11.5px] text-gray-500 dark:text-white/40 truncate">
+                {snippet(s.body)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SmartReplies({
   threadId,
@@ -80,48 +157,9 @@ export function SmartReplies({
 
   const suggestions = data?.suggestions.slice(0, 3) ?? [];
 
-  // ── Rows variant — horizontal chip strip inside QuickReply glass card (ThreadDetail) ──
+  // ── Rows variant — "Reply as" tone chips + collapsible text preview ────────
   if (variant === "rows") {
-    return (
-      <div className="flex items-center gap-2 px-3 py-2.5 flex-wrap">
-        <div className="flex items-center gap-1 shrink-0">
-          <IconSparkles
-            size={11}
-            className="text-violet-500 dark:text-violet-400"
-          />
-          <span className="text-[10.5px] font-medium text-gray-400 dark:text-white/28 select-none">
-            Suggest
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-          {isPending
-            ? [1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-7 w-28 rounded-full bg-black/5 dark:bg-white/6 animate-pulse shrink-0"
-                />
-              ))
-            : suggestions.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSelect(s)}
-                  className={cn(
-                    "flex items-center h-7 px-3 rounded-full shrink-0",
-                    "text-[12px] font-medium transition-all duration-100 active:scale-95",
-                    "bg-black/4 dark:bg-white/6",
-                    "text-gray-600 dark:text-white/55",
-                    "hover:bg-violet-50 dark:hover:bg-violet-950/30",
-                    "hover:text-violet-600 dark:hover:text-violet-400",
-                    "border border-transparent hover:border-violet-200/60 dark:hover:border-violet-700/30",
-                    "max-w-40 truncate",
-                  )}
-                >
-                  {snippet(s.body)}
-                </button>
-              ))}
-        </div>
-      </div>
-    );
+    return <RowsVariant suggestions={suggestions} isPending={isPending} onSelect={handleSelect} />;
   }
 
   // ── Inline variant — compact tone chip strip (ThreadSheet) ────────────────

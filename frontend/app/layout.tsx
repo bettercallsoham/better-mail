@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "https://bettermail.tech",
-    title: "BetterMail — Fastest Email Experience Ever Made",
+    title: "BetterMail - Fastest Email Experience Ever Made",
     description: "A faster, smarter email experience built for modern teams.",
     siteName: "BetterMail",
     images: [
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
 
   twitter: {
     card: "summary_large_image",
-    title: "BetterMail — The AI-First Email Client",
+    title: "BetterMail - The AI-First Email Client",
     description: "A faster, smarter email experience built for modern teams.",
     images: ["/og-image.png"],
   },
