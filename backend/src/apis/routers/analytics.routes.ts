@@ -19,4 +19,25 @@ router.get(
   analyticsController.getTimePatterns,
 );
 
+router.get(
+  "/senders",
+  verifyAccessToken(),
+  analyticsValidator.validateSenderAnalytics,
+  analyticsController.getSenderAnalytics,
+);
+
+router.get(
+  "/inbox-health",
+  verifyAccessToken(),
+  analyticsValidator.validateInboxHealth,
+  analyticsController.getInboxHealth,
+);
+
+router.get(
+  "/response",
+  verifyAccessToken(),
+  analyticsValidator.validateResponseAnalytics,
+  analyticsController.getResponseAnalytics,
+);
+
 export default router;

@@ -45,3 +45,48 @@ export const validateTimePatterns = [
 
   handleValidationErrors,
 ];
+
+export const validateSenderAnalytics = [
+  query("period")
+    .optional()
+    .isIn(["daily", "weekly", "monthly"])
+    .withMessage("period must be one of: daily, weekly, monthly"),
+
+  query("email")
+    .optional()
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+
+  handleValidationErrors,
+];
+
+export const validateInboxHealth = [
+  query("period")
+    .optional()
+    .isIn(["daily", "weekly", "monthly"])
+    .withMessage("period must be one of: daily, weekly, monthly"),
+
+  query("email")
+    .optional()
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+
+  handleValidationErrors,
+];
+
+export const validateResponseAnalytics = [
+  query("period")
+    .optional()
+    .isIn(["weekly", "monthly"])
+    .withMessage("period must be one of: weekly, monthly"),
+
+  query("email")
+    .optional()
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+
+  handleValidationErrors,
+];
