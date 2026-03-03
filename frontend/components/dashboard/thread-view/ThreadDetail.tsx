@@ -59,9 +59,12 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
   const panelInstance = usePanelInstance();
 
   const emails = useMemo(
-    () => (data.success ? data.data.emails : []) as FullEmail[],
+    () => (data.success ? (data.data.emails as FullEmail[]) : []),
+    // data.data.emails is the actual array — use it as the sole dep so the
+    // memo only recomputes when the array reference changes (i.e. a real
+    // fetch result), not on every render due to a conditional expression.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data.success, data.success ? data.data.emails : null],
+    [data.success && data.data?.emails],
   );
 
   const subject = emails[0]?.subject || "(no subject)";
@@ -292,21 +295,35 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
             {overflowOpen && (
               <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl overflow-hidden bg-white dark:bg-[#27241f] shadow-[0_4px_20px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.08)] py-1">
                 <button
-                  onClick={() => { handleRead(); setOverflowOpen(false); }}
+                  onClick={() => {
+                    handleRead();
+                    setOverflowOpen(false);
+                  }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-gray-600 dark:text-white/60 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
                 >
-                  {isRead ? <IconMailOpened size={13} /> : <IconMail size={13} />}
+                  {isRead ? (
+                    <IconMailOpened size={13} />
+                  ) : (
+                    <IconMail size={13} />
+                  )}
                   {isRead ? "Mark unread" : "Mark read"}
-                  <kbd className="ml-auto text-[10px] font-mono text-gray-300 dark:text-white/20">U</kbd>
+                  <kbd className="ml-auto text-[10px] font-mono text-gray-300 dark:text-white/20">
+                    U
+                  </kbd>
                 </button>
                 <div className="mx-2 my-1 border-t border-black/[0.05] dark:border-white/[0.05]" />
                 <button
-                  onClick={() => { handleDelete(); setOverflowOpen(false); }}
+                  onClick={() => {
+                    handleDelete();
+                    setOverflowOpen(false);
+                  }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                 >
                   <IconTrash size={13} />
                   Delete
-                  <kbd className="ml-auto text-[10px] font-mono text-red-300 dark:text-red-900">#</kbd>
+                  <kbd className="ml-auto text-[10px] font-mono text-red-300 dark:text-red-900">
+                    #
+                  </kbd>
                 </button>
               </div>
             )}

@@ -962,6 +962,13 @@ export class ElasticsearchService {
       index: this.EMAILS_INDEX,
       size,
       from: page * size,
+      _source: {
+        excludes: [
+          "searchText",
+          "embedding",
+          "attachments",
+        ],
+      },
       query: {
         bool: {
           filter: [

@@ -26,7 +26,25 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "lh3.googleusercontent.com",
       },
+      // Microsoft / Outlook account avatars (Graph API + Office CDNs)
+      {
+        protocol: "https",
+        hostname: "graph.microsoft.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.office.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.live.com",
+      },
     ],
+  },
+  experimental: {
+    // Enables granular tree-shaking on these barrel-exporting packages so only
+    // the icons/components actually used are bundled.
+    optimizePackageImports: ["@tabler/icons-react", "lucide-react", "recharts"],
   },
   async headers() {
     return [

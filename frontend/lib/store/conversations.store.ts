@@ -78,18 +78,10 @@ export const useConversationStore = create<ConversationSlice>()((set) => ({
 
   completeStream: (conversationId) =>
     set((s) => {
-      const existing = s.streamingMessages[conversationId];
-      if (!existing) return s;
-      return {
-        streamingMessages: {
-          ...s.streamingMessages,
-          [conversationId]: {
-            ...existing,
-            isStreaming: false,
-            toolInProgress: null,
-          },
-        },
-      };
+      // Remove the entry entirely once streaming is done — keeps the map
+      // lean and makes future appendToken spreads O(active conversations).
+      const { [conversationId]: _, ...rest } = s.streamingMessages;
+      return { streamingMessages: rest };
     }),
 
   setPendingAction: (action) => set({ pendingAction: action }),

@@ -1,14 +1,23 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ReactNode } from "react";
+import dynamic from "next/dynamic";
 
 import { QueryProvider } from "@/lib/query/provider";
 import { DashboardSidebar } from "@/components/dashboard/sidebar/DashboardSidebar";
 import { DashboardProviders } from "@/components/dashboard/DashboardProviders";
 import { getUserFromToken } from "@/lib/auth/getUserFromToken";
 import { Toaster } from "@/components/ui/sonner";
-import { ComposerPortal } from "@/components/composer";
 import { GlobalShortcutsMount } from "@/components/shortcuts/GlobalShortcutsMount";
+
+// Lazy-load the composer (Tiptap + 8 deps, ~95 KB gz) — only needed when the
+// user actually opens it, not on every dashboard page load.
+const ComposerPortal = dynamic(
+  () =>
+    import("@/components/composer/ComposerPortal").then((m) => ({
+      default: m.ComposerPortal,
+    })),
+);
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const token = (await cookies()).get("access_token");

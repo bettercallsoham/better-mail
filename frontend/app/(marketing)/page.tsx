@@ -6,8 +6,9 @@ import FAQ from "@/components/landing-page/FAQ/FAQ";
 import Card from "@/components/landing-page/FeaturesSection/Features";
 import Footer from "@/components/landing-page/Footer/Footer";
 import HeroSection from "@/components/landing-page/HeroSection/HeroSection";
-import ImageCompare from "@/components/ui/ImageCompare";
 import Navbar from "@/components/landing-page/Navbar";
+// Client wrapper: lazily loads ImageCompare + tsparticles only in the browser.
+import ImageCompare from "@/components/ui/ImageCompareLazy";
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen ">

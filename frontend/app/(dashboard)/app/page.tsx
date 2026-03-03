@@ -132,10 +132,14 @@ function DesktopLayout() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  // Transient split held in a ref during drag — avoids triggering Zustand
+  // (and its localStorage persist) on every mousemove tick (60-120/s).
+  const liveSplitRef = useRef(splitPct);
 
   const startDrag = (e: React.MouseEvent) => {
     e.preventDefault();
     dragging.current = true;
+    let rafId = 0;
 
     const onMove = (ev: MouseEvent) => {
       if (!dragging.current || !containerRef.current) return;
@@ -143,12 +147,23 @@ function DesktopLayout() {
       const pct = ((ev.clientX - rect.left) / rect.width) * 100;
       const min = MIN_SPLIT[layoutMode] ?? 40;
       const max = MAX_SPLIT[layoutMode] ?? 70;
-      // Write directly to store — persisted automatically via zustand/persist
-      setSplitPct(layoutMode, Math.max(min, Math.min(max, pct)));
+      liveSplitRef.current = Math.max(min, Math.min(max, pct));
+      // Apply visual update via RAF — no Zustand/localStorage write yet.
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (containerRef.current) {
+          const listEl = containerRef.current
+            .firstElementChild as HTMLElement | null;
+          if (listEl) listEl.style.width = `${liveSplitRef.current}%`;
+        }
+      });
     };
 
     const onUp = () => {
       dragging.current = false;
+      cancelAnimationFrame(rafId);
+      // Persist to store exactly once — triggered on mouseup, not per pixel.
+      setSplitPct(layoutMode, liveSplitRef.current);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };

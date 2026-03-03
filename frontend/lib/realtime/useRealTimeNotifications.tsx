@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { getPusherClient } from "@/lib/realtime/pusherClient";
+import { getPusherClient } from "./pusherClient";
 import { useQueryClient } from "@tanstack/react-query";
 import { mailboxKeys } from "@/features/mailbox/mailbox.query";
 import { toast } from "sonner";
@@ -16,12 +16,7 @@ export function useRealtimeNotifications(userId: string | null) {
     const pusher = getPusherClient();
     const channelName = `private-user-${userId}-notifications`;
 
-    console.log("📡 Subscribing to", channelName);
     const channel = pusher.subscribe(channelName);
-
-    channel.bind("pusher:subscription_succeeded", () => {
-      console.log("✅ Subscription succeeded");
-    });
 
     channel.bind("pusher:subscription_error", (err: any) => {
       console.error("❌ Subscription error", err);
@@ -33,8 +28,6 @@ export function useRealtimeNotifications(userId: string | null) {
         messages: { id: string; threadId: string; snippet: string }[];
         total: number;
       }) => {
-        console.log("📬 mail.received", data);
-
         const count = data.total;
         const snippet = data.messages[0]?.snippet?.slice(0, 80) ?? "";
 
@@ -52,13 +45,16 @@ export function useRealtimeNotifications(userId: string | null) {
           closeButton: true,
         });
 
-        queryClient.invalidateQueries({ queryKey: mailboxKeys.threads() });
-        queryClient.invalidateQueries({ queryKey: mailboxKeys.inboxZero() });
+        // Use prefix keys so ALL thread/inbox-zero queries are invalidated
+        // regardless of their email/folder params.
+        queryClient.invalidateQueries({ queryKey: ["threads"] });
+        queryClient.invalidateQueries({
+          queryKey: [...mailboxKeys.all, "inbox-zero"],
+        });
       },
     );
 
     return () => {
-      console.log("🔌 Unsubscribing from", channelName);
       channel.unbind_all();
       pusher.unsubscribe(channelName);
     };
