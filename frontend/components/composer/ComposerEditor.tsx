@@ -366,15 +366,129 @@ export function ComposerEditor({
         />
       )}
 
+      {/* Rich-text toolbar — shown when composer is a full dialog or panel */}
+      {(instance.shell === "dialog" || instance.shell === "panel") && (
+        <ComposerStaticToolbar editor={editor} />
+      )}
+
       {/* Clicking empty space below the editor text focuses it */}
       <div style={{ minHeight }} onClick={() => editor.commands.focus("end")}>
-        {/* stopPropagation so clicking inside the editor doesn't jump cursor to end */}
-        <div onClick={(e) => e.stopPropagation()}>
+        {/* stopPropagation for plain key presses — keeps d/e/r etc. from triggering
+            global shortcuts while typing. Modifier combos (⌘↵, Ctrl+.) pass through
+            so composer-scoped hotkeys in ComposerFooter still work. */}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (!e.ctrlKey && !e.metaKey && !e.altKey) e.stopPropagation();
+          }}
+        >
           <EditorContent editor={editor} />
         </div>
       </div>
 
       {instance.quotedHtml && <QuotedThread html={instance.quotedHtml} />}
+    </div>
+  );
+}
+
+// ─── Static rich-text toolbar (dialog / panel only) ─────────────────────────
+function ToolbarBtn({
+  active,
+  onClick,
+  title,
+  children,
+}: {
+  active?: boolean;
+  onClick: () => void;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onMouseDown={(e) => {
+        e.preventDefault(); // keep editor focused
+        onClick();
+      }}
+      className={cn(
+        "w-6 h-6 flex items-center justify-center rounded-md transition-colors",
+        active
+          ? "bg-black/[0.07] dark:bg-white/[0.1] text-gray-800 dark:text-white/80"
+          : "text-gray-400 dark:text-white/35 hover:bg-black/[0.05] dark:hover:bg-white/[0.07] hover:text-gray-700 dark:hover:text-white/65",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ComposerStaticToolbar({
+  editor,
+}: {
+  editor: ReturnType<typeof useEditor>;
+}) {
+  if (!editor) return null;
+  return (
+    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-black/[0.06] dark:border-white/[0.07] overflow-x-auto">
+      <ToolbarBtn
+        title="Heading 1"
+        active={editor.isActive("heading", { level: 1 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+      >
+        <IconH1 size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        title="Heading 2"
+        active={editor.isActive("heading", { level: 2 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+      >
+        <IconH2 size={12} />
+      </ToolbarBtn>
+      <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
+      <ToolbarBtn
+        title="Bold"
+        active={editor.isActive("bold")}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      >
+        <IconBold size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        title="Italic"
+        active={editor.isActive("italic")}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      >
+        <IconItalic size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        title="Underline"
+        active={editor.isActive("underline")}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+      >
+        <IconUnderline size={12} />
+      </ToolbarBtn>
+      <div className="w-px h-3.5 mx-1 bg-black/[0.08] dark:bg-white/[0.1]" />
+      <ToolbarBtn
+        title="Bullet list"
+        active={editor.isActive("bulletList")}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      >
+        <IconList size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        title="Ordered list"
+        active={editor.isActive("orderedList")}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      >
+        <IconListNumbers size={12} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        title="Blockquote"
+        active={editor.isActive("blockquote")}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      >
+        <IconBlockquote size={12} />
+      </ToolbarBtn>
     </div>
   );
 }

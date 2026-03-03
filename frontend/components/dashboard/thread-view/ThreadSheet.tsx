@@ -38,6 +38,7 @@ function SheetContent({ threadId }: { threadId: string }) {
   const setActive = useUIStore((s) => s.setActiveThread);
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
   const threadIds = useUIStore((s) => (s.threadIds as string[]) ?? []);
+  const layoutMode = useUIStore((s) => s.layoutMode);
   const emailAction = useEmailAction();
 
   const { replyTo, forward } = useComposer();
@@ -70,10 +71,10 @@ function SheetContent({ threadId }: { threadId: string }) {
       action: Parameters<typeof emailAction.mutate>[0]["action"],
     ) =>
       emailAction.mutate({
-        from: email.from.email,
+        from: email.emailAddress,
         provider:
           email.provider?.toLowerCase() === "outlook" ? "OUTLOOK" : "GOOGLE",
-        messageIds: [email.id],
+        messageIds: [email.providerMessageId],
         action,
       }),
     [emailAction],
@@ -101,9 +102,13 @@ function SheetContent({ threadId }: { threadId: string }) {
     if (lastReal) forward(lastReal, "sheet");
   }, [lastReal, forward]);
 
-  // Keyboard shortcuts — only when not typing
+  // Keyboard shortcuts — only when this sheet IS the active view (velocity / zen).
+  // In flow mode, ThreadDetail is mounted alongside SheetContent and handles the
+  // same shortcuts — without this guard both handlers fire on every keypress.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Only active in the layout modes where the sheet panel is the reader
+      if (layoutMode !== "velocity" && layoutMode !== "zen") return;
       const t = e.target as HTMLElement;
       if (
         t.isContentEditable ||
@@ -145,6 +150,7 @@ function SheetContent({ threadId }: { threadId: string }) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [
+    layoutMode,
     handleReply,
     handleForward,
     handleStar,

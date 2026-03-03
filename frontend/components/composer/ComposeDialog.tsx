@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef, useSyncExternalStore } from "react";
+import {
+  useState,
+  useEffect,
+  Suspense,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import {
   IconX,
   IconArrowsMaximize,
@@ -8,7 +14,10 @@ import {
 } from "@tabler/icons-react";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
 import { cn } from "@/lib/utils";
-import { useComposerStore } from "@/lib/store/composer.store";
+import {
+  useComposerStore,
+  type OpenComposerParams,
+} from "@/lib/store/composer.store";
 import { useUIStore } from "@/lib/store/ui.store";
 import { useConnectedAccounts } from "@/features/mailbox/mailbox.query";
 import type { ConnectedAccount } from "@/features/mailbox/mailbox.type";
@@ -52,9 +61,11 @@ function deriveProvider(
 function ComposeDialogInner({
   onClose,
   isFullscreen,
+  openParams,
 }: {
   onClose: () => void;
   isFullscreen: boolean;
+  openParams?: Partial<OpenComposerParams>;
 }) {
   const { data } = useConnectedAccounts();
   const accounts = data.success ? data.data : [];
@@ -76,6 +87,7 @@ function ComposeDialogInner({
       mode: "new",
       from: defaultFrom,
       provider: defaultProvider,
+      ...openParams,
     });
     setInstanceId(id);
     return () => {
@@ -151,9 +163,10 @@ function TitleBtn({
 
 interface ComposeDialogProps {
   onClose: () => void;
+  openParams?: Partial<OpenComposerParams>;
 }
 
-export function ComposeDialog({ onClose }: ComposeDialogProps) {
+export function ComposeDialog({ onClose, openParams }: ComposeDialogProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -216,7 +229,11 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
           </div>
 
           <Suspense fallback={<DialogSkeleton />}>
-            <ComposeDialogInner onClose={onClose} isFullscreen={false} />
+            <ComposeDialogInner
+              onClose={onClose}
+              isFullscreen={false}
+              openParams={openParams}
+            />
           </Suspense>
         </div>
       </>
@@ -252,8 +269,21 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
           )}
           style={
             isFullscreen
-              ? { position: "fixed", inset: 40, width: "auto", height: "auto", zIndex: 1100 }
-              : { position: "fixed", bottom: MARGIN, right: MARGIN, width: POPUP_W, height: POPUP_H, zIndex: 1100 }
+              ? {
+                  position: "fixed",
+                  inset: 40,
+                  width: "auto",
+                  height: "auto",
+                  zIndex: 1100,
+                }
+              : {
+                  position: "fixed",
+                  bottom: MARGIN,
+                  right: MARGIN,
+                  width: POPUP_W,
+                  height: POPUP_H,
+                  zIndex: 1100,
+                }
           }
         >
           {/* Title bar — drag handle */}
@@ -261,7 +291,9 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
             className={cn(
               "compose-drag-handle shrink-0 flex items-center justify-between px-4 h-12 select-none",
               "border-b border-black/[0.06] dark:border-white/[0.06]",
-              isFullscreen ? "cursor-default" : "cursor-grab active:cursor-grabbing",
+              isFullscreen
+                ? "cursor-default"
+                : "cursor-grab active:cursor-grabbing",
             )}
           >
             <span className="text-[13px] font-semibold text-gray-700 dark:text-white/75">
@@ -275,7 +307,11 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
                 onClick={() => setIsFullscreen((f) => !f)}
                 title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               >
-                {isFullscreen ? <IconArrowsMinimize size={13} /> : <IconArrowsMaximize size={13} />}
+                {isFullscreen ? (
+                  <IconArrowsMinimize size={13} />
+                ) : (
+                  <IconArrowsMaximize size={13} />
+                )}
               </TitleBtn>
               <TitleBtn onClick={onClose} title="Close" danger>
                 <IconX size={13} />
@@ -284,7 +320,11 @@ export function ComposeDialog({ onClose }: ComposeDialogProps) {
           </div>
 
           <Suspense fallback={<DialogSkeleton />}>
-            <ComposeDialogInner onClose={onClose} isFullscreen={isFullscreen} />
+            <ComposeDialogInner
+              onClose={onClose}
+              isFullscreen={isFullscreen}
+              openParams={openParams}
+            />
           </Suspense>
         </div>
       </Draggable>

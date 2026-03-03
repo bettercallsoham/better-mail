@@ -25,6 +25,8 @@ interface LayoutSlice {
   inboxZeroOpen: boolean;
   /** Per-mode panel split percentage (thread list width %) */
   splitPct: Record<string, number>;
+  /** Draft email ID pending open in ComposeDialog */
+  pendingDraftId: string | null;
   setLayoutMode: (mode: LayoutMode) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -33,6 +35,7 @@ interface LayoutSlice {
   setTemplatesBarOpen: (open: boolean) => void;
   setMailSearchOpen: (open: boolean) => void;
   setInboxZeroOpen: (open: boolean) => void;
+  setPendingDraftId: (id: string | null) => void;
 }
 
 interface MailboxSlice {
@@ -104,6 +107,7 @@ export const useUIStore = create<UIState>()(
       mailSearchOpen: false,
       inboxZeroOpen: false,
       splitPct: { ...DEFAULT_SPLIT },
+      pendingDraftId: null,
 
       setLayoutMode: (mode) =>
         set({ layoutMode: mode, activeThreadId: null, focusedThreadId: null }),
@@ -120,6 +124,7 @@ export const useUIStore = create<UIState>()(
       setTemplatesBarOpen: (open) => set({ templatesBarOpen: open }),
       setMailSearchOpen: (open) => set({ mailSearchOpen: open }),
       setInboxZeroOpen: (open) => set({ inboxZeroOpen: open }),
+      setPendingDraftId: (id) => set({ pendingDraftId: id }),
 
       // ── Mailbox ─────────────────────────────────────────────────────────────
       selectedEmailAddress: null,

@@ -203,8 +203,16 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
   useEffect(() => {
     if (!open || snoozeOpen) return;
     const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const target = e.target as HTMLElement;
+      // Never fire while typing in any input or the reply editor
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      )
+        return;
+      // Never fire while the inline reply composer is open
+      if (panelInstance) return;
       if (e.key === "e") act("ARCHIVED");
       if (e.key === "d") act("DONE");
       if (e.key === "r") {

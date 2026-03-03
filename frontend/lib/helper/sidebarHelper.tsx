@@ -7,6 +7,7 @@ import {
   IconClock,
   IconTag,
   IconSend2,
+  IconMailExclamation,
 } from "@tabler/icons-react";
 
 import { MailLabel, SystemFolders } from "@/features/mailbox/mailbox.type";
@@ -66,6 +67,12 @@ export const SYSTEM_FOLDER_CONFIG: {
     label: "Drafts",
     icon: <IconClock size={18} stroke={1.5} />,
   },
+  {
+    key: "spam",
+    folder: "spam",
+    label: "Spam",
+    icon: <IconMailExclamation size={18} stroke={1.5} />,
+  },
 ];
 
 const SYSTEM_LABEL_ALIASES = new Set([
@@ -78,6 +85,7 @@ const SYSTEM_LABEL_ALIASES = new Set([
   "unread",
   "archived",
   "yellow_star",
+  "spam",
 ]);
 
 // ── Builders ───────────────────────────────────────────────────────────────
@@ -110,7 +118,7 @@ export function buildLabelFolders(labels?: MailLabel[]): FolderItem[] {
     .filter((l) => !SYSTEM_LABEL_ALIASES.has(l.label.toLowerCase()))
     .map((l) => ({
       label: formatLabelName(l.label),
-      folder: l.label, 
+      folder: l.label,
       icon: <IconTag size={16} stroke={1.5} />,
       count: l.count,
     }));

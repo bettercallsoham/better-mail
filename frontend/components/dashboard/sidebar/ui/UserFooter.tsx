@@ -61,7 +61,7 @@ function LayoutModeSwitcher() {
   const setLayoutMode = useUIStore((s) => s.setLayoutMode);
 
   return (
-    <div className="px-2 py-2">
+    <div className="px-2 py-2 ">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
         Layout
       </p>
@@ -167,8 +167,8 @@ export function UserDropdownContent({
       className="w-56 text-sm"
     >
       {/* User info header */}
-      <DropdownMenuLabel className="py-2 px-2">
-        <div className="flex items-center gap-2.5">
+      <DropdownMenuLabel className="py-2 px-2 ">
+        <div className="flex  items-center gap-2.5">
           <UserAvatar
             avatar={user?.avatar}
             fullName={user?.fullName}
@@ -274,7 +274,7 @@ function UserFooterInner({ isOpen }: { isOpen: boolean }) {
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            "w-full flex items-center gap-2.5 rounded-lg transition-colors duration-150 outline-none group",
+            "w-full flex cursor-pointer items-center gap-2.5 rounded-lg transition-colors duration-150 outline-none group",
             "hover:bg-app-sidebar-hover",
             "focus-visible:ring-2 focus-visible:ring-blue-500",
             isOpen ? "px-2.5 py-2 mx-0" : "justify-center w-9 h-9 mx-auto",

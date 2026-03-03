@@ -281,6 +281,7 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
   const setFocusedThread = useUIStore((s) => s.setFocusedThread);
   const setThreadIds = useUIStore((s) => s.setThreadIds);
   const activeFolder = useUIStore((s) => s.activeFolder);
+  const setPendingDraftId = useUIStore((s) => s.setPendingDraftId);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useThreadEmails(emailAddress, activeFolder);
@@ -376,7 +377,13 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
               isFocused={thread.threadId === focusedThreadId}
               isFlow={isFlow}
               focusedActionsRef={focusedActionsRef}
-              onSelect={() => setActiveThread(thread.threadId)}
+              onSelect={() => {
+                if (thread.isDraft) {
+                  setPendingDraftId(thread.lastEmailId);
+                } else {
+                  setActiveThread(thread.threadId);
+                }
+              }}
               onHover={() => {
                 setFocusedThread(thread.threadId);
                 prefetchThread(thread.threadId);

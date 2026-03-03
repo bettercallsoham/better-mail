@@ -101,6 +101,7 @@ export interface SystemFolders {
   sent: number;
   important: number;
   drafts: number;
+  spam?: number;
 }
 
 export interface MailLabel {

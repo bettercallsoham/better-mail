@@ -621,7 +621,7 @@ function AIPopover({
     <div
       ref={containerRef}
       className={cn(
-        "absolute z-50 bottom-full left-2 right-2 mx-auto max-w-[300px] mb-2",
+        "absolute z-50 bottom-[calc(100%+110px)] left-2 right-2 mx-auto max-w-[300px]",
         "bg-white dark:bg-[#1f1f1f]",
         "rounded-xl overflow-visible",
         "border border-black/[0.08] dark:border-white/[0.09]",

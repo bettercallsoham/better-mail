@@ -1,9 +1,15 @@
 "use client";
 
-import React, { useState, useCallback, Suspense } from "react";
+import React, {
+  useState,
+  useCallback,
+  Suspense,
+  useEffect,
+  useRef,
+} from "react";
 import { Sidebar, SidebarBody } from "@/components/ui/sidebar";
 import { useUIStore } from "@/lib/store/ui.store";
-import { useFolders } from "@/features/mailbox/mailbox.query";
+import { useFolders, useDraft } from "@/features/mailbox/mailbox.query";
 import {
   IconMenu2,
   IconX,
@@ -24,6 +30,7 @@ import {
 import { AccountSwitcher } from "./ui/AccountSwitcher";
 import { UserFooter, MobileUserAvatarButton } from "./ui/UserFooter";
 import { ComposeDialog } from "@/components/composer/ComposeDialog";
+import type { OpenComposerParams } from "@/lib/store/composer.store";
 import { InboxZeroQueueDialog } from "@/components/inbox-zero/InboxZeroQueueDialog";
 import { useKeyboard } from "@/hooks/keyboard/useKeyboard";
 import {
@@ -241,11 +248,17 @@ export function DashboardSidebar() {
   const [isHovering, setIsHovering] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [dialogs, setDialogs] = useState<string[]>([]);
+  const [dialogs, setDialogs] = useState<
+    { key: string; params?: Partial<OpenComposerParams> }[]
+  >([]);
 
-  const openCompose = useCallback(() => {
-    if (dialogs.length < 2) setDialogs((d) => [...d, crypto.randomUUID()]);
-  }, [dialogs.length]);
+  const openCompose = useCallback(
+    (params?: Partial<OpenComposerParams>) => {
+      if (dialogs.length < 2)
+        setDialogs((d) => [...d, { key: crypto.randomUUID(), params }]);
+    },
+    [dialogs.length],
+  );
 
   const handleSelectFolder = useCallback(
     (folder: string) => {
@@ -256,7 +269,7 @@ export function DashboardSidebar() {
   );
 
   // N key opens compose (disabled when typing in inputs — handled by useKeyboard)
-  useKeyboard("n", openCompose, [openCompose]);
+  useKeyboard("n", () => openCompose(), [openCompose]);
 
   const isOpen = !collapsed || isHovering || dropdownOpen;
   const noop = () => {};
@@ -424,7 +437,7 @@ export function DashboardSidebar() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={openCompose}
+                        onClick={() => openCompose()}
                         className={cn(
                           "flex items-center justify-center gap-2 rounded-xl transition-all duration-150",
                           "bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.97]",
@@ -477,12 +490,16 @@ export function DashboardSidebar() {
       </div>
 
       {/* Compose modals — up to 2 open at once; each is independently closeable */}
-      {dialogs.map((key) => (
+      {dialogs.map(({ key, params }) => (
         <ComposeDialog
           key={key}
-          onClose={() => setDialogs((d) => d.filter((k) => k !== key))}
+          openParams={params}
+          onClose={() =>
+            setDialogs((d) => d.filter((item) => item.key !== key))
+          }
         />
       ))}
+      <DraftComposerLauncher onOpen={(p) => openCompose(p)} />
 
       {/* Inbox Zero triage dialog — globally accessible */}
       {inboxZeroOpen && (
@@ -495,4 +512,61 @@ export function DashboardSidebar() {
       )}
     </>
   );
+}
+
+// ─── Draft → ComposeDialog launcher ──────────────────────────────────────────
+// Watches UIStore for a pending draft ID. When set, loads the draft (via
+// Suspense query) and opens a ComposeDialog pre-populated with its content.
+
+function DraftComposerLauncher({
+  onOpen,
+}: {
+  onOpen: (params: Partial<OpenComposerParams>) => void;
+}) {
+  const pendingDraftId = useUIStore((s) => s.pendingDraftId);
+  const setPendingDraftId = useUIStore((s) => s.setPendingDraftId);
+
+  if (!pendingDraftId) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <DraftLoader
+        id={pendingDraftId}
+        onOpen={onOpen}
+        onDone={() => setPendingDraftId(null)}
+      />
+    </Suspense>
+  );
+}
+
+function DraftLoader({
+  id,
+  onOpen,
+  onDone,
+}: {
+  id: string;
+  onOpen: (params: Partial<OpenComposerParams>) => void;
+  onDone: () => void;
+}) {
+  const { data: draft } = useDraft(id);
+  const openedRef = useRef(false);
+
+  useEffect(() => {
+    if (openedRef.current || !draft) return;
+    openedRef.current = true;
+    onOpen({
+      draftId: draft.id,
+      providerDraftId: draft.draftData.providerDraftId,
+      initialHtml: draft.bodyHtml,
+      subject: draft.subject,
+      from: draft.emailAddress,
+      provider: draft.provider === "gmail" ? "GOOGLE" : "OUTLOOK",
+      to: draft.to.map((r) => ({ email: r.email, name: r.name })),
+      cc: draft.cc.map((r) => ({ email: r.email, name: r.name })),
+      bcc: draft.bcc.map((r) => ({ email: r.email, name: r.name })),
+    });
+    onDone();
+  }, [draft, onOpen, onDone]);
+
+  return null;
 }
