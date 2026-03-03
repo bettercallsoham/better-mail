@@ -20,6 +20,7 @@ class EmailAccount extends Model<
   declare refresh_token: string | null;
   declare subscription_id: string | null;
   declare subscription_expiration: Date | null;
+  declare avatar_url: string | null;
 
   declare email_engine_id: string | null;
   declare created_at: CreationOptional<Date>;
@@ -79,6 +80,11 @@ EmailAccount.init(
 
     subscription_expiration: {
       type: DataTypes.DATE,
+      allowNull: true,
+    },
+
+    avatar_url: {
+      type: DataTypes.TEXT,
       allowNull: true,
     },
 

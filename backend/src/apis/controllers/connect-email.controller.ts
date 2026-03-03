@@ -2,6 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 import jwt from "jsonwebtoken";
 const { JWT_SECRET } = process.env;
 import bcrypt from "bcrypt";
+import axios from "axios";
 import { Request, Response } from "express";
 import { EmailAccount, User } from "../../shared/models";
 import { GoogleOAuthService } from "../services/oauth/google-oauth.service";
@@ -9,6 +10,28 @@ import { OutlookOAuthService } from "../services/oauth/outlook-oauth.service";
 import redis from "../../shared/config/redis";
 import { handleMailboxConnectionQueue } from "../../shared/queues/handle-mailbox-connection";
 import { invalidateUserEmailsCache } from "../utils/email-helper";
+
+/**
+ * Fetch the Outlook profile photo from Microsoft Graph and return it
+ * as a base64 data URL. Returns null if unavailable.
+ */
+async function fetchOutlookAvatar(accessToken: string): Promise<string | null> {
+  try {
+    const response = await axios.get(
+      "https://graph.microsoft.com/v1.0/me/photo/$value",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        responseType: "arraybuffer",
+        timeout: 5000,
+      },
+    );
+    const contentType = response.headers["content-type"] ?? "image/jpeg";
+    const base64 = Buffer.from(response.data).toString("base64");
+    return `data:${contentType};base64,${base64}`;
+  } catch {
+    return null;
+  }
+}
 
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined");
@@ -106,12 +129,14 @@ export const gmailConnectCallback = asyncHandler(async (req, res) => {
       provider: "GOOGLE",
       email: identity.email,
       refresh_token: tokens.refresh_token,
+      avatar_url: identity.avatar || null,
     });
   } else {
     await EmailAccount.upsert({
       user_id: userId,
       provider: "GOOGLE",
       email: identity.email,
+      avatar_url: identity.avatar || null,
     });
   }
 
@@ -179,6 +204,11 @@ export const outlookConnectCallback = asyncHandler(
     }
 
     /**
+     * Fetch profile photo from Graph API (best-effort)
+     */
+    const avatarUrl = await fetchOutlookAvatar(tokens.access_token);
+
+    /**
      * Persist email account
      */
     await EmailAccount.upsert({
@@ -186,6 +216,7 @@ export const outlookConnectCallback = asyncHandler(
       provider: "OUTLOOK",
       email: identity.email,
       refresh_token: tokens.refresh_token ?? null,
+      avatar_url: avatarUrl,
     });
 
     await handleMailboxConnectionQueue.add(handleMailboxConnectionQueue.name, {

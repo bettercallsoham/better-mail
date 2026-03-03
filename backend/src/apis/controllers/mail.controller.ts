@@ -26,7 +26,7 @@ export const getConnectedMailboxes = asyncHandler(
       where: {
         user_id: userId,
       },
-      attributes: ["id", "email", "created_at"],
+      attributes: ["id", "email", "provider", "avatar_url", "created_at"],
     });
 
     res.json({

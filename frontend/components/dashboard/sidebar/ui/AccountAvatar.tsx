@@ -18,6 +18,9 @@ export function AccountAvatar({ email, avatar, size = "md", isActive }: Props) {
         <Image
           src={avatar}
           alt={email}
+          width={size === "sm" ? 28 : 32}
+          height={size === "sm" ? 28 : 32}
+          unoptimized
           className={cn(
             "rounded-lg object-cover ring-1 ring-black/10 dark:ring-white/10",
             dim,

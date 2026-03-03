@@ -3,6 +3,7 @@ export interface ConnectedAccount {
   email: string;
   created_at: string;
   provider?: string;
+  avatar_url?: string | null;
 }
 
 export interface GetConnectedAccountsResponse {

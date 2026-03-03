@@ -234,7 +234,11 @@ function AddAccountDropdown({
                 onClick={() => onSwitch(account.email)}
                 className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg cursor-pointer"
               >
-                <AccountAvatar email={account.email} size="sm" />
+                <AccountAvatar
+                  email={account.email}
+                  avatar={account.avatar_url ?? undefined}
+                  size="sm"
+                />
                 <span className="flex-1 truncate text-[12.5px]">
                   {account.email}
                 </span>
@@ -301,7 +305,11 @@ function CollapsedDropdown({
             onClick={() => onSwitch(account.email)}
             className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg cursor-pointer"
           >
-            <AccountAvatar email={account.email} size="sm" />
+            <AccountAvatar
+              email={account.email}
+              avatar={account.avatar_url ?? undefined}
+              size="sm"
+            />
             <span className="flex-1 truncate text-[12.5px]">
               {account.email}
             </span>
@@ -368,7 +376,12 @@ function AccountSwitcherInner({
               {isAllAccounts ? (
                 <AllAccountsChip isActive />
               ) : (
-                <AccountAvatar email={activeEmail!} isActive size="md" />
+                <AccountAvatar
+                  email={activeEmail!}
+                  avatar={activeAccount?.avatar_url ?? undefined}
+                  isActive
+                  size="md"
+                />
               )}
             </button>
           </CollapsedDropdown>
@@ -398,6 +411,7 @@ function AccountSwitcherInner({
                     >
                       <AccountAvatar
                         email={account.email}
+                        avatar={account.avatar_url ?? undefined}
                         isActive={account.email === activeEmail}
                         size="md"
                       />
