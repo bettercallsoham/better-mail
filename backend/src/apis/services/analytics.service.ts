@@ -233,10 +233,13 @@ export class AnalyticsService {
         ? Math.round((newsletterCount / totalReceived) * 100)
         : 0;
 
+    // When there's no data at all both ratios are 0 ("no data"), not 100/0
+    const humanRatio = totalReceived > 0 ? Math.max(0, 100 - newsletterRatio) : 0;
+
     return {
       topSenders,
       newsletterRatio,
-      humanRatio: Math.max(0, 100 - newsletterRatio),
+      humanRatio,
       attachmentSenders,
       totalReceived,
       dateRange,
@@ -279,11 +282,6 @@ export class AnalyticsService {
                 field: "snoozeUntil",
                 calendar_interval: "week",
                 format: "yyyy-MM-dd",
-                min_doc_count: 0,
-                extended_bounds: {
-                  min: dateRange.from,
-                  max: dateRange.to,
-                },
               },
             },
             avg_snooze_until: {
