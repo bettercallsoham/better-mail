@@ -130,7 +130,8 @@ export const mailboxService = {
     const searchParams = new URLSearchParams();
     if (params?.from) searchParams.append("from", params.from);
     if (params?.size) searchParams.append("size", params.size.toString());
-    if (params?.cursor) searchParams.append("cursor", params.cursor);
+    if (params?.page !== undefined && params.page !== null)
+      searchParams.append("page", params.page.toString());
     return apiClient<GetInboxZeroResponse>(
       `/mail/inbox-zero?${searchParams.toString()}`,
     );
@@ -186,14 +187,14 @@ export const mailboxService = {
   deleteSavedSearch: (id: string) =>
     apiClient(`/mail/saved-searches/${id}`, { method: "DELETE" }),
 
-  // Updated to match your JSON structure and support pagination
   getEmailsFromSender: (
     senderEmail: string,
-    params?: { size?: number; cursor?: string },
+    params?: { size?: number; page?: number },
   ) => {
     const searchParams = new URLSearchParams();
     if (params?.size) searchParams.append("size", params.size.toString());
-    if (params?.cursor) searchParams.append("cursor", params.cursor);
+    if (params?.page !== undefined && params.page !== null)
+      searchParams.append("page", params.page.toString());
 
     return apiClient<GetEmailsFromSenderResponse>(
       `/mail/from/${encodeURIComponent(senderEmail)}?${searchParams.toString()}`,

@@ -387,9 +387,9 @@ export function useInboxZero(params?: InboxZeroParams) {
   return useSuspenseInfiniteQuery({
     queryKey: mailboxKeys.inboxZero(params),
     queryFn: ({ pageParam }) =>
-      mailboxService.getInboxZero({ ...params, cursor: pageParam as string }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? null,
+      mailboxService.getInboxZero({ ...params, page: pageParam as number }),
+    initialPageParam: 0 as number,
+    getNextPageParam: (lastPage) => lastPage.nextPage ?? null,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });

@@ -36,17 +36,37 @@ async function processGmailWebhook(job: Job<GmailWebhookJobData>) {
 
   await elasticService.bulkIndexEmails(documents);
 
-  const accounts = await getUserIdsByEmail(email);
+  // Queue embeddings only for non-draft emails
+  const nonDraftDocs = documents.filter((d) => !d.isDraft);
+  await Promise.all(
+    nonDraftDocs.map((doc) =>
+      embeddingsQueue
+        .add("generate-embedding", {
+          emailAddress: doc.emailAddress,
+          provider: doc.provider,
+          providerMessageId: doc.providerMessageId,
+        })
+        .catch((err) =>
+          logger.error(
+            `Failed to queue embedding for ${doc.providerMessageId}: ${err.message}`,
+          ),
+        ),
+    ),
+  );
 
-  for (const userId of accounts) {
-    await pusher.trigger(
-      `private-user-${userId}-notifications`,
-      "mail.received",
-      {
-        messages,
-        total: documents.length,
-      },
-    );
+  // Only notify for real received emails — skip drafts
+  if (nonDraftDocs.length > 0) {
+    const accounts = await getUserIdsByEmail(email);
+    for (const userId of accounts) {
+      await pusher.trigger(
+        `private-user-${userId}-notifications`,
+        "mail.received",
+        {
+          messages: nonDraftDocs,
+          total: nonDraftDocs.length,
+        },
+      );
+    }
   }
 
   await redis.set(`gmail:history:${email}`, historyId);
@@ -54,7 +74,6 @@ async function processGmailWebhook(job: Job<GmailWebhookJobData>) {
   logger.info(
     `Gmail webhook processed: ${email}, indexed ${documents.length} emails, updated historyId to ${historyId}`,
   );
-  
 
   return {
     success: true,

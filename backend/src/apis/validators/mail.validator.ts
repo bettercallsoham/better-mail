@@ -370,7 +370,10 @@ export const validateGetInboxZero = [
     .isInt({ min: 1, max: 100 })
     .withMessage("size must be between 1 and 100"),
 
-  query("cursor").optional().isString().withMessage("cursor must be a string"),
+  query("page")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("page must be a non-negative integer"),
 
   handleValidationErrors,
 ];
@@ -682,6 +685,12 @@ export const validateListThreadNotes = [
     .isInt({ min: 0 })
     .withMessage("Offset must be a non-negative integer"),
 
+  query("query")
+    .optional()
+    .isString()
+    .trim()
+    .withMessage("Query must be a string"),
+
   handleValidationErrors,
 ];
 export const validateGetEmailsFromUser = [
@@ -697,7 +706,10 @@ export const validateGetEmailsFromUser = [
     .isInt({ min: 1, max: 100 })
     .withMessage("Size must be between 1 and 100"),
 
-  query("cursor").optional().isString().withMessage("Cursor must be a string"),
+  query("page")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("Page must be a non-negative integer"),
 
   handleValidationErrors,
 ];

@@ -6,7 +6,9 @@ import { elasticClient } from "../shared/config/elastic";
 import { logger } from "../shared/utils/logger";
 import { OutlookWebhookJobData } from "../shared/queues/handle-webhook.queue";
 import { transformOutlookToUnified } from "../shared/utils/helpers/outlook-helper";
-import { EmailAccount } from "../shared/models";
+import { embeddingsQueue } from "../shared/queues/generate-embeddings.queue";
+import { pusher } from "../shared/config/pusher";
+import { getUserIdsByEmail } from "../apis/utils/email-helper";
 
 const elasticService = new ElasticsearchService(elasticClient);
 
@@ -26,7 +28,29 @@ async function processOutlookWebhook(job: Job<OutlookWebhookJobData>) {
   const document = transformOutlookToUnified(message, email, true);
   await elasticService.indexEmail(document);
 
-  logger.info(`Outlook webhook processed: ${email}, messageId: ${messageId}`);
+  // Queue embeddings and notify — only for non-draft emails
+  if (!document.isDraft) {
+    await embeddingsQueue
+      .add("generate-embedding", {
+        emailAddress: document.emailAddress,
+        provider: document.provider,
+        providerMessageId: document.providerMessageId,
+      })
+      .catch((err) =>
+        logger.error(
+          `Failed to queue embedding for ${document.providerMessageId}: ${err.message}`,
+        ),
+      );
+
+    const accounts = await getUserIdsByEmail(email);
+    for (const userId of accounts) {
+      await pusher.trigger(
+        `private-user-${userId}-notifications`,
+        "mail.received",
+        { messages: [document], total: 1 },
+      );
+    }
+  }
 
   return {
     success: true,

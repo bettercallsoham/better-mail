@@ -451,220 +451,277 @@ export class ElasticsearchService {
     }
   }
 
+  async searchEmails(params: {
+    emailAddresses: string[];
+    query: string;
+    size?: number;
+    page?: number;
+    filters?: {
+      isRead?: boolean;
+      isStarred?: boolean;
+      isArchived?: boolean;
+      hasAttachments?: boolean;
+      from?: string;
+      to?: string;
+      labels?: string[];
+      dateFrom?: string;
+      dateTo?: string;
+    };
+  }) {
+    const { emailAddresses, query, size = 20, page = 0, filters = {} } = params;
+    const trimmed = query.trim();
 
-async searchEmails(params: {
-  emailAddresses: string[];
-  query: string;
-  size?: number;
-  page?: number;
-  filters?: {
-    isRead?: boolean;
-    isStarred?: boolean;
-    isArchived?: boolean;
-    hasAttachments?: boolean;
-    from?: string;
-    to?: string;
-    labels?: string[];
-    dateFrom?: string;
-    dateTo?: string;
-  };
-}) {
-  const { emailAddresses, query, size = 20, page = 0, filters = {} } = params;
-  const trimmed = query.trim();
+    // ── Email filters ──────────────────────────────────────────────────────────
+    const mustFilters: object[] = [
+      { terms: { emailAddress: emailAddresses } },
+      { term: { isDeleted: false } },
+    ];
 
-  // ── Email filters ──────────────────────────────────────────────────────────
-  const mustFilters: object[] = [
-    { terms: { emailAddress: emailAddresses } },
-    { term:  { isDeleted: false } },
-  ];
-
-  if (filters.isRead         !== undefined) mustFilters.push({ term: { isRead:          filters.isRead         } });
-  if (filters.isStarred      !== undefined) mustFilters.push({ term: { isStarred:       filters.isStarred      } });
-  if (filters.isArchived     !== undefined) mustFilters.push({ term: { isArchived:      filters.isArchived     } });
-  if (filters.hasAttachments !== undefined) mustFilters.push({ term: { hasAttachments:  filters.hasAttachments } });
-  if (filters.from) mustFilters.push({ term: { "from.email": filters.from.toLowerCase() } });
-  if (filters.to) {
-    mustFilters.push({
-      nested: { path: "to", query: { term: { "to.email": filters.to.toLowerCase() } } },
-    });
-  }
-  if (filters.labels?.length) mustFilters.push({ terms: { labels: filters.labels } });
-  if (filters.dateFrom || filters.dateTo) {
-    mustFilters.push({
-      range: {
-        receivedAt: {
-          ...(filters.dateFrom && { gte: filters.dateFrom }),
-          ...(filters.dateTo   && { lte: filters.dateTo   }),
+    if (filters.isRead !== undefined)
+      mustFilters.push({ term: { isRead: filters.isRead } });
+    if (filters.isStarred !== undefined)
+      mustFilters.push({ term: { isStarred: filters.isStarred } });
+    if (filters.isArchived !== undefined)
+      mustFilters.push({ term: { isArchived: filters.isArchived } });
+    if (filters.hasAttachments !== undefined)
+      mustFilters.push({ term: { hasAttachments: filters.hasAttachments } });
+    if (filters.from)
+      mustFilters.push({ term: { "from.email": filters.from.toLowerCase() } });
+    if (filters.to) {
+      mustFilters.push({
+        nested: {
+          path: "to",
+          query: { term: { "to.email": filters.to.toLowerCase() } },
         },
-      },
-    });
-  }
-
-  // ── With query: single msearch — [0] notes, [1] emails ────────────────────
-  if (trimmed) {
-    const { responses } = await this.client.msearch({
-      searches: [
-        // ── [0] Notes probe ── threads index, lightweight ──────────────────
-        // emailAddress filter intentionally omitted: existing notes were saved
-        // before emailAddress was added to the upsert. Once all notes have it
-        // (going forward), restore: filter: [{ terms: { emailAddress: emailAddresses } }]
-        // Security: note threadIds are UUIDs; the email results query still
-        // enforces emailAddress ownership so boosted results stay scoped.
-        { index: this.THREADS_INDEX },
-        {
-          size:    50,
-          _source: ["threadId"],
-          query: {
-            bool: {
-              must: [{ match: { notes: { query: trimmed, operator: "or", fuzziness: "AUTO" } } }],
-            },
+      });
+    }
+    if (filters.labels?.length)
+      mustFilters.push({ terms: { labels: filters.labels } });
+    if (filters.dateFrom || filters.dateTo) {
+      mustFilters.push({
+        range: {
+          receivedAt: {
+            ...(filters.dateFrom && { gte: filters.dateFrom }),
+            ...(filters.dateTo && { lte: filters.dateTo }),
           },
         },
+      });
+    }
 
-        // ── [1] Email search ── emails index ───────────────────────────────
-        { index: this.EMAILS_INDEX },
-        {
-          size,
-          from: page * size,
-          _source: { excludes: ["bodyText", "bodyHtml", "searchText", "embedding", "attachments"] },
-          query: {
-            bool: {
-              must: [{
-                bool: {
-                  should: [
-                    // Exact phrase on subject — highest priority
-                    { match_phrase: { subject: { query: trimmed, boost: 4 } } },
-                    // BM25 across all content fields (searchText = subject + bodyText + snippet via copy_to)
-                    {
-                      multi_match: {
-                        query:     trimmed,
-                        fields:    ["subject^3", "searchText^2", "snippet^1.5", "from.email"],
-                        type:      "best_fields" as const,
-                        operator:  "or"          as const,
+    // ── With query: single msearch — [0] notes, [1] emails ────────────────────
+    if (trimmed) {
+      const { responses } = await this.client.msearch({
+        searches: [
+          // ── [0] Notes probe ── threads index, lightweight ──────────────────
+          // emailAddress filter intentionally omitted: existing notes were saved
+          // before emailAddress was added to the upsert. Once all notes have it
+          // (going forward), restore: filter: [{ terms: { emailAddress: emailAddresses } }]
+          // Security: note threadIds are UUIDs; the email results query still
+          // enforces emailAddress ownership so boosted results stay scoped.
+          { index: this.THREADS_INDEX },
+          {
+            size: 50,
+            _source: ["threadId"],
+            query: {
+              bool: {
+                must: [
+                  {
+                    match: {
+                      notes: {
+                        query: trimmed,
+                        operator: "or",
                         fuzziness: "AUTO",
-                        boost:     2,
                       },
                     },
-                    // Phrase prefix for partial/autocomplete typing
-                    {
-                      multi_match: {
-                        query:  trimmed,
-                        fields: ["subject^2", "searchText"],
-                        type:   "phrase_prefix" as const,
-                        boost:  1.5,
-                      },
+                  },
+                ],
+              },
+            },
+          },
+
+          // ── [1] Email search ── emails index ───────────────────────────────
+          { index: this.EMAILS_INDEX },
+          {
+            size,
+            from: page * size,
+            _source: {
+              excludes: [
+                "bodyText",
+                "bodyHtml",
+                "searchText",
+                "embedding",
+                "attachments",
+              ],
+            },
+            query: {
+              bool: {
+                must: [
+                  {
+                    bool: {
+                      should: [
+                        // Exact phrase on subject — highest priority
+                        {
+                          match_phrase: {
+                            subject: { query: trimmed, boost: 4 },
+                          },
+                        },
+                        // BM25 across all content fields (searchText = subject + bodyText + snippet via copy_to)
+                        {
+                          multi_match: {
+                            query: trimmed,
+                            fields: [
+                              "subject^3",
+                              "searchText^2",
+                              "snippet^1.5",
+                              "from.email",
+                            ],
+                            type: "best_fields" as const,
+                            operator: "or" as const,
+                            fuzziness: "AUTO",
+                            boost: 2,
+                          },
+                        },
+                        // Phrase prefix for partial/autocomplete typing
+                        {
+                          multi_match: {
+                            query: trimmed,
+                            fields: ["subject^2", "searchText"],
+                            type: "phrase_prefix" as const,
+                            boost: 1.5,
+                          },
+                        },
+                      ],
+                      minimum_should_match: 1,
                     },
-                  ],
-                  minimum_should_match: 1,
+                  },
+                ],
+                filter: mustFilters,
+              },
+            },
+            sort: [
+              { _score: { order: "desc" } },
+              { receivedAt: { order: "desc" } },
+            ],
+            highlight: {
+              fields: {
+                subject: {
+                  number_of_fragments: 0,
+                  pre_tags: ["<mark>"],
+                  post_tags: ["</mark>"],
                 },
-              }],
-              filter: mustFilters,
+                snippet: {
+                  number_of_fragments: 1,
+                  fragment_size: 150,
+                  pre_tags: ["<mark>"],
+                  post_tags: ["</mark>"],
+                },
+              },
             },
           },
-          sort:      [{ _score: { order: "desc" } }, { receivedAt: { order: "desc" } }],
-          highlight: {
-            fields: {
-              subject: { number_of_fragments: 0,    pre_tags: ["<mark>"], post_tags: ["</mark>"] },
-              snippet: { number_of_fragments: 1, fragment_size: 150, pre_tags: ["<mark>"], post_tags: ["</mark>"] },
-            },
-          },
-        },
-      ],
+        ],
+      });
+
+      // ── Extract note threadIds from response[0] ────────────────────────────
+      const noteSet = new Set<string>();
+      const notesResp = responses[0];
+      if (notesResp && "hits" in notesResp) {
+        for (const h of notesResp.hits.hits) {
+          const tid = (h._source as { threadId?: string })?.threadId;
+          if (tid) noteSet.add(tid);
+        }
+      }
+
+      // ── Parse + re-rank email hits from response[1] ────────────────────────
+      const emailsResp = responses[1];
+      if (!emailsResp || !("hits" in emailsResp)) {
+        return { emails: [], total: 0, page, nextPage: null };
+      }
+
+      const NOTE_BOOST = 3;
+      const hits = emailsResp.hits.hits;
+
+      // O(n) re-rank on page size only — negligible
+      const ranked = hits
+        .map((hit) => {
+          const src = hit._source as UnifiedEmailDocument;
+          const base = hit._score ?? 0;
+          return {
+            hit,
+            src,
+            score: noteSet.has(src.threadId) ? base + NOTE_BOOST : base,
+          };
+        })
+        .sort((a, b) => b.score - a.score);
+
+      return {
+        emails: ranked.map(({ hit, src, score }) => ({
+          id: hit._id,
+          threadId: src.threadId,
+          score,
+          subject: (hit as any).highlight?.subject?.[0] ?? src.subject,
+          snippet: (hit as any).highlight?.snippet?.[0] ?? src.snippet,
+          receivedAt: src.receivedAt,
+          from: src.from,
+          to: src.to,
+          isRead: src.isRead,
+          isStarred: src.isStarred,
+          isArchived: src.isArchived,
+          hasAttachments: src.hasAttachments,
+          labels: src.labels,
+          emailAddress: src.emailAddress,
+          provider: src.provider,
+        })),
+        total: (emailsResp.hits.total as { value: number }).value,
+        page,
+        nextPage: hits.length === size ? page + 1 : null,
+      };
+    }
+
+    // ── No query — plain filtered search, zero notes overhead ─────────────────
+    const result = await this.client.search({
+      index: this.EMAILS_INDEX,
+      size,
+      from: page * size,
+      _source: {
+        excludes: [
+          "bodyText",
+          "bodyHtml",
+          "searchText",
+          "embedding",
+          "attachments",
+        ],
+      },
+      query: { bool: { filter: mustFilters } },
+      sort: [{ receivedAt: { order: "desc" } }],
     });
 
-    // ── Extract note threadIds from response[0] ────────────────────────────
-    const noteSet = new Set<string>();
-    const notesResp = responses[0];
-    if (notesResp && "hits" in notesResp) {
-      for (const h of notesResp.hits.hits) {
-        const tid = (h._source as { threadId?: string })?.threadId;
-        if (tid) noteSet.add(tid);
-      }
-    }
-
-    // ── Parse + re-rank email hits from response[1] ────────────────────────
-    const emailsResp = responses[1];
-    if (!emailsResp || !("hits" in emailsResp)) {
-      return { emails: [], total: 0, page, nextPage: null };
-    }
-
-    const NOTE_BOOST = 3;
-    const hits = emailsResp.hits.hits;
-
-    // O(n) re-rank on page size only — negligible
-    const ranked = hits
-      .map((hit) => {
-        const src  = hit._source as UnifiedEmailDocument;
-        const base = hit._score ?? 0;
-        return {
-          hit,
-          src,
-          score: noteSet.has(src.threadId) ? base + NOTE_BOOST : base,
-        };
-      })
-      .sort((a, b) => b.score - a.score);
-
+    const hits = result.hits.hits;
     return {
-      emails: ranked.map(({ hit, src, score }) => ({
-        id:             hit._id,
-        threadId:       src.threadId,
-        score,
-        subject:        (hit as any).highlight?.subject?.[0] ?? src.subject,
-        snippet:        (hit as any).highlight?.snippet?.[0] ?? src.snippet,
-        receivedAt:     src.receivedAt,
-        from:           src.from,
-        to:             src.to,
-        isRead:         src.isRead,
-        isStarred:      src.isStarred,
-        isArchived:     src.isArchived,
-        hasAttachments: src.hasAttachments,
-        labels:         src.labels,
-        emailAddress:   src.emailAddress,
-        provider:       src.provider,
-      })),
-      total:    (emailsResp.hits.total as { value: number }).value,
+      emails: hits.map((hit) => {
+        const src = hit._source as UnifiedEmailDocument;
+        return {
+          id: hit._id,
+          threadId: src.threadId,
+          score: 0,
+          subject: src.subject,
+          snippet: src.snippet,
+          receivedAt: src.receivedAt,
+          from: src.from,
+          to: src.to,
+          isRead: src.isRead,
+          isStarred: src.isStarred,
+          isArchived: src.isArchived,
+          hasAttachments: src.hasAttachments,
+          labels: src.labels,
+          emailAddress: src.emailAddress,
+          provider: src.provider,
+        };
+      }),
+      total: (result.hits.total as { value: number }).value,
       page,
       nextPage: hits.length === size ? page + 1 : null,
     };
   }
-
-  // ── No query — plain filtered search, zero notes overhead ─────────────────
-  const result = await this.client.search({
-    index:   this.EMAILS_INDEX,
-    size,
-    from:    page * size,
-    _source: { excludes: ["bodyText", "bodyHtml", "searchText", "embedding", "attachments"] },
-    query:   { bool: { filter: mustFilters } },
-    sort:    [{ receivedAt: { order: "desc" } }],
-  });
-
-  const hits = result.hits.hits;
-  return {
-    emails: hits.map((hit) => {
-      const src = hit._source as UnifiedEmailDocument;
-      return {
-        id:             hit._id,
-        threadId:       src.threadId,
-        score:          0,
-        subject:        src.subject,
-        snippet:        src.snippet,
-        receivedAt:     src.receivedAt,
-        from:           src.from,
-        to:             src.to,
-        isRead:         src.isRead,
-        isStarred:      src.isStarred,
-        isArchived:     src.isArchived,
-        hasAttachments: src.hasAttachments,
-        labels:         src.labels,
-        emailAddress:   src.emailAddress,
-        provider:       src.provider,
-      };
-    }),
-    total:    (result.hits.total as { value: number }).value,
-    page,
-    nextPage: hits.length === size ? page + 1 : null,
-  };
-}
   /**
    * Top level thread Emails
    */
@@ -717,6 +774,8 @@ async searchEmails(params: {
       }
     };
 
+    const lower = folder.toLowerCase();
+
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
       size,
@@ -728,6 +787,15 @@ async searchEmails(params: {
             { term: { isDeleted: false } },
             folderFilter(),
           ],
+          // Exclude archived and draft emails from every view except their own
+          ...(lower !== "archived" && lower !== "drafts"
+            ? {
+                must_not: [
+                  { term: { isArchived: true } },
+                  { term: { isDraft: true } },
+                ],
+              }
+            : {}),
         },
       },
       sort: [{ receivedAt: "desc" }],
@@ -886,13 +954,14 @@ async searchEmails(params: {
   async getInboxZeroEmails(params: {
     emailAddresses: string[];
     size?: number;
-    cursor?: { receivedAt: string; id: string };
+    page?: number;
   }) {
-    const { emailAddresses, size = 20, cursor } = params;
+    const { emailAddresses, size = 20, page = 0 } = params;
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
       size,
+      from: page * size,
       query: {
         bool: {
           filter: [
@@ -916,10 +985,7 @@ async searchEmails(params: {
           minimum_should_match: 1,
         },
       },
-      sort: [{ receivedAt: "desc" }, { id: "asc" }],
-      ...(cursor && {
-        search_after: [cursor.receivedAt, cursor.id],
-      }),
+      sort: [{ receivedAt: "desc" }],
     });
 
     const hits = result.hits.hits;
@@ -927,13 +993,7 @@ async searchEmails(params: {
     return {
       emails: hits.map((hit) => hit._source as UnifiedEmailDocument),
       total: (result.hits.total as any).value,
-      nextCursor:
-        hits.length === size
-          ? {
-              receivedAt: (hits[hits.length - 1]._source as any).receivedAt,
-              id: (hits[hits.length - 1]._source as any).id,
-            }
-          : null,
+      nextPage: hits.length === size ? page + 1 : null,
     };
   }
 
@@ -1486,45 +1546,49 @@ async searchEmails(params: {
 
   /**
    * Get all emails from a specific sender
-   * Sorted by receivedAt ascending (earliest first)
+   * Sorted by receivedAt descending (latest first)
    */
   async getEmailsFromSender(params: {
     emailAddresses: string[];
     senderEmail: string;
     size?: number;
-    cursor?: { receivedAt: string; id: string };
+    page?: number;
   }) {
-    const { emailAddresses, senderEmail, size = 20, cursor } = params;
+    const { emailAddresses, senderEmail, size = 20, page = 0 } = params;
 
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
       size,
-      _source: [
-        "id",
-        "providerMessageId",
-        "providerThreadId",
-        "threadId",
-        "from",
-        "subject",
-        "snippet",
-        "receivedAt",
-        "sentAt",
-      ],
+      from: page * size,
+      _source: {
+        excludes: [
+          "bodyText",
+          "bodyHtml",
+          "searchText",
+          "embedding",
+          "attachments",
+        ],
+      },
       query: {
         bool: {
           filter: [
             { terms: { emailAddress: emailAddresses } },
-            { term: { "from.email": senderEmail.toLowerCase() } },
             { term: { isDeleted: false } },
           ],
+          // Emails either sent by OR received from this address
+          should: [
+            { term: { "from.email": senderEmail.toLowerCase() } },
+            {
+              nested: {
+                path: "to",
+                query: { term: { "to.email": senderEmail.toLowerCase() } },
+              },
+            },
+          ],
+          minimum_should_match: 1,
         },
       },
-      sort: [
-        { receivedAt: "asc" }, // Earliest first
-      ],
-      ...(cursor && {
-        search_after: [cursor.receivedAt, cursor.id],
-      }),
+      sort: [{ receivedAt: "desc" }],
     });
 
     const hits = result.hits.hits;
@@ -1535,13 +1599,7 @@ async searchEmails(params: {
         id: hit._id as string,
       })),
       total: (result.hits.total as any).value,
-      nextCursor:
-        hits.length === size
-          ? {
-              receivedAt: (hits[hits.length - 1]._source as any).receivedAt,
-              id: (hits[hits.length - 1]._source as any).id,
-            }
-          : null,
+      nextPage: hits.length === size ? page + 1 : null,
     };
   }
 
@@ -1559,24 +1617,36 @@ async searchEmails(params: {
     const mustConditions: any[] = [];
 
     if (query) {
+      const q = query.toLowerCase();
       mustConditions.push({
-        nested: {
-          path: "to",
-          query: {
-            bool: {
-              should: [
-                { wildcard: { "to.email": `*${query.toLowerCase()}*` } },
-                { match_phrase_prefix: { "to.name": query } },
-              ],
+        bool: {
+          should: [
+            // Match against to recipients
+            {
+              nested: {
+                path: "to",
+                query: {
+                  bool: {
+                    should: [
+                      { wildcard: { "to.email": `*${q}*` } },
+                      { match_phrase_prefix: { "to.name": query } },
+                    ],
+                  },
+                },
+              },
             },
-          },
+            // Match against from sender
+            { wildcard: { "from.email": `*${q}*` } },
+            { match_phrase_prefix: { "from.name": query } },
+          ],
+          minimum_should_match: 1,
         },
       });
     }
 
     const res = await this.client.search({
       index: this.EMAILS_INDEX,
-      size: 1000, // Get more results to aggregate unique recipients
+      size: 1000,
       query: {
         bool: {
           filter: [
@@ -1587,29 +1657,39 @@ async searchEmails(params: {
           must: mustConditions.length > 0 ? mustConditions : undefined,
         },
       },
-      sort: [{ sentAt: "desc" }],
-      _source: ["to", "sentAt"],
+      sort: [{ receivedAt: "desc" }],
+      _source: ["to", "from", "receivedAt", "sentAt"],
     });
 
-    // Manually aggregate unique recipients by email
+    // Aggregate unique contacts by email (both to recipients and from senders)
     const recipientMap = new Map<
       string,
       { email: string; name: string; lastUsed: string }
     >();
 
-    res.hits.hits.forEach((hit: any) => {
-      const doc = hit._source;
-      const recipients = Array.isArray(doc.to) ? doc.to : [doc.to];
-
-      recipients.forEach((recipient: any) => {
-        if (recipient?.email && !recipientMap.has(recipient.email)) {
-          recipientMap.set(recipient.email, {
-            email: recipient.email,
-            name: recipient.name || "",
-            lastUsed: doc.sentAt,
+    const addContact = (contact: any, date: string) => {
+      if (contact?.email && !recipientMap.has(contact.email)) {
+        // Skip our own addresses
+        if (!emailAddresses.includes(contact.email)) {
+          recipientMap.set(contact.email, {
+            email: contact.email,
+            name: contact.name || "",
+            lastUsed: date,
           });
         }
-      });
+      }
+    };
+
+    res.hits.hits.forEach((hit: any) => {
+      const doc = hit._source;
+      const date = doc.sentAt || doc.receivedAt || "";
+
+      // Collect to recipients
+      const toList = Array.isArray(doc.to) ? doc.to : doc.to ? [doc.to] : [];
+      toList.forEach((r: any) => addContact(r, date));
+
+      // Collect from sender
+      if (doc.from) addContact(doc.from, date);
     });
 
     const suggestions = Array.from(recipientMap.values()).slice(0, limit);

@@ -117,25 +117,41 @@ export class ThreadNoteService {
     emailAddresses: string[],
     limit: number = 50,
     offset: number = 0,
+    query?: string,
   ): Promise<ListNotesResult> {
     try {
       logger.info(
         `Listing notes for emails: ${JSON.stringify(emailAddresses)}`,
       );
 
+      const trimmed = query?.trim();
+
+      const esQuery = trimmed
+        ? {
+            bool: {
+              must: [
+                {
+                  match: {
+                    notes: {
+                      query: trimmed,
+                      fuzziness: "AUTO",
+                      operator: "or",
+                    },
+                  },
+                },
+              ],
+              filter: [{ terms: { "emailAddress.keyword": emailAddresses } }],
+            },
+          }
+        : {
+            bool: {
+              filter: [{ terms: { "emailAddress.keyword": emailAddresses } }],
+            },
+          };
+
       const result = await elasticClient.search({
         index: THREADS_INDEX,
-        query: {
-          bool: {
-            filter: [
-              {
-                terms: {
-                  "emailAddress.keyword": emailAddresses,
-                },
-              },
-            ],
-          },
-        },
+        query: esQuery as any,
         size: limit,
         from: offset,
         sort: [

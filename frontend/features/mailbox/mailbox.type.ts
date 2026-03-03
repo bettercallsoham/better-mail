@@ -275,13 +275,13 @@ export interface GetInboxZeroResponse {
   success: boolean;
   total: number;
   emails: InboxZeroEmail[];
-  nextCursor: string | null;
+  nextPage: number | null;
 }
 
 export interface InboxZeroParams {
   from?: string;
   size?: number;
-  cursor?: string;
+  page?: number;
 }
 
 export interface UpdateInboxStateParams {
@@ -428,14 +428,34 @@ export interface SenderEmail {
   providerMessageId: string;
   providerThreadId: string;
   threadId: string;
+  emailAddress: string;
+  provider: "gmail" | "outlook";
   receivedAt: string;
   sentAt: string;
   from: {
     email: string;
     name: string;
   };
+  to: {
+    email: string;
+    name?: string;
+  }[];
+  cc?: {
+    email: string;
+    name?: string;
+  }[];
+  bcc?: {
+    email: string;
+    name?: string;
+  }[];
   subject: string;
   snippet: string;
+  isRead: boolean;
+  isStarred: boolean;
+  isArchived: boolean;
+  isDraft: boolean;
+  hasAttachments: boolean;
+  labels?: string[];
 }
 
 export interface GetEmailsFromSenderResponse {
@@ -443,10 +463,7 @@ export interface GetEmailsFromSenderResponse {
   data: {
     sender: SenderInfo;
     emails: SenderEmail[];
-    nextCursor: {
-      receivedAt: string;
-      id: string;
-    } | null;
+    nextPage: number | null;
   };
 }
 

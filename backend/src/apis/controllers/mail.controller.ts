@@ -627,7 +627,7 @@ export const searchEmails = asyncHandler(
 export const getInboxZero = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
-    const { from: fromEmail, size, cursor } = req.query;
+    const { from: fromEmail, size, page } = req.query;
 
     if (!userId) {
       return res.status(401).json({
@@ -652,30 +652,17 @@ export const getInboxZero = asyncHandler(
     try {
       const elasticService = new ElasticsearchService(elasticClient);
 
-      // Parse cursor if provided
-      let parsedCursor;
-      if (cursor && typeof cursor === "string") {
-        try {
-          parsedCursor = JSON.parse(cursor);
-        } catch (e) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid cursor format",
-          });
-        }
-      }
-
       const result = await elasticService.getInboxZeroEmails({
         emailAddresses,
         size: size ? parseInt(size as string) : 20,
-        cursor: parsedCursor,
+        page: page ? parseInt(page as string) : 0,
       });
 
       res.json({
         success: true,
         total: result.total,
         emails: result.emails,
-        nextCursor: result.nextCursor,
+        nextPage: result.nextPage,
       });
     } catch (error: any) {
       logger.error("Failed to fetch inbox zero emails:", error);
@@ -1534,19 +1521,14 @@ export const getThreadNote = asyncHandler(
 
     // Ensure emailAddress is a single string
     const emailAddress =
-      typeof emailAddressParam === "string"
-        ? emailAddressParam
-        : undefined;
+      typeof emailAddressParam === "string" ? emailAddressParam : undefined;
 
     const emailToUse =
       emailAddress && emailAddresses.emails.includes(emailAddress)
         ? emailAddress
         : emailAddresses.emails[0];
 
-    const note = await threadNoteService.getNote(
-      emailToUse,
-      threadId
-    );
+    const note = await threadNoteService.getNote(emailToUse, threadId);
 
     return res.status(200).json({
       success: true,
@@ -1624,12 +1606,13 @@ export const listThreadNotes = asyncHandler(
       });
     }
 
-    const { limit, offset } = req.query;
+    const { limit, offset, query } = req.query;
 
     const result = await threadNoteService.listNotes(
       emailAddresses.emails,
       limit ? parseInt(limit as string) : undefined,
       offset ? parseInt(offset as string) : undefined,
+      query ? (query as string) : undefined,
     );
 
     res.status(200).json({
@@ -1646,13 +1629,13 @@ export const listThreadNotes = asyncHandler(
 );
 /**
  * Get all emails from a specific sender
- * GET /api/v1/mail/from/:senderEmail?size=20&cursor=...
+ * GET /api/v1/mail/from/:senderEmail?size=20&page=0
  */
 export const getEmailsFromUser = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
     const { senderEmail } = req.params;
-    const { size, cursor } = req.query;
+    const { size, page } = req.query;
 
     if (!userId) {
       return res.status(401).json({
@@ -1672,26 +1655,13 @@ export const getEmailsFromUser = asyncHandler(
     }
 
     try {
-      // Parse cursor if provided
-      let parsedCursor: { receivedAt: string; id: string } | undefined;
-      if (cursor && typeof cursor === "string") {
-        try {
-          parsedCursor = JSON.parse(cursor as string);
-        } catch (err) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid cursor format",
-          });
-        }
-      }
-
       const elasticService = new ElasticsearchService(elasticClient);
 
       const result = await elasticService.getEmailsFromSender({
         emailAddresses,
         senderEmail: senderEmail as string,
         size: size ? parseInt(size as string, 10) : 20,
-        cursor: parsedCursor,
+        page: page ? parseInt(page as string, 10) : 0,
       });
 
       res.json({
@@ -1702,7 +1672,7 @@ export const getEmailsFromUser = asyncHandler(
             totalCount: result.total,
           },
           emails: result.emails,
-          nextCursor: result.nextCursor,
+          nextPage: result.nextPage,
         },
       });
     } catch (error: any) {
