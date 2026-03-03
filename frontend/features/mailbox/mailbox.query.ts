@@ -16,7 +16,9 @@ import {
   CreateSavedSearchParams,
   EmailActionParams,
   EmailActionType,
+  GetInboxZeroResponse,
   GetThreadEmailsResponse,
+  InboxZeroEmail,
   InboxZeroParams,
   ReplyEmailParams,
   SearchQueryParams,
@@ -391,17 +393,78 @@ export function useInboxZero(params?: InboxZeroParams) {
     initialPageParam: 0 as number,
     getNextPageParam: (lastPage) => lastPage.nextPage ?? null,
     staleTime: 5 * 60 * 1000,
+    // Keep pages in memory for 30 min so navigating away and back is instant
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 }
+
+type InboxZeroCache = InfiniteData<GetInboxZeroResponse>;
 
 export function useUpdateInboxState() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: UpdateInboxStateParams) =>
       mailboxService.updateInboxState(params),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: mailboxKeys.inboxZero() });
+
+    onMutate: async (params) => {
+      // Cancel any in-flight inbox-zero fetches so they don't overwrite the patch
+      await queryClient.cancelQueries({
+        queryKey: [...mailboxKeys.all, "inbox-zero"],
+        exact: false,
+      });
+
+      // Snapshot all inbox-zero cache variants for rollback
+      const previous = queryClient.getQueriesData<InboxZeroCache>({
+        queryKey: [...mailboxKeys.all, "inbox-zero"],
+        exact: false,
+      });
+
+      const messageIdSet = new Set(params.messageIds);
+
+      // Surgically remove the actioned emails from every page of every cache variant
+      queryClient.setQueriesData<InboxZeroCache>(
+        { queryKey: [...mailboxKeys.all, "inbox-zero"], exact: false },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => {
+              const removed = page.emails.filter((e: InboxZeroEmail) =>
+                messageIdSet.has(e.providerMessageId),
+              ).length;
+              return {
+                ...page,
+                emails: page.emails.filter(
+                  (e: InboxZeroEmail) => !messageIdSet.has(e.providerMessageId),
+                ),
+                total: Math.max(0, page.total - removed),
+              };
+            }),
+          };
+        },
+      );
+
+      return { previous };
+    },
+
+    onError: (_err, _params, context) => {
+      // Roll back to the snapshot on failure
+      context?.previous?.forEach(([key, data]) =>
+        queryClient.setQueryData(key, data),
+      );
+      toast.error("Failed to update email", {
+        description: "Changes reverted. Please try again.",
+        duration: 4000,
+      });
+    },
+
+    onSettled: () => {
+      // Background sync from server after the mutation resolves (success or error)
+      queryClient.invalidateQueries({
+        queryKey: [...mailboxKeys.all, "inbox-zero"],
+        exact: false,
+      });
     },
   });
 }

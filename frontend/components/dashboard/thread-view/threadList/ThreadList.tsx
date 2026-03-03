@@ -14,6 +14,7 @@ import {
   useMailboxPrefetch,
   useSearchEmails,
 } from "@/features/mailbox/mailbox.query";
+import { useDebouncedPrefetch } from "@/hooks/useDebouncedPrefetch";
 import { useThreadNavigation } from "@/hooks/keyboard/useThreadNavigation";
 import { useThreadActions } from "@/hooks/keyboard/useThreadActions";
 import { useComposerStore } from "@/lib/store/composer.store";
@@ -287,6 +288,7 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
     useThreadEmails(emailAddress, activeFolder);
 
   const { prefetchThread } = useMailboxPrefetch();
+  const { onHover: debouncedPrefetch } = useDebouncedPrefetch(prefetchThread);
 
   const focusedActionsRef = useRef<ThreadActions | null>(null);
 
@@ -386,7 +388,7 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
               }}
               onHover={() => {
                 setFocusedThread(thread.threadId);
-                prefetchThread(thread.threadId);
+                debouncedPrefetch(thread.threadId);
               }}
             />
           ))}
