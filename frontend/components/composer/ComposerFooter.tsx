@@ -577,6 +577,7 @@ function AIPopover({
         refineInstruction: topic.trim() || undefined,
         tone,
         recipientName,
+        senderEmail: instance.from || undefined,
         subjectHint: instance.subject || undefined,
       });
     } else {
@@ -586,6 +587,7 @@ function AIPopover({
         topic: topic.trim(),
         tone,
         recipientName,
+        senderEmail: instance.from || undefined,
         subjectHint: instance.subject || undefined,
       });
     }
@@ -599,6 +601,7 @@ function AIPopover({
       draft,
       refineInstruction: instruction,
       tone,
+      senderEmail: instance.from || undefined,
       subjectHint: preview?.subject ?? instance.subject ?? undefined,
     });
   };
@@ -611,6 +614,7 @@ function AIPopover({
       draft: preview.html,
       refineInstruction: instr,
       tone,
+      senderEmail: instance.from || undefined,
       subjectHint: preview.subject || instance.subject || undefined,
     });
   };

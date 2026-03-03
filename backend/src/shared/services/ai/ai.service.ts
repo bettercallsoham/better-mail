@@ -210,15 +210,28 @@ interface SuggestEmailInput {
   /** optional hints for richer output */
   recipientName?: string;
   subjectHint?: string;
+  /** email address of the person sending — used for sign-off name */
+  senderEmail?: string;
 }
 
-const HTML_BODY_RULES = `
-- Return the body as semantic HTML using only: <p>, <strong>, <em>, <u>, <h2>, <h3>, <ul>, <li>, <ol>, <blockquote>
-- Use <p> for paragraphs — every line of text must be wrapped in a tag
-- Use <strong> for key terms or emphasis
-- Use <ul><li> for bullet lists, <ol><li> for numbered lists
-- Do NOT use <html>, <head>, <body>, <div>, <span>, <br>, <style>, inline styles, or markdown
-- Do NOT include a greeting or sign-off as plain strings outside tags — wrap them in <p> tags`;
+const TONE_DESCRIPTIONS: Record<SuggestEmailTone, string> = {
+  formal:
+    "highly professional and structured — suitable for executive, legal, or unfamiliar recipients",
+  friendly:
+    "warm and conversational — like writing to a colleague you know well",
+  concise:
+    "brief and direct — short sentences, no filler, every word earns its place",
+  professional:
+    "clear and business-appropriate — confident without being stiff",
+  empathetic:
+    "compassionate and understanding — acknowledges the reader's perspective before diving into content",
+};
+
+const HTML_BODY_RULES = `Body must be valid semantic HTML using ONLY these tags: <p>, <strong>, <em>, <u>, <h2>, <h3>, <ul>, <li>, <ol>, <blockquote>.
+- Wrap every line of text in a tag — never output bare text.
+- Use <p> for paragraphs, <strong> for emphasis, <ul>/<ol> for lists.
+- Do NOT use <html>, <head>, <body>, <div>, <span>, <br>, <style>, inline styles, or markdown.
+- Every greeting and sign-off line must be wrapped in its own <p> tag.`;
 
 export class AISuggestEmailService {
   async suggestEmail(input: SuggestEmailInput): Promise<SuggestEmailOutput> {
@@ -230,35 +243,58 @@ export class AISuggestEmailService {
       tone = "professional",
       recipientName,
       subjectHint,
+      senderEmail,
     } = input;
 
-    const toneInstruction = `Tone: ${tone}.`;
-    const recipientLine = recipientName ? `Recipient: ${recipientName}.` : "";
-    const subjectLine = subjectHint ? `Subject hint: ${subjectHint}.` : "";
+    const toneDesc = TONE_DESCRIPTIONS[tone];
+    const recipientLabel = recipientName ?? "the recipient";
 
-    const systemPrompt = `You are an expert email writing assistant for BetterMail.
-Output ONLY a pure JSON object (no markdown, no code blocks):
-{ "subject": "<email subject>", "body": "<full email HTML body>" }
-Rules:
-- ${toneInstruction}
-- ${recipientLine}
-- ${subjectLine}
-- Body must be a complete, ready-to-send email (proper greeting, content, sign-off).
-- Do NOT include any text outside the JSON object.
+    const systemPrompt = `You are an expert email writing assistant.
+Output ONLY a valid JSON object — no markdown, no code fences:
+{ "subject": "<subject line>", "body": "<full email HTML body>" }
+
+Context:
+- Sender email: ${senderEmail ?? "unknown"}
+- Recipient: ${recipientLabel}${subjectHint ? `\n- Subject context: ${subjectHint}` : ""}
+- Tone: ${tone} — ${toneDesc}
+ 
+Do what user have asked you to do:) 
+
 ${HTML_BODY_RULES}`;
 
     let userPrompt: string;
     if (mode === "compose") {
-      userPrompt = `Compose a new email about the following topic:\n${topic}`;
+      userPrompt = `User have given , topic= ${topic}
+
+Requirements:
+- Address the email to: ${recipientLabel}
+- Use a ${tone} tone (${toneDesc})`;
     } else if (mode === "rewrite") {
-      userPrompt = `Rewrite the following email draft to be more ${tone}. Preserve the intent but improve clarity, structure, and ${tone === "concise" ? "brevity" : "tone"}.\nReturn the improved version as semantic HTML body.\n\nDraft:\n${draft}`;
+      userPrompt = `Rewrite the following email draft so it sounds ${tone} (${toneDesc}).${
+        refineInstruction
+          ? `userInstructions = ${refineInstruction}`
+          : ""
+      }
+
+Requirements:
+- Preserve all key facts, the original intent, and any name used in the existing sign-off
+- Improve clarity, structure, and tone
+- Return a complete, ready-to-send email
+
+Original draft:
+${draft}`;
     } else {
       // refine
-      userPrompt = `Apply the following instruction to the email draft below. Preserve everything not affected by the instruction. Return the updated email as semantic HTML body.\n\nInstruction: ${refineInstruction}\n\nCurrent draft (HTML):\n${draft}`;
+      userPrompt = `Apply the following instruction to the email draft below. Change only what the instruction targets — preserve everything else exactly.
+
+Instruction: ${refineInstruction}
+
+Current draft (HTML):
+${draft}`;
     }
 
     const response = await azureClient41.chat.completions.create({
-      model: GPT_41_MODEL!,
+      model: GPT_4O_MINI_MODEL!,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

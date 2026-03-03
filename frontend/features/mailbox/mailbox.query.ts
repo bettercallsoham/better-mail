@@ -386,10 +386,17 @@ export function useUpsertThreadNote() {
 }
 
 export function useInboxZero(params?: InboxZeroParams) {
+  // Small page size so the first response is tiny and fast;
+  // the next page is prefetched before the user runs out.
+  const size = params?.size ?? 3;
+  const mergedParams = { ...params, size };
   return useSuspenseInfiniteQuery({
-    queryKey: mailboxKeys.inboxZero(params),
+    queryKey: mailboxKeys.inboxZero(mergedParams),
     queryFn: ({ pageParam }) =>
-      mailboxService.getInboxZero({ ...params, page: pageParam as number }),
+      mailboxService.getInboxZero({
+        ...mergedParams,
+        page: pageParam as number,
+      }),
     initialPageParam: 0 as number,
     getNextPageParam: (lastPage) => lastPage.nextPage ?? null,
     staleTime: 5 * 60 * 1000,

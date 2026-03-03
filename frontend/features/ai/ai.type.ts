@@ -58,6 +58,8 @@ export interface SuggestEmailParams {
   subjectHint?: string;
   /** refine mode: specific instruction to apply to the current draft */
   refineInstruction?: string;
+  /** email address of the sender — used for sign-off name */
+  senderEmail?: string;
 }
 
 export interface SuggestEmailResponse {

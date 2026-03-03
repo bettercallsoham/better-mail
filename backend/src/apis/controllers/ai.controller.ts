@@ -280,6 +280,7 @@ export const suggestEmail = asyncHandler(
       recipientName,
       subjectHint,
       refineInstruction,
+      senderEmail,
     } = req.body;
 
     try {
@@ -293,6 +294,7 @@ export const suggestEmail = asyncHandler(
         recipientName,
         subjectHint,
         refineInstruction,
+        senderEmail,
       });
 
       return res.json({

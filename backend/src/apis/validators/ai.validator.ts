@@ -174,5 +174,11 @@ export const validateSuggestEmail = [
     .isLength({ max: 200 })
     .withMessage("subjectHint must be at most 200 characters"),
 
+  body("senderEmail")
+    .optional()
+    .isEmail()
+    .withMessage("senderEmail must be a valid email address")
+    .normalizeEmail(),
+
   handleValidationErrors,
 ];

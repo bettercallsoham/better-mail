@@ -162,9 +162,10 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
   const total = data?.pages[0]?.total ?? 0;
   const email = emails[idx] ?? null;
 
-  // Pre-fetch when approaching end
+  // Pre-fetch the next page when the user reaches the 2nd email in the current
+  // batch so the next 3 are already cached by the time they're needed.
   useEffect(() => {
-    if (hasNextPage && idx >= emails.length - 3) {
+    if (hasNextPage && idx >= emails.length - 2) {
       fetchNextPage();
     }
   }, [idx, emails.length, hasNextPage, fetchNextPage]);
