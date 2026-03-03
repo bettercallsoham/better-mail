@@ -1,8 +1,13 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { InboxZeroEmail } from "@/features/mailbox/mailbox.type";
+import { type InboxZeroEmail, type FullEmail } from "@/features/mailbox/mailbox.type";
 import { useUpdateInboxState } from "@/features/mailbox/mailbox.query";
+import { useReplySuggestionsQuery } from "@/features/ai/ai.query";
+import { useComposer } from "@/components/composer/hooks/useComposer";
+import { useComposerStore } from "@/lib/store/composer.store";
+import type { ReplySuggestion } from "@/features/ai/ai.type";
+import { IconSparkles } from "@tabler/icons-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Paperclip,
+  Reply,
 } from "lucide-react";
 import {
   format,
@@ -48,13 +54,15 @@ const PROVIDER_MAP = {
   outlook: "OUTLOOK",
 } as const;
 
+/** Safe cast — InboxZeroEmail and FullEmail are structurally identical */
+function toFullEmail(e: InboxZeroEmail): FullEmail {
+  return e as unknown as FullEmail;
+}
+
 function snoozeOptions() {
   const now = new Date();
   return [
-    {
-      label: "In 2 hours",
-      value: addHours(now, 2).toISOString(),
-    },
+    { label: "In 2 hours", value: addHours(now, 2).toISOString() },
     {
       label: "Tomorrow 9 AM",
       value: setMinutes(setHours(addDays(now, 1), 9), 0).toISOString(),
@@ -66,6 +74,76 @@ function snoozeOptions() {
   ];
 }
 
+// ─── Reply bar ────────────────────────────────────────────────────────────────
+
+function ReplyBar({
+  email,
+  onReply,
+}: {
+  email: InboxZeroEmail;
+  onReply: (suggestion?: ReplySuggestion) => void;
+}) {
+  const { data, isPending } = useReplySuggestionsQuery(
+    email.threadId,
+    email.emailAddress,
+  );
+  const suggestions = data?.suggestions?.slice(0, 3) ?? [];
+
+  return (
+    <div className="px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-1.5 shrink-0">
+        <IconSparkles
+          size={11}
+          className="text-violet-500 dark:text-violet-400 shrink-0"
+        />
+        <span className="text-[10.5px] font-medium text-neutral-400 dark:text-neutral-500 select-none">
+          Reply as
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
+        {isPending ? (
+          [1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-6 w-16 rounded-lg bg-black/[0.05] dark:bg-white/[0.06] animate-pulse shrink-0"
+            />
+          ))
+        ) : suggestions.length > 0 ? (
+          suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => onReply(s)}
+              className={cn(
+                "h-6 px-2.5 rounded-lg text-[11.5px] font-medium capitalize transition-colors active:scale-95 shrink-0",
+                "bg-black/[0.04] dark:bg-white/[0.06] text-neutral-600 dark:text-neutral-400",
+                "hover:bg-violet-50 dark:hover:bg-violet-950/25 hover:text-violet-600 dark:hover:text-violet-400",
+              )}
+            >
+              {s.tone}
+            </button>
+          ))
+        ) : null}
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => onReply()}
+        className="gap-1.5 text-[12px] h-7 px-2.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 shrink-0"
+      >
+        <Reply size={12} />
+        Reply
+        <kbd className="ml-0.5 text-[9px] px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 font-mono text-neutral-400 dark:text-neutral-500">
+          R
+        </kbd>
+      </Button>
+    </div>
+  );
+}
+
+// ─── Dialog ───────────────────────────────────────────────────────────────────
+
 export function InboxZeroEmailDialog({
   email,
   onClose,
@@ -75,6 +153,7 @@ export function InboxZeroEmailDialog({
   hasNext,
 }: Props) {
   const { mutate: updateState, isPending } = useUpdateInboxState();
+  const { replyTo } = useComposer();
 
   const act = useCallback(
     (action: "ARCHIVED" | "DONE" | "SNOOZED", snoozeUntil?: string) => {
@@ -93,18 +172,60 @@ export function InboxZeroEmailDialog({
     [email, updateState, onClose],
   );
 
-  // ← → keyboard navigation
+  const handleReply = useCallback(
+    (suggestion?: ReplySuggestion) => {
+      if (!email) return;
+      replyTo(toFullEmail(email), "window", "reply");
+      if (suggestion) {
+        setTimeout(() => {
+          const inst = useComposerStore
+            .getState()
+            .instances.find(
+              (i) => i.threadId === email.threadId && i.shell === "window",
+            );
+          if (inst) {
+            useComposerStore.getState().setPendingTemplate(inst.id, {
+              id: -1,
+              userId: "",
+              name: "",
+              subject: suggestion.subject,
+              body: suggestion.body,
+              variables: [],
+              category: null,
+              tags: [],
+              usageCount: 0,
+              version: 1,
+              createdAt: "",
+              updatedAt: "",
+            });
+          }
+        }, 50);
+      }
+      onClose();
+    },
+    [email, replyTo, onClose],
+  );
+
+  // ← → keyboard navigation + actions
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!email) return;
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      )
+        return;
       if (e.key === "ArrowLeft" && hasPrev) onPrev();
       if (e.key === "ArrowRight" && hasNext) onNext();
       if (e.key === "e") act("ARCHIVED");
       if (e.key === "d") act("DONE");
+      if (e.key === "r") handleReply();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [email, hasPrev, hasNext, onPrev, onNext, act]);
+  }, [email, hasPrev, hasNext, onPrev, onNext, act, handleReply]);
 
   if (!email) return null;
 
@@ -166,7 +287,7 @@ export function InboxZeroEmailDialog({
         </DialogHeader>
 
         {/* ── Body ── */}
-        <div className="px-6 py-4 max-h-[52vh] overflow-y-auto">
+        <div className="px-6 py-4 max-h-[48vh] overflow-y-auto">
           {email.bodyHtml ? (
             <div
               className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-relaxed"
@@ -178,6 +299,9 @@ export function InboxZeroEmailDialog({
             </p>
           )}
         </div>
+
+        {/* ── Reply bar ── */}
+        <ReplyBar email={email} onReply={handleReply} />
 
         {/* ── Actions ── */}
         <div className="px-6 py-4 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-end gap-2">
@@ -191,12 +315,15 @@ export function InboxZeroEmailDialog({
             </kbd>
             {" done · "}
             <kbd className="px-1.5 py-0.5 text-[10px] rounded bg-neutral-100 dark:bg-neutral-800">
+              r
+            </kbd>
+            {" reply · "}
+            <kbd className="px-1.5 py-0.5 text-[10px] rounded bg-neutral-100 dark:bg-neutral-800">
               ←→
             </kbd>
             {" navigate"}
           </span>
 
-          {/* Snooze dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
