@@ -73,7 +73,7 @@ export function EmailVolumeAreaChart({ data, period }: Props) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-50 w-full">
+        <ChartContainer config={chartConfig} className="h-64 w-full">
           <AreaChart
             data={chartData}
             margin={{ left: -8, right: 8, top: 4, bottom: 0 }}

@@ -15,7 +15,6 @@ import { MetricCard } from "@/components/analytics/MetricCard";
 import { EmailVolumeAreaChart } from "@/components/analytics/EmailVolumeAreaChart";
 import { PeakHoursBarChart } from "@/components/analytics/PeakHoursBarChart";
 import { DayOfWeekRadarChart } from "@/components/analytics/DayOfWeekRadarChart";
-import { ActionsDonutChart } from "@/components/analytics/ActionsDonutChart";
 import { TopSendersTable } from "@/components/analytics/TopSendersTable";
 import { NewsletterRatioDonut } from "@/components/analytics/NewsletterRatioDonut";
 import { InboxHealthScore } from "@/components/analytics/InboxHealthScore";
@@ -26,7 +25,7 @@ import { AccountSelector } from "@/components/analytics/AccountSelector";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStore } from "@/lib/store/ui.store";
 import { format, parseISO } from "date-fns";
-import { Send, Eye, Inbox, MailOpen, BarChart2 } from "lucide-react";
+import { Send, Eye, Inbox, MailOpen } from "lucide-react";
 
 // ─── Period tabs — constrained to what the backend validators accept ───────────
 // validateTimePatterns: weekly | monthly only
@@ -47,6 +46,29 @@ function formatDateRange(from: string, to: string) {
   }
 }
 
+// ─── Section block ────────────────────────────────────────────────────────────
+
+function SectionBlock({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <span className="w-1 h-4 rounded-full bg-neutral-300 dark:bg-neutral-600 shrink-0" />
+        <h2 className="text-[13px] font-semibold text-neutral-600 dark:text-neutral-300 tracking-tight">
+          {label}
+        </h2>
+        <span className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
+      </div>
+      {children}
+    </div>
+  );
+}
+
 // ─── Inbox Zero count card ────────────────────────────────────────────────────
 
 function InboxZeroCard({ onOpen }: { onOpen: () => void }) {
@@ -58,7 +80,7 @@ function InboxZeroCard({ onOpen }: { onOpen: () => void }) {
       title="Inbox Zero"
       value={total === 0 ? "✓" : total}
       icon={Inbox}
-      accentClass="bg-emerald-500/10"
+      accentClass="bg-emerald-500/30"
       iconClass="text-emerald-500"
       description={
         total > 0
@@ -98,7 +120,7 @@ function MetricsRow({
         title="Received"
         value={m.received.toLocaleString()}
         icon={MailOpen}
-        accentClass="bg-blue-500/10"
+        accentClass="bg-blue-500/30"
         iconClass="text-blue-500"
         description={dateLabel}
       />
@@ -106,7 +128,7 @@ function MetricsRow({
         title="Sent"
         value={m.sent.toLocaleString()}
         icon={Send}
-        accentClass="bg-indigo-500/10"
+        accentClass="bg-indigo-500/30"
         iconClass="text-indigo-500"
         description={
           m.received > 0
@@ -118,7 +140,7 @@ function MetricsRow({
         title="Read Rate"
         value={m.received > 0 ? `${Math.round(m.readRate)}%` : "—"}
         icon={Eye}
-        accentClass="bg-violet-500/10"
+        accentClass="bg-violet-500/30"
         iconClass="text-violet-500"
         description={
           m.received > 0
@@ -143,20 +165,14 @@ function ChartsSection({
   email?: string;
 }) {
   const { data: patterns } = useTimePatterns(period as AnalyticsPeriod, email);
-  const { data: overview } = useAnalyticsOverview(
-    period as AnalyticsPeriod,
-    email,
-  );
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <EmailVolumeAreaChart
-          data={patterns}
-          period={period as AnalyticsPeriod}
-        />
-        {/* <ActionsDonutChart metrics={overview.metrics} /> */}
-      </div>
+      {/* Email Volume spans full width */}
+      <EmailVolumeAreaChart
+        data={patterns}
+        period={period as AnalyticsPeriod}
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PeakHoursBarChart data={patterns} />
         <DayOfWeekRadarChart data={patterns} />
@@ -226,13 +242,10 @@ function MetricsSkeleton() {
 function ChartsSkeleton() {
   return (
     <div className="flex flex-col gap-4">
+      <Skeleton className="h-72 rounded-2xl w-full" />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Skeleton className="h-70 rounded-2xl" />
-        <Skeleton className="h-70 rounded-2xl" />
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Skeleton className="h-70 rounded-2xl" />
-        <Skeleton className="h-70 rounded-2xl" />
+        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-64 rounded-2xl" />
       </div>
     </div>
   );
@@ -258,14 +271,14 @@ export default function InsightsPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
-            <h1 className="text-[20px] font-semibold text-neutral-900 dark:text-neutral-50 tracking-tight">
+            <p className="text-[11px] font-medium uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
+              Analytics
+            </p>
+            <h1 className="text-[26px] font-bold text-neutral-900 dark:text-neutral-50 tracking-tight leading-none">
               Insights
             </h1>
-            <p className="text-[12px] text-neutral-400 dark:text-neutral-500 mt-0.5">
-              Your email habits at a glance
-            </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <AccountSelector value={email} onChange={setEmail} />
@@ -303,34 +316,25 @@ export default function InsightsPage() {
         </Suspense>
 
         {/* Sender Intelligence */}
-        <div className="flex flex-col gap-2">
-          <h2 className="text-[13px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-            Sender Intelligence
-          </h2>
+        <SectionBlock label="Sender Intelligence">
           <Suspense fallback={<TwoColSkeleton />}>
             <SenderSection period={period} email={email} />
           </Suspense>
-        </div>
+        </SectionBlock>
 
         {/* Inbox Health */}
-        <div className="flex flex-col gap-2">
-          <h2 className="text-[13px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-            Inbox Health
-          </h2>
+        <SectionBlock label="Inbox Health">
           <Suspense fallback={<TwoColSkeleton />}>
             <InboxHealthSection period={period} email={email} />
           </Suspense>
-        </div>
+        </SectionBlock>
 
         {/* Response Patterns */}
-        <div className="flex flex-col gap-2">
-          <h2 className="text-[13px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-            Response Patterns
-          </h2>
+        <SectionBlock label="Response Patterns">
           <Suspense fallback={<TwoColSkeleton />}>
             <ResponseSection period={period} email={email} />
           </Suspense>
-        </div>
+        </SectionBlock>
       </div>
     </div>
   );
