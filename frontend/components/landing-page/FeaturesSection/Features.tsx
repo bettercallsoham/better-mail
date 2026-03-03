@@ -12,6 +12,9 @@ import {
   Search,
   Star,
   FileTextIcon,
+  CheckSquare,
+  BarChart2,
+  CheckCircle2,
 } from "lucide-react";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView } from "motion/react";
@@ -20,7 +23,10 @@ import { AnimatedBeam } from "../../ui/animated-beam";
 
 export default function Bento() {
   return (
-    <div className="flex flex-col gap-10 items-center justify-center bg-neutral-50 py-10 sm:py-20">
+    <div
+      id="features"
+      className="flex flex-col gap-10 items-center justify-center bg-neutral-50 py-10 sm:py-20"
+    >
       <div className="w-full max-w-4xl px-2 sm:px-4">
         <h1 className="bg-clip-text text-transparent bg-gradient-to-b from-neutral-950 to-neutral-400 dark:from-neutral-50 dark:to-neutral-400 text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-instrument leading-tight">
           Built For Power Users
@@ -110,6 +116,36 @@ export default function Bento() {
               </CardDescription>
               <CardSkeleton>
                 <AIComposeSkeleton />
+              </CardSkeleton>
+            </Card>
+
+            {/* Zero Inbox Card */}
+            <Card className="border-t md:border-t-0">
+              <CardHeader>
+                <CheckSquare className="w-5 h-5" />
+                <CardTitle>Reach Zero Inbox</CardTitle>
+              </CardHeader>
+              <CardDescription>
+                Triage every email in seconds. Archive, snooze, or mark done
+                with single keystrokes &mdash; watch your inbox empty itself.
+              </CardDescription>
+              <CardSkeleton>
+                <ZeroInboxSkeleton />
+              </CardSkeleton>
+            </Card>
+
+            {/* Analytics Card */}
+            <Card className="border-t md:border-t-0">
+              <CardHeader>
+                <BarChart2 className="w-5 h-5" />
+                <CardTitle>Email Analytics</CardTitle>
+              </CardHeader>
+              <CardDescription>
+                Understand your inbox habits at a glance. Track reply latency,
+                email volume, and your inbox health score over time.
+              </CardDescription>
+              <CardSkeleton>
+                <AnalyticsSkeleton />
               </CardSkeleton>
             </Card>
           </div>
@@ -1141,6 +1177,327 @@ const AIComposeSkeleton = () => {
         >
           Add bullets
         </motion.div>
+      </div>
+    </div>
+  );
+};
+
+// ============= ZERO INBOX SKELETON =============
+
+const INBOX_EMAILS = [
+  {
+    sender: "Sarah Chen",
+    subject: "Q4 design review — can we align?",
+    dot: "bg-rose-400",
+  },
+  {
+    sender: "Notion",
+    subject: "Your weekly digest is ready",
+    dot: "bg-neutral-300",
+  },
+  {
+    sender: "Alex Kim",
+    subject: "Re: launch timeline confirmed!",
+    dot: "bg-amber-400",
+  },
+  {
+    sender: "GitHub",
+    subject: "[betterMail] PR #42 merged",
+    dot: "bg-neutral-300",
+  },
+  {
+    sender: "Zara Ahmed",
+    subject: "Quick question about the demo",
+    dot: "bg-sky-400",
+  },
+];
+
+const EmailRow = memo(function EmailRow({
+  email,
+  idx,
+}: {
+  email: (typeof INBOX_EMAILS)[0];
+  idx: number;
+}) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, x: -16 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 72, scale: 0.96 }}
+      transition={{ duration: 0.3, delay: idx * 0.06, ease: "easeOut" }}
+      className="flex items-center gap-3 px-3 py-2 rounded-xl group cursor-default"
+    >
+      <div className={`w-2 h-2 rounded-full ${email.dot} shrink-0`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] font-medium text-neutral-800 truncate">
+          {email.sender}
+        </p>
+        <p className="text-[11px] text-neutral-400 truncate">{email.subject}</p>
+      </div>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        <span className="px-2 py-0.5 rounded-md bg-neutral-100 text-[10px] text-neutral-500 font-medium">
+          Done
+        </span>
+      </div>
+    </motion.div>
+  );
+});
+
+const ZeroInboxSkeleton = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(containerRef, { once: false, amount: 0.3 });
+  const [visible, setVisible] = useState([0, 1, 2, 3, 4]);
+  const [done, setDone] = useState(false);
+  const [loopKey, setLoopKey] = useState(0);
+
+  useEffect(() => {
+    if (!isInView) return;
+    setVisible([0, 1, 2, 3, 4]);
+    setDone(false);
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    [0, 1, 2, 3, 4].forEach((i) => {
+      timers.push(
+        setTimeout(
+          () => {
+            setVisible((prev) => prev.filter((v) => v !== i));
+          },
+          1000 + i * 320,
+        ),
+      );
+    });
+
+    timers.push(setTimeout(() => setDone(true), 1000 + 5 * 320 + 80));
+
+    timers.push(
+      setTimeout(
+        () => {
+          setDone(false);
+          setVisible([0, 1, 2, 3, 4]);
+          setLoopKey((k) => k + 1);
+        },
+        1000 + 5 * 320 + 80 + 2200,
+      ),
+    );
+
+    return () => timers.forEach(clearTimeout);
+  }, [isInView, loopKey]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="h-full w-full p-3 relative overflow-hidden"
+    >
+      <AnimatePresence>
+        {!done &&
+          visible.map((idx) => (
+            <EmailRow
+              key={`${loopKey}-${idx}`}
+              email={INBOX_EMAILS[idx]}
+              idx={idx}
+            />
+          ))}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {done && (
+          <motion.div
+            key="zero"
+            initial={{ opacity: 0, scale: 0.82, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 280, damping: 20 }}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.08, 1] }}
+              transition={{
+                duration: 1.6,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-sm"
+            >
+              <CheckCircle2 className="w-7 h-7 text-emerald-500" />
+            </motion.div>
+            <p className="text-sm font-semibold text-neutral-800">Inbox Zero</p>
+            <p className="text-xs text-neutral-400">All caught up 🎉</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// ============= ANALYTICS SKELETON =============
+
+const ANALYTICS_BARS = [
+  { h: 38, highlight: false },
+  { h: 62, highlight: false },
+  { h: 48, highlight: false },
+  { h: 88, highlight: true },
+  { h: 55, highlight: false },
+  { h: 32, highlight: false },
+  { h: 70, highlight: false },
+];
+const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
+
+function ScoreArc({ score }: { score: number }) {
+  const r = 28;
+  const cx = 36;
+  const cy = 36;
+  const circumference = 2 * Math.PI * r;
+  const filled = (score / 100) * circumference;
+  return (
+    <div className="relative shrink-0">
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="#f5f5f5"
+          strokeWidth={6}
+        />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="#10b981"
+          strokeWidth={6}
+          strokeDasharray={`${filled} ${circumference - filled}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`}
+          style={{ transition: "stroke-dasharray 0.04s linear" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[15px] font-bold text-neutral-800 leading-none">
+          {score}
+        </span>
+        <span className="text-[8px] text-emerald-500 font-semibold mt-0.5">
+          GREAT
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const StatPill = memo(function StatPill({
+  label,
+  value,
+  delay,
+  isInView,
+}: {
+  label: string;
+  value: string;
+  delay: number;
+  isInView: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -8 }}
+      transition={{ duration: 0.4, delay, ease: "easeOut" }}
+      className="flex items-center gap-2"
+    >
+      <span className="text-[10px] text-neutral-400 leading-none">{label}</span>
+      <span className="text-[10px] font-semibold text-neutral-700 leading-none">
+        {value}
+      </span>
+    </motion.div>
+  );
+});
+
+const AnalyticsSkeleton = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(containerRef, { once: false, amount: 0.3 });
+  const [score, setScore] = useState(0);
+  const [animKey, setAnimKey] = useState(0);
+
+  useEffect(() => {
+    if (!isInView) {
+      setScore(0);
+      setAnimKey((k) => k + 1);
+      return;
+    }
+    const start = Date.now();
+    const duration = 1400;
+    const target = 84;
+    let handle: number;
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setScore(Math.round(eased * target));
+      if (progress < 1) handle = requestAnimationFrame(tick);
+    };
+    handle = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(handle);
+  }, [isInView, animKey]);
+
+  return (
+    <div ref={containerRef} className="h-full w-full p-4 flex flex-col gap-4">
+      {/* Score + stats row */}
+      <div className="flex items-center gap-4">
+        <ScoreArc score={score} />
+        <div className="flex flex-col gap-2">
+          <StatPill
+            label="Emails / week"
+            value="114"
+            delay={0.3}
+            isInView={isInView}
+          />
+          <StatPill
+            label="Avg reply"
+            value="3h 12m"
+            delay={0.45}
+            isInView={isInView}
+          />
+          <StatPill
+            label="Done rate"
+            value="71%"
+            delay={0.6}
+            isInView={isInView}
+          />
+          <StatPill
+            label="Inbox health"
+            value="Excellent"
+            delay={0.75}
+            isInView={isInView}
+          />
+        </div>
+      </div>
+
+      {/* Mini bar chart */}
+      <div className="flex-1 flex items-end gap-1.5 px-1">
+        {ANALYTICS_BARS.map((bar, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <motion.div
+              initial={{ scaleY: 0 }}
+              animate={isInView ? { scaleY: 1 } : { scaleY: 0 }}
+              transition={{
+                duration: 0.55,
+                delay: 0.15 + i * 0.07,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              style={{
+                height: `${bar.h}%`,
+                originY: 1,
+                minHeight: 4,
+              }}
+              className={`w-full rounded-t-md ${
+                bar.highlight ? "bg-emerald-400" : "bg-neutral-200"
+              }`}
+            />
+            <span className="text-[9px] text-neutral-400 font-medium">
+              {DAYS[i]}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

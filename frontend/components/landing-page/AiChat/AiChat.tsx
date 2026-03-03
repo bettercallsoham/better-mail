@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Plus, Minimize2, Maximize2, SendHorizontal } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
 
 interface Message {
@@ -60,7 +61,10 @@ export default function AIChat() {
   };
 
   return (
-    <div className="w-full relative flex items-center justify-center flex-col bg-white mx-auto px-4 py-8 md:py-12">
+    <div
+      id="ai"
+      className="w-full relative flex items-center justify-center flex-col bg-white mx-auto px-4 py-8 md:py-12"
+    >
       {/* Grid Pattern Overlay */}
       <div
         className="absolute z-0 inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.1)_1px,transparent_1px)]"
@@ -314,26 +318,44 @@ function ChatMessage({ message }: { message: Message }) {
         </div>
       </div>
 
-      {/* Message Bubble */}
-      <div
-        className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-          message.isUser
-            ? "bg-blue-600 text-white shadow-sm"
-            : "bg-white text-neutral-900 border border-neutral-200 shadow-sm"
-        }`}
-      >
-        <p className="text-sm leading-relaxed">{message.text}</p>
-        <p
-          className={`text-[10px] mt-1 ${
-            message.isUser ? "text-blue-100" : "text-neutral-400"
+      {/* Message Bubble + CTA */}
+      <div className="flex flex-col gap-2 max-w-[70%]">
+        <div
+          className={`rounded-2xl px-4 py-3 ${
+            message.isUser
+              ? "bg-blue-600 text-white shadow-sm"
+              : "bg-white text-neutral-900 border border-neutral-200 shadow-sm"
           }`}
         >
-          {message.timestamp.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </p>
-      </div>be
+          <p className="text-sm leading-relaxed">{message.text}</p>
+          <p
+            className={`text-[10px] mt-1 ${
+              message.isUser ? "text-blue-100" : "text-neutral-400"
+            }`}
+          >
+            {message.timestamp.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+
+        {/* CTA after bot response */}
+        {!message.isUser && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.35, ease: "easeOut" }}
+          >
+            <Link
+              href="/auth"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-950 text-white text-[11px] font-semibold hover:bg-neutral-700 transition-colors duration-200 shadow-sm active:scale-95"
+            >
+              Try it, it&apos;s free 🎉
+            </Link>
+          </motion.div>
+        )}
+      </div>
     </motion.div>
   );
 }

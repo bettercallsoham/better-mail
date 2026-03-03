@@ -11,7 +11,7 @@ type AccordionContextType = {
 };
 
 const AccordionContext = React.createContext<AccordionContextType | undefined>(
-  undefined
+  undefined,
 );
 
 const useAccordionContext = () => {
@@ -30,7 +30,7 @@ type AccordionProps = {
 
 function Accordion({ children, className, defaultOpen }: AccordionProps) {
   const [openItem, setOpenItem] = React.useState<string | null>(
-    defaultOpen || null
+    defaultOpen || null,
   );
 
   return (
@@ -61,7 +61,7 @@ function AccordionItem({ children, value, className }: AccordionItemProps) {
       className={cn(
         "rounded-xl cursor-pointer bg-white border-b border-b-neutral-300 overflow-hidden transition-all duration-200",
         isOpen && "shadow-sm border-neutral-300",
-        className
+        className,
       )}
     >
       <AccordionItemContext.Provider value={{ isOpen, toggleOpen }}>
@@ -102,7 +102,7 @@ function AccordionButton({ children, className }: AccordionButtonProps) {
       className={cn(
         "flex items-center cursor-pointer justify-between w-full px-6 py-4 text-left transition-colors",
         "hover:bg-neutral-50 focus:outline-none focus:bg-neutral-50",
-        className
+        className,
       )}
     >
       <span className="font-semibold text-neutral-900 text-sm md:text-base pr-4">
@@ -111,7 +111,7 @@ function AccordionButton({ children, className }: AccordionButtonProps) {
       <ChevronDown
         className={cn(
           "flex-shrink-0 w-5 h-5 text-neutral-500 transition-transform duration-200",
-          isOpen && "rotate-180"
+          isOpen && "rotate-180",
         )}
       />
     </button>
@@ -139,7 +139,7 @@ function AccordionPanel({ children, className }: AccordionPanelProps) {
           <div
             className={cn(
               "px-6 pb-5 pt-0 text-neutral-600 text-sm leading-relaxed",
-              className
+              className,
             )}
           >
             {children}
@@ -207,12 +207,15 @@ const FAQ_ITEMS = [
 
 export default function FAQ() {
   return (
-    <section className="w-full py-16 md:py-24 bg-linear-to-b from-white to-neutral-50">
+    <section
+      id="faq"
+      className="w-full py-16 md:py-24 bg-linear-to-b from-white to-neutral-50"
+    >
       <div className="max-w-3xl mx-auto  px-4">
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="bg-clip-text text-transparent bg-gradient-to-b from-neutral-950 to-neutral-400 dark:from-neutral-50 dark:to-neutral-400 text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-instrument leading-tight">
-           Frequently Asked Questions
+            Frequently Asked Questions
           </h1>
 
           <p className="text-neutral-600 text-base md:text-lg">

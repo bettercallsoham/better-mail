@@ -58,7 +58,7 @@ export default function CTASection() {
                     width={80}
                     height={80}
                     alt="Bettermail"
-                    className="w-full h-full"
+                    className="w-full invert h-full"
                   />
                 </div>
               </motion.div>
