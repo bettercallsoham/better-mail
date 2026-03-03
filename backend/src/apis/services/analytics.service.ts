@@ -18,8 +18,14 @@ export interface SenderInfo {
 
 export interface SenderAnalyticsData {
   topSenders: SenderInfo[];
-  newsletterRatio: number; // 0-100
-  humanRatio: number; // 0-100
+  newsletterRatio: number;
+  humanRatio: number;
+  categoryBreakdown: {
+    human: number;
+    promotions: number;
+    updates: number;
+    social: number;
+  };
   attachmentSenders: SenderInfo[];
   totalReceived: number;
   dateRange: DateRange;
@@ -115,12 +121,25 @@ export class AnalyticsService {
         },
       },
       aggs: {
+        // ──────────────────────────────────────────────────────────────────────
+        // "Inbound" = owned by user AND NOT sent by user (from.email not in list)
+        // We avoid `to.email` entirely because `to` is a nested field in the
+        // ES mapping and cannot be queried with a flat `terms` filter.
+        // ──────────────────────────────────────────────────────────────────────
         total_received: {
-          filter: { terms: { "to.email": emailAddresses } },
+          filter: {
+            bool: {
+              must_not: [{ terms: { "from.email": emailAddresses } }],
+            },
+          },
         },
         // Top senders with per-sender read rate
         top_senders: {
-          filter: { terms: { "to.email": emailAddresses } },
+          filter: {
+            bool: {
+              must_not: [{ terms: { "from.email": emailAddresses } }],
+            },
+          },
           aggs: {
             by_sender: {
               terms: { field: "from.email", size: 20 },
@@ -141,22 +160,28 @@ export class AnalyticsService {
             },
           },
         },
-        // Newsletter vs promo detection via provider labels
-        newsletter_count: {
+        // Category breakdown via provider labels
+        promotions_count: {
           filter: {
             bool: {
-              must: [
-                { terms: { "to.email": emailAddresses } },
-                {
-                  terms: {
-                    providerLabels: [
-                      "CATEGORY_PROMOTIONS",
-                      "CATEGORY_UPDATES",
-                      "CATEGORY_SOCIAL",
-                    ],
-                  },
-                },
-              ],
+              must_not: [{ terms: { "from.email": emailAddresses } }],
+              must: [{ terms: { providerLabels: ["CATEGORY_PROMOTIONS"] } }],
+            },
+          },
+        },
+        updates_count: {
+          filter: {
+            bool: {
+              must_not: [{ terms: { "from.email": emailAddresses } }],
+              must: [{ terms: { providerLabels: ["CATEGORY_UPDATES"] } }],
+            },
+          },
+        },
+        social_count: {
+          filter: {
+            bool: {
+              must_not: [{ terms: { "from.email": emailAddresses } }],
+              must: [{ terms: { providerLabels: ["CATEGORY_SOCIAL"] } }],
             },
           },
         },
@@ -164,10 +189,8 @@ export class AnalyticsService {
         attachment_senders: {
           filter: {
             bool: {
-              must: [
-                { terms: { "to.email": emailAddresses } },
-                { term: { hasAttachments: true } },
-              ],
+              must_not: [{ terms: { "from.email": emailAddresses } }],
+              must: [{ term: { hasAttachments: true } }],
             },
           },
           aggs: {
@@ -192,7 +215,6 @@ export class AnalyticsService {
 
     const aggs = result.aggregations as any;
     const totalReceived: number = aggs.total_received?.doc_count ?? 0;
-    const newsletterCount: number = aggs.newsletter_count?.doc_count ?? 0;
 
     // Build top senders
     const topSenders: SenderInfo[] = (
@@ -228,18 +250,32 @@ export class AnalyticsService {
       };
     });
 
-    const newsletterRatio =
-      totalReceived > 0
-        ? Math.round((newsletterCount / totalReceived) * 100)
-        : 0;
+    const promotionsCount: number = aggs.promotions_count?.doc_count ?? 0;
+    const updatesCount: number = aggs.updates_count?.doc_count ?? 0;
+    const socialCount: number = aggs.social_count?.doc_count ?? 0;
+    const categorisedCount = promotionsCount + updatesCount + socialCount;
+    const humanCount = Math.max(0, totalReceived - categorisedCount);
 
-    // When there's no data at all both ratios are 0 ("no data"), not 100/0
-    const humanRatio = totalReceived > 0 ? Math.max(0, 100 - newsletterRatio) : 0;
+    function toPct(n: number) {
+      return totalReceived > 0 ? Math.round((n / totalReceived) * 100) : 0;
+    }
+
+    const categoryBreakdown = {
+      human: toPct(humanCount),
+      promotions: toPct(promotionsCount),
+      updates: toPct(updatesCount),
+      social: toPct(socialCount),
+    };
+
+    // Keep legacy fields for backwards compat
+    const newsletterRatio = toPct(categorisedCount);
+    const humanRatio = toPct(humanCount);
 
     return {
       topSenders,
       newsletterRatio,
       humanRatio,
+      categoryBreakdown,
       attachmentSenders,
       totalReceived,
       dateRange,
@@ -476,14 +512,13 @@ export class AnalyticsService {
             },
           },
         },
-        // Also get inbound emails for same threads (to compute the delta)
+        // Inbound emails = owned by user AND not sent by user.
+        // Avoids querying the nested `to` field entirely.
         inbound_thread_times: {
           filter: {
             bool: {
-              must: [
-                { terms: { emailAddress: emailAddresses } },
-                { terms: { "to.email": emailAddresses } },
-              ],
+              must: [{ terms: { emailAddress: emailAddresses } }],
+              must_not: [{ terms: { "from.email": emailAddresses } }],
             },
           },
           aggs: {
@@ -555,7 +590,13 @@ export class AnalyticsService {
         const src = hit._source;
         // Only consider emails sent by the user (not received)
         if (!emailAddresses.includes(src?.from?.email ?? "")) continue;
-        const sentTs = src?.sentAt ? new Date(src.sentAt).getTime() : null;
+        // Fall back to receivedAt if sentAt is not populated (some providers
+        // only populate receivedAt on outbound messages)
+        const sentTs = src?.sentAt
+          ? new Date(src.sentAt).getTime()
+          : src?.receivedAt
+            ? new Date(src.receivedAt).getTime()
+            : null;
         if (!sentTs) continue;
         const deltaMinutes = (sentTs - inboundTs) / (1000 * 60);
         if (deltaMinutes > 0 && deltaMinutes < 60 * 24 * 14) {

@@ -52,3 +52,74 @@ export interface GetTimePatternsResponse {
   data: TimePatternsData;
   cached: boolean;
 }
+
+// ── Sender Analytics ─────────────────────────────────────────────────────────
+
+export interface SenderInfo {
+  email: string;
+  name?: string;
+  volume: number;
+  readRate: number;
+  hasAttachments: boolean;
+}
+
+export interface SenderAnalyticsData {
+  topSenders: SenderInfo[];
+  /** @deprecated use categoryBreakdown */
+  newsletterRatio: number;
+  /** @deprecated use categoryBreakdown */
+  humanRatio: number;
+  categoryBreakdown: {
+    human: number;
+    promotions: number;
+    updates: number;
+    social: number;
+  };
+  attachmentSenders: SenderInfo[];
+  totalReceived: number;
+  dateRange: AnalyticsDateRange;
+}
+
+export interface GetSenderAnalyticsResponse {
+  success: boolean;
+  data: SenderAnalyticsData;
+  cached: boolean;
+}
+
+// ── Inbox Health ─────────────────────────────────────────────────────────────
+
+export interface InboxHealthData {
+  score: number;
+  stateDistribution: Record<string, number>;
+  avgSnoozeDays: number;
+  snoozeWeeklyBuckets: { week: string; count: number }[];
+  abandonedDrafts: number;
+  labelGrowth: {
+    month: string;
+    topLabels: { label: string; count: number }[];
+  }[];
+  dateRange: AnalyticsDateRange;
+}
+
+export interface GetInboxHealthResponse {
+  success: boolean;
+  data: InboxHealthData;
+  cached: boolean;
+}
+
+// ── Response Analytics ───────────────────────────────────────────────────────
+
+export interface ResponseAnalyticsData {
+  p50MinutesToReply: number;
+  p90MinutesToReply: number;
+  sentByHour: Record<string, number>;
+  bestSendHour: number;
+  bestSendDayOfWeek: string;
+  dateRange: AnalyticsDateRange;
+}
+
+export interface GetResponseAnalyticsResponse {
+  success: boolean;
+  data: ResponseAnalyticsData;
+  cached: boolean;
+}

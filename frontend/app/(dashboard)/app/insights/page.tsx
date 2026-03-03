@@ -5,6 +5,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   useAnalyticsOverview,
   useTimePatterns,
+  useSenderAnalytics,
+  useInboxHealth,
+  useResponseAnalytics,
 } from "@/features/analytics/analytics.query";
 import { useInboxZero } from "@/features/mailbox/mailbox.query";
 import { AnalyticsPeriod } from "@/features/analytics/analytics.type";
@@ -13,10 +16,17 @@ import { EmailVolumeAreaChart } from "@/components/analytics/EmailVolumeAreaChar
 import { PeakHoursBarChart } from "@/components/analytics/PeakHoursBarChart";
 import { DayOfWeekRadarChart } from "@/components/analytics/DayOfWeekRadarChart";
 import { ActionsDonutChart } from "@/components/analytics/ActionsDonutChart";
+import { TopSendersTable } from "@/components/analytics/TopSendersTable";
+import { NewsletterRatioDonut } from "@/components/analytics/NewsletterRatioDonut";
+import { InboxHealthScore } from "@/components/analytics/InboxHealthScore";
+import { SnoozePatternChart } from "@/components/analytics/SnoozePatternChart";
+import { ReplyLatencyCard } from "@/components/analytics/ReplyLatencyCard";
+import { BestSendWindowChart } from "@/components/analytics/BestSendWindowChart";
+import { AccountSelector } from "@/components/analytics/AccountSelector";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStore } from "@/lib/store/ui.store";
 import { format, parseISO } from "date-fns";
-import { Send, Eye, Inbox, MailOpen } from "lucide-react";
+import { Send, Eye, Inbox, MailOpen, BarChart2 } from "lucide-react";
 
 // ─── Period tabs — constrained to what the backend validators accept ───────────
 // validateTimePatterns: weekly | monthly only
@@ -48,9 +58,13 @@ function InboxZeroCard({ onOpen }: { onOpen: () => void }) {
       title="Inbox Zero"
       value={total === 0 ? "✓" : total}
       icon={Inbox}
-      accentClass="bg-emerald-500"
+      accentClass="bg-emerald-500/10"
       iconClass="text-emerald-500"
-      description={total > 0 ? `${total} thread${total === 1 ? "" : "s"} to triage` : "All caught up"}
+      description={
+        total > 0
+          ? `${total} thread${total === 1 ? "" : "s"} to triage`
+          : "All caught up"
+      }
       onClick={total > 0 ? onOpen : undefined}
       badge={
         total > 0 ? (
@@ -67,12 +81,14 @@ function InboxZeroCard({ onOpen }: { onOpen: () => void }) {
 
 function MetricsRow({
   period,
+  email,
   onOpenInboxZero,
 }: {
   period: InsightsPeriod;
+  email?: string;
   onOpenInboxZero: () => void;
 }) {
-  const { data } = useAnalyticsOverview(period as AnalyticsPeriod);
+  const { data } = useAnalyticsOverview(period as AnalyticsPeriod, email);
   const m = data.metrics;
   const dateLabel = formatDateRange(data.dateRange.from, data.dateRange.to);
 
@@ -82,7 +98,7 @@ function MetricsRow({
         title="Received"
         value={m.received.toLocaleString()}
         icon={MailOpen}
-        accentClass="bg-blue-500"
+        accentClass="bg-blue-500/10"
         iconClass="text-blue-500"
         description={dateLabel}
       />
@@ -90,7 +106,7 @@ function MetricsRow({
         title="Sent"
         value={m.sent.toLocaleString()}
         icon={Send}
-        accentClass="bg-indigo-500"
+        accentClass="bg-indigo-500/10"
         iconClass="text-indigo-500"
         description={
           m.received > 0
@@ -102,7 +118,7 @@ function MetricsRow({
         title="Read Rate"
         value={m.received > 0 ? `${Math.round(m.readRate)}%` : "—"}
         icon={Eye}
-        accentClass="bg-violet-500"
+        accentClass="bg-violet-500/10"
         iconClass="text-violet-500"
         description={
           m.received > 0
@@ -119,9 +135,18 @@ function MetricsRow({
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 
-function ChartsSection({ period }: { period: InsightsPeriod }) {
-  const { data: patterns } = useTimePatterns(period as AnalyticsPeriod);
-  const { data: overview } = useAnalyticsOverview(period as AnalyticsPeriod);
+function ChartsSection({
+  period,
+  email,
+}: {
+  period: InsightsPeriod;
+  email?: string;
+}) {
+  const { data: patterns } = useTimePatterns(period as AnalyticsPeriod, email);
+  const { data: overview } = useAnalyticsOverview(
+    period as AnalyticsPeriod,
+    email,
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -130,7 +155,7 @@ function ChartsSection({ period }: { period: InsightsPeriod }) {
           data={patterns}
           period={period as AnalyticsPeriod}
         />
-        <ActionsDonutChart metrics={overview.metrics} />
+        {/* <ActionsDonutChart metrics={overview.metrics} /> */}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PeakHoursBarChart data={patterns} />
@@ -139,7 +164,53 @@ function ChartsSection({ period }: { period: InsightsPeriod }) {
     </div>
   );
 }
+function SenderSection({
+  period,
+  email,
+}: {
+  period: InsightsPeriod;
+  email?: string;
+}) {
+  const { data } = useSenderAnalytics(period as AnalyticsPeriod, email);
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <TopSendersTable data={data} />
+      <NewsletterRatioDonut data={data} />
+    </div>
+  );
+}
 
+function InboxHealthSection({
+  period,
+  email,
+}: {
+  period: InsightsPeriod;
+  email?: string;
+}) {
+  const { data } = useInboxHealth(period as AnalyticsPeriod, email);
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <InboxHealthScore data={data} />
+      <SnoozePatternChart data={data} />
+    </div>
+  );
+}
+
+function ResponseSection({
+  period,
+  email,
+}: {
+  period: InsightsPeriod;
+  email?: string;
+}) {
+  const { data } = useResponseAnalytics(period as AnalyticsPeriod, email);
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <ReplyLatencyCard data={data} />
+      <BestSendWindowChart data={data} />
+    </div>
+  );
+}
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
 function MetricsSkeleton() {
@@ -167,10 +238,20 @@ function ChartsSkeleton() {
   );
 }
 
+function TwoColSkeleton() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <Skeleton className="h-64 rounded-2xl" />
+      <Skeleton className="h-64 rounded-2xl" />
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
   const [period, setPeriod] = useState<InsightsPeriod>("weekly");
+  const [email, setEmail] = useState<string | undefined>(undefined);
   const setInboxZeroOpen = useUIStore((s) => s.setInboxZeroOpen);
 
   return (
@@ -186,36 +267,70 @@ export default function InsightsPage() {
               Your email habits at a glance
             </p>
           </div>
-          <Tabs
-            value={period}
-            onValueChange={(v) => setPeriod(v as InsightsPeriod)}
-          >
-            <TabsList className="h-8">
-              {PERIODS.map((p) => (
-                <TabsTrigger
-                  key={p.value}
-                  value={p.value}
-                  className="text-[12px] px-4"
-                >
-                  {p.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center gap-2 flex-wrap">
+            <AccountSelector value={email} onChange={setEmail} />
+            <Tabs
+              value={period}
+              onValueChange={(v) => setPeriod(v as InsightsPeriod)}
+            >
+              <TabsList className="h-8">
+                {PERIODS.map((p) => (
+                  <TabsTrigger
+                    key={p.value}
+                    value={p.value}
+                    className="text-[12px] px-4"
+                  >
+                    {p.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
 
         {/* Metric cards */}
         <Suspense fallback={<MetricsSkeleton />}>
           <MetricsRow
             period={period}
+            email={email}
             onOpenInboxZero={() => setInboxZeroOpen(true)}
           />
         </Suspense>
 
-        {/* Charts */}
+        {/* Volume + actions charts */}
         <Suspense fallback={<ChartsSkeleton />}>
-          <ChartsSection period={period} />
+          <ChartsSection period={period} email={email} />
         </Suspense>
+
+        {/* Sender Intelligence */}
+        <div className="flex flex-col gap-2">
+          <h2 className="text-[13px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+            Sender Intelligence
+          </h2>
+          <Suspense fallback={<TwoColSkeleton />}>
+            <SenderSection period={period} email={email} />
+          </Suspense>
+        </div>
+
+        {/* Inbox Health */}
+        <div className="flex flex-col gap-2">
+          <h2 className="text-[13px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+            Inbox Health
+          </h2>
+          <Suspense fallback={<TwoColSkeleton />}>
+            <InboxHealthSection period={period} email={email} />
+          </Suspense>
+        </div>
+
+        {/* Response Patterns */}
+        <div className="flex flex-col gap-2">
+          <h2 className="text-[13px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+            Response Patterns
+          </h2>
+          <Suspense fallback={<TwoColSkeleton />}>
+            <ResponseSection period={period} email={email} />
+          </Suspense>
+        </div>
       </div>
     </div>
   );

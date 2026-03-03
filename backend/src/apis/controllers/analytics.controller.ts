@@ -159,7 +159,7 @@ export const getSenderAnalytics = asyncHandler(
       }
 
       const emailScope = (email as string | undefined) ?? "all";
-      const cacheKey = `analytics:${userId}:senders:${period}:${emailScope}`;
+      const cacheKey = `analytics:${userId}:senders:v4:${period}:${emailScope}`;
       const cached = await redis.get(cacheKey);
 
       if (cached) {
@@ -222,7 +222,7 @@ export const getInboxHealth = asyncHandler(
       }
 
       const emailScope = (email as string | undefined) ?? "all";
-      const cacheKey = `analytics:${userId}:inbox-health:${period}:${emailScope}`;
+      const cacheKey = `analytics:${userId}:inbox-health:v2:${period}:${emailScope}`;
       const cached = await redis.get(cacheKey);
 
       if (cached) {
@@ -285,7 +285,7 @@ export const getResponseAnalytics = asyncHandler(
       }
 
       const emailScope = (email as string | undefined) ?? "all";
-      const cacheKey = `analytics:${userId}:response:${period}:${emailScope}`;
+      const cacheKey = `analytics:${userId}:response:v3:${period}:${emailScope}`;
       const cached = await redis.get(cacheKey);
 
       if (cached) {
