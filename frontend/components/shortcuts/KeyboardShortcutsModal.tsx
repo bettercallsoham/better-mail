@@ -48,9 +48,10 @@ const SECTIONS = [
   {
     title: "App",
     rows: [
+      { keys: ["`"], label: "Toggle sidebar" },
       { keys: ["⌘", "K"], label: "Search" },
       { keys: ["alt", "T"], label: "Templates" },
-      { keys: ["`"], label: "Toggle sidebar" },
+      { keys: ["alt", "0"], label: "Inbox Zero" },
       { keys: ["⌘", "1–3"], label: "Switch account" },
       { keys: ["⌘", "0"], label: "All accounts" },
       { keys: ["?"], label: "Open this help" },

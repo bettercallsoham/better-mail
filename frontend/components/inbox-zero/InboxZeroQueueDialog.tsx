@@ -1,11 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useInboxZero,
   useUpdateInboxState,
 } from "@/features/mailbox/mailbox.query";
-import { InboxZeroEmail } from "@/features/mailbox/mailbox.type";
+import {
+  type InboxZeroEmail,
+  type FullEmail,
+} from "@/features/mailbox/mailbox.type";
+import { useComposer } from "@/components/composer/hooks/useComposer";
+import { useComposerStore, usePanelInstance } from "@/lib/store/composer.store";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -14,6 +19,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Archive, Check, Clock, Paperclip, Inbox } from "lucide-react";
+import { QuickReply } from "@/components/dashboard/thread-view/components/QuickReply";
+import { SmartReplies } from "@/components/composer/SmartReplies";
+import { PanelShell } from "@/components/composer/shells/PanelShell";
 import {
   format,
   addHours,
@@ -30,6 +38,58 @@ interface Props {
 }
 
 const PROVIDER_MAP = { gmail: "GOOGLE", outlook: "OUTLOOK" } as const;
+
+/** Safe cast — InboxZeroEmail and FullEmail are structurally identical */
+function toFullEmail(e: InboxZeroEmail): FullEmail {
+  return e as unknown as FullEmail;
+}
+
+// ── Sandboxed email renderer ───────────────────────────────────────────────────
+// Isolates email HTML in a script-less iframe so third-party CSS/fonts/layouts
+// can never bleed into the app shell.
+function IsolatedEmailFrame({ html }: { html: string }) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(300);
+
+  const resize = useCallback(() => {
+    const body = ref.current?.contentDocument?.body;
+    if (body) setHeight(body.scrollHeight + 20);
+  }, []);
+
+  const srcDoc = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; overflow-x: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px; line-height: 1.6; color: #374151;
+    word-break: break-word; overflow-wrap: break-word;
+  }
+  * { max-width: 100% !important; }
+  table { width: 100% !important; table-layout: fixed !important; }
+  td, th { word-break: break-word !important; }
+  img { max-width: 100% !important; height: auto !important; display: block; }
+  a { color: #6366f1; }
+  pre, code { white-space: pre-wrap !important; }
+</style>
+</head><body>${html}</body></html>`;
+
+  return (
+    <iframe
+      ref={ref}
+      srcDoc={srcDoc}
+      sandbox="allow-same-origin"
+      scrolling="no"
+      title="email-body"
+      className="w-full border-none block"
+      style={{ height }}
+      onLoad={resize}
+    />
+  );
+}
 
 function snoozeOptions() {
   const now = new Date();
@@ -48,7 +108,7 @@ function snoozeOptions() {
 
 function Kbd({ children }: { children: string }) {
   return (
-    <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-mono font-semibold bg-white/20 dark:bg-black/20 border border-white/25 dark:border-black/20 shrink-0">
+    <span className="hidden sm:inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-mono font-semibold bg-white/20 dark:bg-black/20 border border-white/25 dark:border-black/20 shrink-0">
       {children}
     </span>
   );
@@ -74,7 +134,7 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97]",
+        "flex items-center justify-center gap-1.5 sm:gap-2.5 px-3 sm:px-6 py-3 rounded-xl text-[13px] sm:text-[14px] font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97]",
         variant === "solid"
           ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 border border-transparent"
           : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700",
@@ -95,6 +155,8 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
 
   const { data, fetchNextPage, hasNextPage } = useInboxZero();
   const { mutate: updateState, isPending } = useUpdateInboxState();
+  const { replyTo } = useComposer();
+  const panelInstance = usePanelInstance();
 
   const emails: InboxZeroEmail[] = data?.pages.flatMap((p) => p.emails) ?? [];
   const total = data?.pages[0]?.total ?? 0;
@@ -132,6 +194,11 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
     [email, isPending, updateState, advance],
   );
 
+  const handleReply = useCallback(() => {
+    if (!email) return;
+    replyTo(toFullEmail(email), "panel", "reply");
+  }, [email, replyTo]);
+
   // Keyboard shortcuts
   useEffect(() => {
     if (!open || snoozeOpen) return;
@@ -140,6 +207,10 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.key === "e") act("ARCHIVED");
       if (e.key === "d") act("DONE");
+      if (e.key === "r") {
+        e.preventDefault();
+        handleReply();
+      }
       if (e.key === "s") setSnoozeOpen(true);
       if (e.key === "ArrowRight" && idx < emails.length - 1)
         setIdx((i) => i + 1);
@@ -147,15 +218,23 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, snoozeOpen, act, idx, emails.length]);
+  }, [open, snoozeOpen, act, handleReply, idx, emails.length]);
 
   const senderDisplay = email?.from.name ?? email?.from.email ?? "";
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="min-w-5xl w-full h-[75vh] p-0 gap-0 overflow-hidden border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 flex flex-col"
+        className="w-[calc(100vw-1rem)] sm:w-[min(calc(100vw-3rem),900px)] h-[92vh] sm:h-[78vh] p-0 gap-0 overflow-hidden border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 flex flex-col"
         showCloseButton={false}
+        onEscapeKeyDown={(e) => {
+          // Two-stage Escape: first Esc closes the composer, second closes the dialog
+          if (panelInstance) {
+            e.preventDefault();
+            useComposerStore.getState().close(panelInstance.id);
+          }
+          // else: let Radix handle it → dialog closes normally
+        }}
       >
         {/* ── Done state ── */}
         {emails.length === 0 || !email ? (
@@ -181,7 +260,7 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
         ) : (
           <>
             {/* ── Top bar: progress + close ── */}
-            <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+            <div className="flex items-center justify-between px-4 sm:px-6 pt-4 pb-3 border-b border-neutral-100 dark:border-neutral-800">
               <div className="flex items-center gap-3">
                 <span className="text-[12px] font-medium text-neutral-400 dark:text-neutral-500 tabular-nums">
                   {idx + 1}{" "}
@@ -191,7 +270,7 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
                   {total}
                 </span>
                 {/* Progress bar */}
-                <div className="w-28 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+                <div className="hidden xs:block w-28 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-neutral-900 dark:bg-white transition-all duration-300"
                     style={{
@@ -219,7 +298,7 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
             </div>
 
             {/* ── Email header ── */}
-            <div className="px-6 pt-5 pb-4">
+            <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <h2 className="text-[16px] font-semibold text-neutral-900 dark:text-neutral-50 leading-snug mb-1">
@@ -252,74 +331,119 @@ export function InboxZeroQueueDialog({ open, onClose }: Props) {
             </div>
 
             {/* ── Body ── */}
-            <div className="px-6 pb-2 flex-1 overflow-y-auto border-t border-neutral-50 dark:border-neutral-800/60">
-              {email.bodyHtml ? (
-                <div
-                  className="py-4 prose prose-sm dark:prose-invert max-w-none text-[13px] leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: email.bodyHtml }}
-                />
-              ) : (
-                <p className="py-4 text-[13px] text-neutral-500 dark:text-neutral-400 italic leading-relaxed">
-                  {email.snippet || "No preview available."}
-                </p>
+            <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden border-t border-neutral-50 dark:border-neutral-800/60">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden">
+                <div className="px-4 sm:px-6 pt-1 sm:pt-2">
+                  {email.bodyHtml ? (
+                    <IsolatedEmailFrame html={email.bodyHtml} />
+                  ) : (
+                    <p className="py-4 text-[13px] text-neutral-500 dark:text-neutral-400 italic leading-relaxed">
+                      {email.snippet || "No preview available."}
+                    </p>
+                  )}
+                  {/* Spacer so content clears the floating reply card */}
+                  {!panelInstance && <div className="hidden sm:block h-28" />}
+                </div>
+              </div>
+
+              {/* Desktop floating QuickReply + SmartReplies — anchored to this relative container */}
+              {!panelInstance && (
+                <div className="hidden sm:block">
+                  <QuickReply
+                    userEmail={email.emailAddress}
+                    lastEmail={toFullEmail(email)}
+                    variant="float"
+                    shell="panel"
+                  >
+                    <SmartReplies
+                      threadId={email.threadId}
+                      emailAddress={email.emailAddress}
+                      lastEmail={toFullEmail(email)}
+                      shell="panel"
+                      variant="rows"
+                    />
+                  </QuickReply>
+                </div>
               )}
             </div>
 
-            {/* ── Action buttons ── */}
-            <div className="px-6 pt-4 pb-5 border-t border-neutral-100 dark:border-neutral-800">
-              <div className="grid grid-cols-3 gap-3">
-                {/* Snooze */}
-                <DropdownMenu open={snoozeOpen} onOpenChange={setSnoozeOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      disabled={isPending}
-                      className={cn(
-                        "flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl text-[14px] font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97]",
-                        "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200",
-                        "hover:bg-neutral-50 dark:hover:bg-neutral-700",
-                        "border border-neutral-200 dark:border-neutral-700",
-                      )}
-                    >
-                      <Clock size={15} />
-                      Snooze
-                      <Kbd>S</Kbd>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-48">
-                    {snoozeOptions().map((opt) => (
-                      <DropdownMenuItem
-                        key={opt.label}
-                        onSelect={() => act("SNOOZED", opt.value)}
-                        className="text-[13px]"
+            {/* ── Composer panel — slides up from bottom ── */}
+            {panelInstance && <PanelShell instance={panelInstance} />}
+
+            {/* ── Desktop action buttons ── */}
+            {!panelInstance && (
+              <div className="px-4 sm:px-6 pt-3 sm:pt-4 pb-3 sm:pb-5 border-t border-neutral-100 dark:border-neutral-800">
+                <div className="grid grid-cols-3 gap-3">
+                  <DropdownMenu open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        disabled={isPending}
+                        className={cn(
+                          "flex items-center justify-center gap-1.5 sm:gap-2.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-[13px] sm:text-[14px] font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97]",
+                          "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200",
+                          "hover:bg-neutral-50 dark:hover:bg-neutral-700",
+                          "border border-neutral-200 dark:border-neutral-700",
+                        )}
                       >
-                        {opt.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Archive */}
-                <ActionButton
-                  onClick={() => act("ARCHIVED")}
-                  disabled={isPending}
-                  kbd="E"
-                >
-                  <Archive size={15} />
-                  Archive
-                </ActionButton>
-
-                {/* Done */}
-                <ActionButton
-                  onClick={() => act("DONE")}
-                  disabled={isPending}
-                  kbd="D"
-                  variant="solid"
-                >
-                  <Check size={15} />
-                  Done
-                </ActionButton>
+                        <Clock size={14} />
+                        Snooze
+                        <Kbd>S</Kbd>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-48">
+                      {snoozeOptions().map((opt) => (
+                        <DropdownMenuItem
+                          key={opt.label}
+                          onSelect={() => act("SNOOZED", opt.value)}
+                          className="text-[13px]"
+                        >
+                          {opt.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <ActionButton
+                    onClick={() => act("ARCHIVED")}
+                    disabled={isPending}
+                    kbd="E"
+                  >
+                    <Archive size={14} /> Archive
+                  </ActionButton>
+                  <ActionButton
+                    onClick={() => act("DONE")}
+                    disabled={isPending}
+                    kbd="D"
+                    variant="solid"
+                  >
+                    <Check size={14} /> Done
+                  </ActionButton>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* ── Mobile Reply + AI chips bar ── */}
+            {!panelInstance && (
+              <div className="sm:hidden border-t border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-3 pt-2 pb-4">
+                {/* AI suggestion chips */}
+                <div className="overflow-x-auto scrollbar-none mb-2">
+                  <SmartReplies
+                    threadId={email.threadId}
+                    emailAddress={email.emailAddress}
+                    lastEmail={toFullEmail(email)}
+                    shell="panel"
+                    variant="rows"
+                  />
+                </div>
+                {/* Reply button */}
+                <button
+                  onClick={handleReply}
+                  disabled={!email}
+                  className="w-full flex items-center justify-center gap-2 h-11 rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-[13px] font-semibold active:scale-[0.97] transition-transform disabled:opacity-40"
+                >
+                  Reply
+                </button>
+              </div>
+            )}
           </>
         )}
       </DialogContent>
