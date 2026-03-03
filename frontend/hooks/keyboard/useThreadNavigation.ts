@@ -25,8 +25,6 @@ export function useThreadNavigation(
       )
         return;
 
-      // Don't steal keypresses while a compose dialog is open — the user is
-      // actively composing, so J/K/Enter/S/E/U should not fire list shortcuts.
       if (
         useComposerStore.getState().instances.some((i) => i.shell === "dialog")
       )

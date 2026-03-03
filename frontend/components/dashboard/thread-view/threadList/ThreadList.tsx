@@ -313,6 +313,9 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
       )
         return;
 
+      // Yield to ThreadDetail when a thread is open — it owns s/e/u in that context
+      if (useUIStore.getState().activeThreadId) return;
+
       const actions = focusedActionsRef.current;
       if (!actions) return;
 

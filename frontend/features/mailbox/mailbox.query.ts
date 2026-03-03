@@ -390,7 +390,8 @@ export function useInboxZero(params?: InboxZeroParams) {
       mailboxService.getInboxZero({ ...params, cursor: pageParam as string }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? null,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 

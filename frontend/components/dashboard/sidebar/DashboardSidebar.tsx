@@ -4,8 +4,16 @@ import React, { useState, useCallback, Suspense } from "react";
 import { Sidebar, SidebarBody } from "@/components/ui/sidebar";
 import { useUIStore } from "@/lib/store/ui.store";
 import { useFolders } from "@/features/mailbox/mailbox.query";
-import { IconMenu2, IconX, IconEdit, IconTemplate } from "@tabler/icons-react";
+import {
+  IconMenu2,
+  IconX,
+  IconEdit,
+  IconTemplate,
+  IconChartBar,
+  IconInbox,
+} from "@tabler/icons-react";
 import { Search } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +24,7 @@ import {
 import { AccountSwitcher } from "./ui/AccountSwitcher";
 import { UserFooter, MobileUserAvatarButton } from "./ui/UserFooter";
 import { ComposeDialog } from "@/components/composer/ComposeDialog";
+import { InboxZeroQueueDialog } from "@/components/inbox-zero/InboxZeroQueueDialog";
 import { useKeyboard } from "@/hooks/keyboard/useKeyboard";
 import {
   Tooltip,
@@ -136,11 +145,17 @@ function FolderList({
   compact,
   onSelect,
   onOpenTemplates,
+  onOpenInsights,
+  onOpenInboxZero,
+  isInsightsActive,
 }: SidebarDataChildProps & {
   activeFolder: string;
   compact: boolean;
   onSelect: (f: string) => void;
   onOpenTemplates: () => void;
+  onOpenInsights: () => void;
+  onOpenInboxZero: () => void;
+  isInsightsActive: boolean;
 }) {
   return (
     <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden min-h-0">
@@ -185,18 +200,43 @@ function FolderList({
           compact={compact}
           onClick={onOpenTemplates}
         />
+        <FolderRow
+          item={{
+            icon: <IconInbox size={16} />,
+            label: "Inbox Zero",
+            folder: "tools_inboxzero",
+          }}
+          isActive={false}
+          compact={compact}
+          onClick={onOpenInboxZero}
+        />
+        <FolderRow
+          item={{
+            icon: <IconChartBar size={16} />,
+            label: "Insights",
+            folder: "tools_insights",
+          }}
+          isActive={isInsightsActive}
+          compact={compact}
+          onClick={onOpenInsights}
+        />
       </div>
     </div>
   );
 }
 
 export function DashboardSidebar() {
-  const collapsed          = useUIStore((s) => s.sidebarCollapsed);
-  const activeFolder       = useUIStore((s) => s.activeFolder);
-  const setActiveFolder    = useUIStore((s) => s.setActiveFolder);
-  const selectedEmail      = useUIStore((s) => s.selectedEmailAddress);
+  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  const activeFolder = useUIStore((s) => s.activeFolder);
+  const setActiveFolder = useUIStore((s) => s.setActiveFolder);
+  const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
   const setTemplatesBarOpen = useUIStore((s) => s.setTemplatesBarOpen);
-  const setMailSearchOpen  = useUIStore((s) => s.setMailSearchOpen);
+  const setMailSearchOpen = useUIStore((s) => s.setMailSearchOpen);
+  const inboxZeroOpen = useUIStore((s) => s.inboxZeroOpen);
+  const setInboxZeroOpen = useUIStore((s) => s.setInboxZeroOpen);
+  const router = useRouter();
+  const pathname = usePathname();
+  const isInsightsActive = pathname === "/app/insights";
 
   const [isHovering, setIsHovering] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -206,6 +246,14 @@ export function DashboardSidebar() {
   const openCompose = useCallback(() => {
     if (dialogs.length < 2) setDialogs((d) => [...d, crypto.randomUUID()]);
   }, [dialogs.length]);
+
+  const handleSelectFolder = useCallback(
+    (folder: string) => {
+      setActiveFolder(folder);
+      if (pathname !== "/app") router.push("/app");
+    },
+    [setActiveFolder, pathname, router],
+  );
 
   // N key opens compose (disabled when typing in inputs — handled by useKeyboard)
   useKeyboard("n", openCompose, [openCompose]);
@@ -228,10 +276,13 @@ export function DashboardSidebar() {
         {/* Inline search bar — opens search modal */}
         <button
           onClick={() => setMailSearchOpen(true)}
-          className="flex-1 flex items-center gap-2 h-9 px-3 rounded-xl bg-black/[0.05] dark:bg-white/[0.06] min-w-0 active:opacity-70 transition-opacity"
+          className="flex-1 flex items-center gap-2 h-9 px-3 rounded-xl bg-black/5 dark:bg-white/6 min-w-0 active:opacity-70 transition-opacity"
           aria-label="Search mail"
         >
-          <Search size={14} className="text-gray-400 dark:text-white/30 shrink-0" />
+          <Search
+            size={14}
+            className="text-gray-400 dark:text-white/30 shrink-0"
+          />
           <span className="flex-1 text-[13px] text-gray-400 dark:text-white/30 text-left truncate">
             Search mail…
           </span>
@@ -284,7 +335,7 @@ export function DashboardSidebar() {
 
               {/* Folders */}
               <div className="flex-1 overflow-y-auto py-2">
-              {/* Compose button */}
+                {/* Compose button */}
                 <div className="px-2 pb-2">
                   <button
                     onClick={() => {
@@ -306,13 +357,22 @@ export function DashboardSidebar() {
                         activeFolder={activeFolder}
                         compact={false}
                         onSelect={(f) => {
-                          setActiveFolder(f);
+                          handleSelectFolder(f);
                           setMobileOpen(false);
                         }}
                         onOpenTemplates={() => {
                           setTemplatesBarOpen(true);
                           setMobileOpen(false);
                         }}
+                        onOpenInboxZero={() => {
+                          setInboxZeroOpen(true);
+                          setMobileOpen(false);
+                        }}
+                        onOpenInsights={() => {
+                          router.push("/app/insights");
+                          setMobileOpen(false);
+                        }}
+                        isInsightsActive={isInsightsActive}
                       />
                     )}
                   </FolderData>
@@ -397,8 +457,11 @@ export function DashboardSidebar() {
                       {...props}
                       activeFolder={activeFolder}
                       compact={!isOpen}
-                      onSelect={setActiveFolder}
+                      onSelect={handleSelectFolder}
                       onOpenTemplates={() => setTemplatesBarOpen(true)}
+                      onOpenInboxZero={() => setInboxZeroOpen(true)}
+                      onOpenInsights={() => router.push("/app/insights")}
+                      isInsightsActive={isInsightsActive}
                     />
                   )}
                 </FolderData>
@@ -420,6 +483,16 @@ export function DashboardSidebar() {
           onClose={() => setDialogs((d) => d.filter((k) => k !== key))}
         />
       ))}
+
+      {/* Inbox Zero triage dialog — globally accessible */}
+      {inboxZeroOpen && (
+        <Suspense fallback={null}>
+          <InboxZeroQueueDialog
+            open={inboxZeroOpen}
+            onClose={() => setInboxZeroOpen(false)}
+          />
+        </Suspense>
+      )}
     </>
   );
 }
