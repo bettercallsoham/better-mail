@@ -4,7 +4,6 @@ import redis from "../../shared/config/redis";
 import {
   Integration,
   IntegrationProvider,
-  IntegrationStatus,
   TelegramIntegration,
 } from "../../shared/models";
 
@@ -57,6 +56,7 @@ export const disconnectTelegram = asyncHandler(
 
     const integration = await Integration.findOne({
       where: { user_id: userId, provider: IntegrationProvider.TELEGRAM },
+      include: [{ model: TelegramIntegration, as: "telegram" }],
     });
 
     if (!integration) {
@@ -65,8 +65,18 @@ export const disconnectTelegram = asyncHandler(
         .json({ success: false, message: "Integration not found" });
     }
 
-    await integration.update({ status: IntegrationStatus.REVOKED });
-    await redis.del(`tg:chat_id:${userId}`);
+    const chatId = integration.telegram?.chat_id ?? null;
+
+    // Delete child row first, then parent (FK constraint)
+    await TelegramIntegration.destroy({
+      where: { integration_id: integration.id },
+    });
+    await integration.destroy();
+
+    // Invalidate all relevant cache keys
+    const keysToDelete = [`tg:chat_id:${userId}`];
+    if (chatId) keysToDelete.push(`tg:user_id_by_chat:${chatId}`);
+    await redis.del(...keysToDelete);
 
     res.json({ success: true });
   },

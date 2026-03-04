@@ -30,10 +30,21 @@ function TelegramCard() {
   const isActive = tg?.status === "active";
 
   const handleConnect = () => {
+    // Open the tab synchronously (direct user gesture) so popup blockers don't interfere,
+    // then assign the URL once the API call resolves.
+    const newTab = window.open("", "_blank");
     getLink(undefined, {
       onSuccess: (res) => {
         setDeepLink(res.link);
-        window.open(res.link, "_blank");
+        if (newTab) {
+          newTab.location.href = res.link;
+        } else {
+          // Popup was blocked — the "Open Telegram" fallback button will appear
+          window.open(res.link, "_blank");
+        }
+      },
+      onError: () => {
+        newTab?.close();
       },
     });
   };
@@ -44,40 +55,42 @@ function TelegramCard() {
       ? `@${tg.username}`
       : null;
 
+  const connectedUser: ConnectedUser | null =
+    isActive && displayName
+      ? { name: displayName, photoUrl: tg?.photoUrl }
+      : null;
+
   return (
     <IntegrationCard
       icon="/telegramIcon.svg"
       name="Telegram"
-      description="Get email summaries, search your inbox, and take actions right from Telegram."
+      description={
+        connectedUser
+          ? undefined
+          : "Get email summaries, search your inbox, and take actions right from Telegram."
+      }
+      connectedUser={connectedUser}
       available
     >
       {isLoading ? (
         <Loader2 size={14} className="animate-spin text-neutral-400" />
       ) : isActive ? (
-        <div className="flex flex-col gap-2 items-end">
-          {displayName && (
-            <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-              <CheckCircle2 size={12} />
-              {displayName}
-            </span>
+        <button
+          onClick={() => disconnect()}
+          disabled={isDisconnecting}
+          className={cn(
+            "flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors",
+            "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10",
+            isDisconnecting && "opacity-50 pointer-events-none",
           )}
-          <button
-            onClick={() => disconnect()}
-            disabled={isDisconnecting}
-            className={cn(
-              "flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors",
-              "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10",
-              isDisconnecting && "opacity-50 pointer-events-none",
-            )}
-          >
-            {isDisconnecting ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <Unlink size={12} />
-            )}
-            Disconnect
-          </button>
-        </div>
+        >
+          {isDisconnecting ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Unlink size={12} />
+          )}
+          Disconnect
+        </button>
       ) : (
         <ConnectButton
           loading={isGettingLink}
@@ -134,17 +147,24 @@ function ConnectButton({
 
 // ── Generic card shells ───────────────────────────────────────────────────────
 
+interface ConnectedUser {
+  name: string;
+  photoUrl?: string | null;
+}
+
 function IntegrationCard({
   icon,
   name,
   description,
   available = false,
+  connectedUser,
   children,
 }: {
   icon: string;
   name: string;
-  description: string;
+  description?: string;
   available?: boolean;
+  connectedUser?: ConnectedUser | null;
   children?: React.ReactNode;
 }) {
   return (
@@ -156,7 +176,7 @@ function IntegrationCard({
           : "bg-neutral-50 dark:bg-neutral-900/40 border-neutral-100 dark:border-neutral-800/50 opacity-60",
       )}
     >
-      {/* Icon */}
+      {/* App icon */}
       <div className="shrink-0 w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 flex items-center justify-center shadow-sm">
         <Image src={icon} alt={name} width={22} height={22} />
       </div>
@@ -169,9 +189,36 @@ function IntegrationCard({
           </span>
           {!available && <ComingSoonBadge />}
         </div>
-        <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
-          {description}
-        </p>
+
+        {connectedUser ? (
+          /* Connected state — show avatar + name instead of description */
+          <div className="mt-1.5 flex items-center gap-2">
+            {connectedUser.photoUrl ? (
+              <Image
+                src={connectedUser.photoUrl}
+                alt={connectedUser.name}
+                width={20}
+                height={20}
+                className="rounded-full ring-1 ring-neutral-200 dark:ring-neutral-700"
+              />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-[9px] font-bold text-neutral-500 dark:text-neutral-300 uppercase">
+                {connectedUser.name[0]}
+              </div>
+            )}
+            <span className="text-[12px] font-medium text-neutral-700 dark:text-neutral-300 truncate">
+              {connectedUser.name}
+            </span>
+            <CheckCircle2
+              size={12}
+              className="shrink-0 text-emerald-500 dark:text-emerald-400"
+            />
+          </div>
+        ) : description ? (
+          <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+            {description}
+          </p>
+        ) : null}
       </div>
 
       {/* Action slot */}
