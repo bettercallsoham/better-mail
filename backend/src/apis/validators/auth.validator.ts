@@ -133,9 +133,13 @@ export const validateRealtimeAuth = [
       const conversationPattern =
         /^private-user-[a-zA-Z0-9_-]+-conversation-[a-zA-Z0-9_-]+$/;
 
+      // Simple private-{conversationId} pattern used by AIEmitter + useConversationRealtime
+      const simpleConversationPattern = /^private-[a-zA-Z0-9_-]+$/;
+
       if (
         !notificationsPattern.test(value) &&
-        !conversationPattern.test(value)
+        !conversationPattern.test(value) &&
+        !simpleConversationPattern.test(value)
       ) {
         throw new Error("Invalid channel format");
       }
