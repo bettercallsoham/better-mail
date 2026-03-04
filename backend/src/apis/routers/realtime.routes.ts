@@ -71,6 +71,30 @@ router.post(
         return res.send(authResponse);
       }
 
+      // Simple private-{conversationId} pattern (used by AIEmitter + useConversationRealtime)
+      const simpleConversationMatch = channel_name.match(
+        /^private-([a-zA-Z0-9_-]+)$/,
+      );
+
+      if (simpleConversationMatch) {
+        const conversationId = simpleConversationMatch[1];
+
+        const hasAccess = await conversationService.userOwnsConversation(
+          userId,
+          conversationId,
+        );
+
+        if (!hasAccess) {
+          return res.status(403).json({
+            success: false,
+            message: "Unauthorized conversation access",
+          });
+        }
+
+        const authResponse = pusher.authorizeChannel(socket_id, channel_name);
+        return res.send(authResponse);
+      }
+
       return res.status(403).json({
         success: false,
         message: "Channel not allowed",
