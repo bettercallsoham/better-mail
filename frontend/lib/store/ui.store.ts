@@ -23,6 +23,7 @@ interface LayoutSlice {
   templatesBarOpen: boolean;
   mailSearchOpen: boolean;
   inboxZeroOpen: boolean;
+  integrationsOpen: boolean;
   /** Per-mode panel split percentage (thread list width %) */
   splitPct: Record<string, number>;
   /** Draft email ID pending open in ComposeDialog */
@@ -35,6 +36,7 @@ interface LayoutSlice {
   setTemplatesBarOpen: (open: boolean) => void;
   setMailSearchOpen: (open: boolean) => void;
   setInboxZeroOpen: (open: boolean) => void;
+  setIntegrationsOpen: (open: boolean) => void;
   setPendingDraftId: (id: string | null) => void;
 }
 
@@ -106,6 +108,7 @@ export const useUIStore = create<UIState>()(
       templatesBarOpen: false,
       mailSearchOpen: false,
       inboxZeroOpen: false,
+      integrationsOpen: false,
       splitPct: { ...DEFAULT_SPLIT },
       pendingDraftId: null,
 
@@ -124,6 +127,7 @@ export const useUIStore = create<UIState>()(
       setTemplatesBarOpen: (open) => set({ templatesBarOpen: open }),
       setMailSearchOpen: (open) => set({ mailSearchOpen: open }),
       setInboxZeroOpen: (open) => set({ inboxZeroOpen: open }),
+      setIntegrationsOpen: (open) => set({ integrationsOpen: open }),
       setPendingDraftId: (id) => set({ pendingDraftId: id }),
 
       // ── Mailbox ─────────────────────────────────────────────────────────────

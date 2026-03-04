@@ -17,6 +17,7 @@ import {
   IconTemplate,
   IconChartBar,
   IconInbox,
+  IconApps,
 } from "@tabler/icons-react";
 import { Search } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
@@ -32,6 +33,7 @@ import { UserFooter, MobileUserAvatarButton } from "./ui/UserFooter";
 import { ComposeDialog } from "@/components/composer/ComposeDialog";
 import type { OpenComposerParams } from "@/lib/store/composer.store";
 import { InboxZeroQueueDialog } from "@/components/inbox-zero/InboxZeroQueueDialog";
+import { IntegrationsModal } from "@/components/integrations/IntegrationsModal";
 import { useKeyboard } from "@/hooks/keyboard/useKeyboard";
 import {
   Tooltip,
@@ -154,6 +156,7 @@ function FolderList({
   onOpenTemplates,
   onOpenInsights,
   onOpenInboxZero,
+  onOpenIntegrations,
   isInsightsActive,
 }: SidebarDataChildProps & {
   activeFolder: string;
@@ -162,6 +165,7 @@ function FolderList({
   onOpenTemplates: () => void;
   onOpenInsights: () => void;
   onOpenInboxZero: () => void;
+  onOpenIntegrations: () => void;
   isInsightsActive: boolean;
 }) {
   return (
@@ -227,6 +231,16 @@ function FolderList({
           compact={compact}
           onClick={onOpenInsights}
         />
+        <FolderRow
+          item={{
+            icon: <IconApps size={16} />,
+            label: "Integrations",
+            folder: "tools_integrations",
+          }}
+          isActive={false}
+          compact={compact}
+          onClick={onOpenIntegrations}
+        />
       </div>
     </div>
   );
@@ -241,6 +255,8 @@ export function DashboardSidebar() {
   const setMailSearchOpen = useUIStore((s) => s.setMailSearchOpen);
   const inboxZeroOpen = useUIStore((s) => s.inboxZeroOpen);
   const setInboxZeroOpen = useUIStore((s) => s.setInboxZeroOpen);
+  const integrationsOpen = useUIStore((s) => s.integrationsOpen);
+  const setIntegrationsOpen = useUIStore((s) => s.setIntegrationsOpen);
   const router = useRouter();
   const pathname = usePathname();
   const isInsightsActive = pathname === "/app/insights";
@@ -385,6 +401,10 @@ export function DashboardSidebar() {
                           router.push("/app/insights");
                           setMobileOpen(false);
                         }}
+                        onOpenIntegrations={() => {
+                          setIntegrationsOpen(true);
+                          setMobileOpen(false);
+                        }}
                         isInsightsActive={isInsightsActive}
                       />
                     )}
@@ -474,6 +494,7 @@ export function DashboardSidebar() {
                       onOpenTemplates={() => setTemplatesBarOpen(true)}
                       onOpenInboxZero={() => setInboxZeroOpen(true)}
                       onOpenInsights={() => router.push("/app/insights")}
+                      onOpenIntegrations={() => setIntegrationsOpen(true)}
                       isInsightsActive={isInsightsActive}
                     />
                   )}
@@ -510,6 +531,12 @@ export function DashboardSidebar() {
           />
         </Suspense>
       )}
+
+      {/* Integrations modal — globally accessible */}
+      <IntegrationsModal
+        open={integrationsOpen}
+        onClose={() => setIntegrationsOpen(false)}
+      />
     </>
   );
 }
