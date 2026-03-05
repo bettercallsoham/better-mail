@@ -2,7 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useAIStore } from "@/lib/store/ui.store";
 import { AIAssistantButton } from "./AIAssistantButton";
 import { AIAssistantPanel } from "./AIAssistantPanel";
@@ -41,6 +41,21 @@ export function AIAssistantPortal() {
   return createPortal(
     <>
       <AIAssistantButton />
+
+      {/* Mobile scrim — only visible below sm breakpoint */}
+      <AnimatePresence>
+        {aiAssistantOpen && !aiMode && (
+          <motion.div
+            key="panel-scrim"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] sm:hidden"
+            onClick={() => setAIAssistantOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {aiAssistantOpen && !aiMode && <AIAssistantPanel />}

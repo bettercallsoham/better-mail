@@ -128,6 +128,7 @@ export const gmailConnectCallback = asyncHandler(async (req, res) => {
       user_id: userId,
       provider: "GOOGLE",
       email: identity.email,
+      name: identity.fullName || null,
       refresh_token: tokens.refresh_token,
       avatar_url: identity.avatar || null,
     });
@@ -136,6 +137,7 @@ export const gmailConnectCallback = asyncHandler(async (req, res) => {
       user_id: userId,
       provider: "GOOGLE",
       email: identity.email,
+      name: identity.fullName || null,
       avatar_url: identity.avatar || null,
     });
   }
@@ -214,6 +216,7 @@ export const outlookConnectCallback = asyncHandler(
       user_id: userId,
       provider: "OUTLOOK",
       email: identity.email,
+      name: identity.fullName || null,
       refresh_token: tokens.refresh_token ?? null,
       avatar_url: "",
     });

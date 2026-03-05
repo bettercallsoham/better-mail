@@ -15,6 +15,7 @@ class EmailAccount extends Model<
   declare user_id: string;
   declare provider: string;
   declare email: string;
+  declare name: string | null;
   declare password: string | null;
   declare host: string | null;
   declare refresh_token: string | null;
@@ -56,6 +57,11 @@ EmailAccount.init(
     email: {
       type: DataTypes.TEXT,
       allowNull: false,
+    },
+
+    name: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
 
     password: {

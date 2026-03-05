@@ -22,6 +22,7 @@ import {
   bullBoardAuth,
   bullBoardEnvCheck,
 } from "./apis/middleware/bullboard-auth";
+import { allowOnlyMyIP } from "./apis/middleware/checkIp";
 
 export function createApp() {
   const app = express();
@@ -61,6 +62,7 @@ export function createApp() {
 
   app.use(
     "/admin/queues",
+    allowOnlyMyIP,
     bullBoardEnvCheck,
     bullBoardAuth,
     serverAdapter.getRouter(),

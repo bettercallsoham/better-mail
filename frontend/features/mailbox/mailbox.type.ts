@@ -1,6 +1,7 @@
 export interface ConnectedAccount {
   id: string;
   email: string;
+  name?: string | null;
   created_at: string;
   provider?: string;
   avatar_url?: string | null;

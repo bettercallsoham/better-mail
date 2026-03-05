@@ -239,9 +239,16 @@ function AddAccountDropdown({
                   avatar={account.avatar_url ?? undefined}
                   size="sm"
                 />
-                <span className="flex-1 truncate text-[12.5px]">
-                  {account.email}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12.5px] font-medium truncate">
+                    {account.name || account.email}
+                  </p>
+                  {account.name && (
+                    <p className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate">
+                      {account.email}
+                    </p>
+                  )}
+                </div>
                 {account.email === activeEmail && (
                   <IconCheck
                     size={13}
@@ -310,9 +317,16 @@ function CollapsedDropdown({
               avatar={account.avatar_url ?? undefined}
               size="sm"
             />
-            <span className="flex-1 truncate text-[12.5px]">
-              {account.email}
-            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12.5px] font-medium truncate">
+                {account.name || account.email}
+              </p>
+              {account.name && (
+                <p className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate">
+                  {account.email}
+                </p>
+              )}
+            </div>
             {account.email === activeEmail && (
               <IconCheck
                 size={13}
@@ -370,7 +384,13 @@ function AccountSwitcherInner({
             onSwitch={handleSwitch}
           >
             <button
-              title={isAllAccounts ? "All accounts" : (activeEmail ?? "")}
+              title={
+                isAllAccounts
+                  ? "All accounts"
+                  : activeAccount?.name
+                    ? `${activeAccount.name} · ${activeEmail}`
+                    : (activeEmail ?? "")
+              }
               className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
             >
               {isAllAccounts ? (
@@ -418,7 +438,9 @@ function AccountSwitcherInner({
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" sideOffset={6}>
-                    {account.email}
+                    {account.name
+                      ? `${account.name} · ${account.email}`
+                      : account.email}
                   </TooltipContent>
                 </Tooltip>
               ))}
@@ -466,7 +488,7 @@ function AccountSwitcherInner({
                   <p className="text-[13px] font-semibold text-neutral-800 dark:text-neutral-100 leading-tight truncate">
                     {isAllAccounts
                       ? userName
-                      : (activeAccount?.email?.split("@")[0] ?? userName)}
+                      : (activeAccount?.name || activeAccount?.email?.split("@")[0] || userName)}
                   </p>
                   <p className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate mt-0.5">
                     {isAllAccounts
