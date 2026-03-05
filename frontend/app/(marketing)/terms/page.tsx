@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 const LAST_UPDATED = "March 6, 2025";
-const CONTACT_EMAIL = "officeAbhiSharma@gmail.com";
+const CONTACT_EMAIL = "admin@bettermail.tech";
 const SITE_URL = "https://bettermail.tech";
 
 function H2({ children }: { children: React.ReactNode }) {
@@ -244,10 +244,11 @@ export default function TermsPage() {
 
         <H2>9. Disclaimers and Limitation of Liability</H2>
         <P>
-          The Service is provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis without
-          warranties of any kind, either express or implied, including but not
-          limited to warranties of merchantability, fitness for a particular
-          purpose, or non-infringement.
+          The Service is provided on an &ldquo;as is&rdquo; and &ldquo;as
+          available&rdquo; basis without warranties of any kind, either express
+          or implied, including but not limited to warranties of
+          merchantability, fitness for a particular purpose, or
+          non-infringement.
         </P>
         <P>We do not warrant that:</P>
         <UL>
@@ -305,8 +306,8 @@ export default function TermsPage() {
         <H2>12. Changes to These Terms</H2>
         <P>
           We reserve the right to modify these Terms at any time. We will post
-          the updated Terms on this page with a new &quot;Last updated&quot; date.
-          Continued use of the Service after changes become effective
+          the updated Terms on this page with a new &quot;Last updated&quot;
+          date. Continued use of the Service after changes become effective
           constitutes your acceptance of the new Terms.
         </P>
         <P>

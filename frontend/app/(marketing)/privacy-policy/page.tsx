@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 const LAST_UPDATED = "March 6, 2025";
-const CONTACT_EMAIL = "officeAbhiSharma@gmail.com";
+const CONTACT_EMAIL = "admin@bettermail.tech";
 const SITE_URL = "https://bettermail.tech";
 
 function H2({ children }: { children: React.ReactNode }) {
@@ -398,8 +398,8 @@ export default function PrivacyPolicyPage() {
         <P>
           We may update this Privacy Policy from time to time. We will notify
           you of material changes by posting the new policy on this page and
-          updating the &quot;Last updated&quot; date. For significant changes, we will
-          also notify you by email if we have your address on file.
+          updating the &quot;Last updated&quot; date. For significant changes,
+          we will also notify you by email if we have your address on file.
         </P>
 
         <H2>10. Contact Us</H2>
