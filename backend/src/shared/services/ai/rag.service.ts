@@ -20,6 +20,26 @@ export class RAGService {
     private vectorSearchService: VectorSearchService,
   ) {}
 
+  async getEmailContext(
+    query: string,
+    userId: string,
+  ): Promise<{ context: string; raw: { emails: any[] } }> {
+    const queryVector = await this.embeddingsService.generate(query);
+    const { emails: verifiedEmails } = await getUserEmails(userId);
+    const emailHits = await this.searchEmails(
+      query,
+      queryVector,
+      verifiedEmails,
+    );
+
+    const context =
+      emailHits.length > 0
+        ? this.formatEmails(emailHits)
+        : "No relevant emails found.";
+
+    return { context, raw: { emails: emailHits } };
+  }
+
   async getUnifiedContext(
     query: string,
     userId: string,

@@ -5,11 +5,11 @@ import {
 } from "langchain";
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import { pool } from "../../../config/db";
-import { gpt41LLM, gpt4oMiniLLM } from "../../../config/llm";
+import { gpt41LLM } from "../../../config/llm";
 import { searchEmailsTool } from "../tools/searchEmailsTools";
 import { emailActionsTool } from "../tools/emailActionTool";
 import { sendTelegramMessageTool } from "../tools/sendTelegramMessageTool";
-import { AGENT_SYSTEM_PROMPT } from "../prompts/system-prompt";
+import { getAgentSystemPrompt } from "../prompts/system-prompt";
 import { unifiedRAGTool } from "../tools/RAGSearchTool";
 import { getEmailContentTool } from "../tools/getEmailContentTool";
 
@@ -39,10 +39,10 @@ export class AgentFactory {
       checkpointer: saver,
       middleware: [
         summarizationMiddleware({
-          model: gpt4oMiniLLM,
+          model: gpt41LLM,
           trigger: { messages: 20 },
-          keep: { messages: 6 },
-          summaryPrefix: "Summary of past conversations",
+          keep: { messages: 10 },
+          summaryPrefix: "Context summary:",
         }),
         humanInTheLoopMiddleware({
           interruptOn: {
@@ -53,7 +53,7 @@ export class AgentFactory {
           },
         }),
       ],
-      systemPrompt: AGENT_SYSTEM_PROMPT,
+      systemPrompt: getAgentSystemPrompt(),
     });
   }
 }
