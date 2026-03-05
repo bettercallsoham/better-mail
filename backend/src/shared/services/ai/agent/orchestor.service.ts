@@ -89,7 +89,8 @@ export class AIOrchestratorService {
     let finalText = "";
     let tgMessageId: number | null = null;
     let lastStreamedLength = 0;
-    const capturedToolCalls: any[] = [];
+    // Map keyed by emailId for automatic deduplication across tool calls
+    const capturedSources = new Map<string, any>();
     const chatId = ctx.isTelegram
       ? ctx.conversationId.replace("tg_", "")
       : null;
@@ -126,6 +127,7 @@ export class AIOrchestratorService {
 
       if (mode === "messages") {
         const msg = data[0];
+
         if (msg._getType() === "ai" && msg.content && !msg.tool_calls?.length) {
           finalText += msg.content;
 
@@ -135,12 +137,35 @@ export class AIOrchestratorService {
                 chatId,
                 finalText,
                 tgMessageId,
-                false, 
+                false,
               );
               lastStreamedLength = finalText.length;
             }
           } else {
             this.emitter.emitToken(ctx.conversationId, msg.content);
+          }
+        }
+
+        // Capture tool results for citations
+        if (msg._getType() === "tool") {
+          const toolName: string = msg.name ?? "";
+          const toolContent: string =
+            typeof msg.content === "string" ? msg.content : "";
+
+          const newSources = this.extractSourcesFromToolResult(
+            toolName,
+            toolContent,
+          );
+          for (const src of newSources) {
+            if (src.emailId) {
+              capturedSources.set(src.emailId, src);
+            }
+          }
+
+          if (newSources.length > 0 && !ctx.isTelegram) {
+            this.emitter.emitToolResult(ctx.conversationId, {
+              sources: Array.from(capturedSources.values()),
+            });
           }
         }
       }
@@ -155,11 +180,15 @@ export class AIOrchestratorService {
       );
     }
 
-    await this.persistCompletion(ctx, finalText, capturedToolCalls);
+    await this.persistCompletion(
+      ctx,
+      finalText,
+      Array.from(capturedSources.values()),
+    );
   }
 
-  private async persistCompletion(ctx: any, content: string, toolCalls: any[]) {
-    if (!content && (!toolCalls || toolCalls.length === 0)) return;
+  private async persistCompletion(ctx: any, content: string, sources: any[]) {
+    if (!content && sources.length === 0) return;
 
     const messageId = crypto.randomUUID();
     const assistantMessage: ConversationMessage = {
@@ -175,6 +204,7 @@ export class AIOrchestratorService {
         model: "gpt-4.1",
         userDecision: ctx.decisionStatus || "auto_executed",
       },
+      sources: sources.length > 0 ? sources : undefined,
     };
 
     await this.conversationService.createMessage(assistantMessage);
@@ -240,5 +270,60 @@ export class AIOrchestratorService {
     } else {
       this.emitter.emitError(conversationId, error.message);
     }
+  }
+
+  private extractSourcesFromToolResult(toolName: string, content: string): any[] {
+    const sources: any[] = [];
+
+    if (toolName === "search_emails" || toolName === "get_email_content") {
+      try {
+        const parsed = JSON.parse(content);
+        const emails: any[] = parsed.emails ?? [];
+        for (const email of emails) {
+          if (!email.emailId) continue;
+          const bodyText: string = email.bodyText ?? email.snippet ?? "";
+          sources.push({
+            type: "email",
+            emailId: email.emailId,
+            snippet: bodyText.slice(0, 120) || undefined,
+            metadata: {
+              subject: email.subject,
+              from: email.from,
+              threadId: email.threadId,
+              receivedAt: email.receivedAt,
+            },
+          });
+        }
+      } catch {
+        // non-JSON result, skip
+      }
+    } else if (toolName === "search_knowledge_and_history") {
+      // Parse the formatted RAG string produced by rag.service.ts
+      // Format per block: "Email N [Score: X.XX] [emailId: ID]:\nFrom: ...\nDate: ...\nBody: ...\n"
+      const blocks = content.split("---").filter((b) => b.trim());
+      for (const block of blocks) {
+        const emailIdMatch = block.match(/\[emailId:\s*([^\]]+)\]/);
+        if (!emailIdMatch) continue;
+
+        const emailId = emailIdMatch[1].trim();
+        const subjectMatch = block.match(/Subject:\s*(.+)/);
+        const fromMatch = block.match(/From:\s*([^|]+)/);
+        const dateMatch = block.match(/Date:\s*([^|]+)/);
+        const bodyMatch = block.match(/Body:\s*([\s\S]+)/);
+
+        sources.push({
+          type: "email",
+          emailId,
+          snippet: bodyMatch?.[1]?.trim().slice(0, 120) || undefined,
+          metadata: {
+            subject: subjectMatch?.[1]?.trim(),
+            from: fromMatch?.[1]?.trim(),
+            receivedAt: dateMatch?.[1]?.trim(),
+          },
+        });
+      }
+    }
+
+    return sources;
   }
 }

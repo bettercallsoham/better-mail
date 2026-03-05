@@ -274,15 +274,25 @@ export class ConversationService {
     userId: string,
     conversationId: string,
   ): Promise<boolean> {
-    const result = await this.client.count({
-      index: this.CONVERSATIONS_INDEX,
-      query: {
-        bool: {
-          filter: [{ term: { conversationId } }, { term: { userId } }],
+    const [msgResult, summaryResult] = await Promise.all([
+      this.client.count({
+        index: this.CONVERSATIONS_INDEX,
+        query: {
+          bool: {
+            filter: [{ term: { conversationId } }, { term: { userId } }],
+          },
         },
-      },
-    });
+      }),
+      this.client.count({
+        index: this.SUMMARIES_INDEX,
+        query: {
+          bool: {
+            filter: [{ term: { conversationId } }, { term: { userId } }],
+          },
+        },
+      }),
+    ]);
 
-    return result.count > 0;
+    return msgResult.count > 0 || summaryResult.count > 0;
   }
 }

@@ -11,6 +11,7 @@ import { emailActionsTool } from "../tools/emailActionTool";
 import { sendTelegramMessageTool } from "../tools/sendTelegramMessageTool";
 import { AGENT_SYSTEM_PROMPT } from "../prompts/system-prompt";
 import { unifiedRAGTool } from "../tools/RAGSearchTool";
+import { getEmailContentTool } from "../tools/getEmailContentTool";
 
 export class AgentFactory {
   private static checkpointer: PostgresSaver | null = null;
@@ -30,6 +31,7 @@ export class AgentFactory {
       model: gpt41LLM,
       tools: [
         searchEmailsTool,
+        getEmailContentTool,
         emailActionsTool,
         unifiedRAGTool,
         sendTelegramMessageTool,
@@ -39,7 +41,7 @@ export class AgentFactory {
         summarizationMiddleware({
           model: gpt4oMiniLLM,
           trigger: { messages: 20 },
-          keep: { messages: 10 },
+          keep: { messages: 6 },
           summaryPrefix: "Summary of past conversations",
         }),
         humanInTheLoopMiddleware({

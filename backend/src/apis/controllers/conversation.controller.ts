@@ -20,11 +20,23 @@ export const createConversation = asyncHandler(
     if (!userId) throw createHttpError(401, "User not authenticated");
 
     const conversationId = crypto.randomUUID();
+    const now = new Date();
+
+    await conversationService.createOrUpdateSummary({
+      conversationId,
+      userId,
+      title: "New Conversation",
+      summary: "",
+      messageCount: 0,
+      lastMessageAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     return res.status(201).json({
       conversationId,
       userId,
-      createdAt: new Date(),
+      createdAt: now,
     });
   },
   "createConversation",

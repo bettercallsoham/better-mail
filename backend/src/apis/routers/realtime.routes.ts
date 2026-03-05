@@ -6,6 +6,7 @@ import { pusher } from "../../shared/config/pusher";
 import { validateRealtimeAuth } from "../validators/auth.validator";
 
 const router = Router();
+const conversationService = new ConversationService(elasticClient);
 
 router.post(
   "/auth",
@@ -30,7 +31,6 @@ router.post(
         });
       }
 
-      const conversationService = new ConversationService(elasticClient);
 
       const expectedNotificationChannel = `private-user-${userId}-notifications`;
 

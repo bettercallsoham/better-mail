@@ -68,14 +68,29 @@ export const searchEmailsTool = tool(
         filters: input.filters || {},
       });
 
-      const simplified = result.emails.map((email: any) => ({
-        emailId: email._id,
-        subject: email.subject || "(No subject)",
-        from: email.from?.email,
-        to: email.to?.email,
-        snippet: email.snippet,
-        receivedAt: email.receivedAt,
-      }));
+      const simplified = result.emails.map((email: any) => {
+        const fullBody: string = email.bodyText || "";
+        const bodyExcerpt =
+          fullBody.length > 600 ? fullBody.slice(0, 600) + "…" : fullBody;
+
+        return {
+          emailId: email._id,
+          threadId: email.threadId,
+          subject: email.subject || "(No subject)",
+          from: email.from?.email,
+          to: email.to?.map((r: any) => r.email).join(", "),
+          snippet: email.snippet,
+          bodyText: bodyExcerpt || undefined,
+          receivedAt: email.receivedAt,
+          isRead: email.isRead,
+          isStarred: email.isStarred,
+          hasAttachments: email.hasAttachments,
+          attachmentNames: email.hasAttachments
+            ? (email.attachments || []).map((a: any) => a.name).filter(Boolean)
+            : undefined,
+          labels: email.labels?.length ? email.labels : undefined,
+        };
+      });
 
       return JSON.stringify({
         total: result.total,

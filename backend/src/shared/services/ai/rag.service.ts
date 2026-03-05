@@ -89,12 +89,20 @@ export class RAGService {
 
   private formatEmails(hits: SearchHit<UnifiedEmailDocument>[]): string {
     return hits
-      .map(
-        (h, i) =>
-          `Email ${i + 1} [Score: ${h._score.toFixed(2)}]:\n` +
-          `From: ${h._source.from.email} | Subject: ${h._source.subject}\n` +
-          `Snippet: ${h._source.snippet}\n---`,
-      )
+      .map((h, i) => {
+        const src = h._source;
+        const fullBody: string = src.bodyText || src.snippet || "";
+        const bodyExcerpt =
+          fullBody.length > 800 ? fullBody.slice(0, 800) + "…" : fullBody;
+        const labels = src.labels?.length ? src.labels.join(", ") : undefined;
+
+        return (
+          `Email ${i + 1} [Score: ${h._score.toFixed(2)}] [emailId: ${h._id}]:\n` +
+          `From: ${src.from.email}${src.from.name ? ` (${src.from.name})` : ""} | Subject: ${src.subject}\n` +
+          `Date: ${src.receivedAt}${labels ? ` | Labels: ${labels}` : ""}\n` +
+          `Body: ${bodyExcerpt || "(no body)"}\n---`
+        );
+      })
       .join("\n");
   }
 
