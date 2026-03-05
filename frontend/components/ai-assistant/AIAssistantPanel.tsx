@@ -17,6 +17,7 @@ import { ConversationList } from "./ConversationList";
 import { ConversationView } from "./ConversationView";
 import { AIInput } from "./AIInput";
 import { useStreamingMessage } from "@/lib/store/conversations.store";
+import { cn } from "@/lib/utils";
 
 export function AIAssistantPanel() {
   const {
@@ -65,17 +66,30 @@ export function AIAssistantPanel() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 12, scale: 0.97 }}
+      exit={{ opacity: 0, y: 16, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 420, damping: 32 }}
-      className="fixed bottom-20 right-6 w-115 h-145 z-50 flex flex-col rounded-2xl overflow-hidden border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#111009] shadow-2xl dark:shadow-none"
+      className={cn(
+        "fixed z-50 flex flex-col overflow-hidden",
+        "border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#111009]",
+        "shadow-2xl dark:shadow-none",
+        // Mobile: full-width bottom sheet
+        "inset-x-0 bottom-0 h-[88dvh] rounded-t-2xl rounded-b-none",
+        // Desktop: floating panel
+        "sm:inset-x-auto sm:bottom-20 sm:right-6 sm:w-115 sm:h-145 sm:rounded-2xl",
+      )}
       style={{
         backdropFilter: "blur(24px) saturate(1.4)",
         boxShadow:
           "0 0 0 1px rgba(0,0,0,0.06), 0 32px 72px rgba(0,0,0,0.18), 0 4px 20px rgba(0,0,0,0.10)",
       }}
     >
+      {/* Mobile drag handle */}
+      <div className="sm:hidden flex justify-center pt-2.5 pb-0.5 shrink-0">
+        <div className="w-9 h-1 rounded-full bg-neutral-300 dark:bg-white/15" />
+      </div>
+
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2.5 px-4 py-3 border-b border-neutral-100 dark:border-white/8 bg-neutral-50/80 dark:bg-[#0e0c0a] shrink-0">
         {hasConversation ? (
