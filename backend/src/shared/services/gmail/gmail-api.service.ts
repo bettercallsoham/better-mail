@@ -165,7 +165,7 @@ export class GmailApiService {
   await scheduleSubscriptionRenewal({
     email:     this.email,
     provider:  "gmail",
-    expiresAt: new Date(parseInt(res.data.expiration)), // Google returns ms epoch string
+    expiresAt: new Date(parseInt(res.data.expiration)), 
   });
 
   return {

@@ -47,7 +47,10 @@ export function AIAssistantFullscreen() {
       createConversation(undefined, {
         onSuccess: (res) => {
           setActiveAIConversationId(res.conversationId);
-          setTimeout(() => sendMessage({ conversationId: res.conversationId, content }), 300);
+          setTimeout(
+            () => sendMessage({ conversationId: res.conversationId, content }),
+            300,
+          );
         },
       });
     } else {

@@ -488,7 +488,9 @@ function AccountSwitcherInner({
                   <p className="text-[13px] font-semibold text-neutral-800 dark:text-neutral-100 leading-tight truncate">
                     {isAllAccounts
                       ? userName
-                      : (activeAccount?.name || activeAccount?.email?.split("@")[0] || userName)}
+                      : activeAccount?.name ||
+                        activeAccount?.email?.split("@")[0] ||
+                        userName}
                   </p>
                   <p className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate mt-0.5">
                     {isAllAccounts

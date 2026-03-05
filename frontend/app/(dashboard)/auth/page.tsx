@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "motion/react";
 import { analytics } from "@/lib/analytics/events";
 import Navbar from "@/components/landing-page/Navbar";
@@ -75,8 +76,22 @@ export default function AuthPage() {
             />
           </div>
 
-          <p className="mt-10 text-center text-[10px] uppercase tracking-[0.2em] font-semibold text-neutral-400 dark:text-neutral-600">
-            Secure Enterprise Login
+          <p className="mt-8 text-center text-[11px] z-100 text-neutral-400 dark:text-neutral-600 leading-relaxed">
+            By continuing, you agree to our{" "}
+            <Link
+              href="/terms"
+              className="underline underline-offset-2 cursor-pointer hover:text-neutral-600 dark:hover:text-neutral-400 transition-colors"
+            >
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="/privacy-policy"
+              className="underline z-100 cursor-pointer underline-offset-2 hover:text-neutral-600 dark:hover:text-neutral-400 transition-colors"
+            >
+              Privacy Policy
+            </Link>
+            .
           </p>
         </motion.div>
       </main>

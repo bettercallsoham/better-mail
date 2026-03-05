@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 
 const NAV_LINKS = [
-  { label: "Features", href: "#features" },
-  { label: "AI Chat", href: "#ai" },
-  { label: "FAQ", href: "#faq" },
+  { label: "Features", href: "/#features" },
+  { label: "AI Chat", href: "/#ai" },
+  { label: "FAQ", href: "/#faq" },
 ];
 
 export default function Navbar() {
