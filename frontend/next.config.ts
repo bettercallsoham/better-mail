@@ -38,10 +38,13 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "*.live.com",
       },
+      {
+        protocol: "https",
+        hostname: "api.telegram.org",
+      },
     ],
   },
   experimental: {
-   
     optimizePackageImports: ["@tabler/icons-react", "lucide-react", "recharts"],
   },
   async headers() {

@@ -498,10 +498,10 @@ const MinimalAIReply = memo(function MinimalAIReply({
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-neutral-100 to-neutral-50 flex items-center justify-center flex-shrink-0 ring-1 ring-black/5">
           <Image
             alt=""
-            src="/logo.png"
-            width={14}
-            height={14}
-            className="w-3.5 h-3.5"
+            src="/betterMailLogo.png"
+            width={240}
+            height={240}
+            className="w-5 rounded-lg h-5"
           />
         </div>
 
@@ -620,11 +620,11 @@ const CentralHub = React.forwardRef<HTMLDivElement, object>((_, ref) => {
       <div className="bg-white rounded-2xl border border-neutral-200 px-2 py-3 md:py-4 shadow-md min-w-[70px] md:min-w-25">
         <div className="flex items-center justify-center gap-2 mb-2">
           <Image
-            src="/logo.png"
-            width={24}
-            height={24}
+            src="/betterMailLogo.png"
+            width={300}
+            height={300}
             alt="Bettermail"
-            className="md:w-8 md:h-8"
+            className="md:w-8 rounded-lg  md:h-8"
           />
         </div>
       </div>

@@ -206,7 +206,6 @@ export const outlookConnectCallback = asyncHandler(
     /**
      * Fetch profile photo from Graph API (best-effort)
      */
-    const avatarUrl = await fetchOutlookAvatar(tokens.access_token);
 
     /**
      * Persist email account
@@ -216,7 +215,7 @@ export const outlookConnectCallback = asyncHandler(
       provider: "OUTLOOK",
       email: identity.email,
       refresh_token: tokens.refresh_token ?? null,
-      avatar_url: avatarUrl,
+      avatar_url: "",
     });
 
     await handleMailboxConnectionQueue.add(handleMailboxConnectionQueue.name, {

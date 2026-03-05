@@ -268,3 +268,24 @@
 :root:not(.dark) *:hover::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.18);
 }
+
+/* ── AI Assistant ───────────────────────────────────────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.tool-pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(251 191 36); 
+  animation: tool-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes tool-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1);    }
+  50%       { opacity: 0.4; transform: scale(0.75); }
+}
+

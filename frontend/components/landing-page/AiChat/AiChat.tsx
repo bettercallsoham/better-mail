@@ -226,11 +226,11 @@ function EmptyState({
       >
         <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-blue-50 to-purple-50 border border-neutral-200 flex items-center justify-center shadow-sm">
           <Image
-            src="/logo.png"
+            src="/betterMailLogo.png"
             width={500}
             height={500}
             alt="AI"
-            className="w-10 h-10"
+            className="w-10 rounded-lg h-10"
           />
         </div>
       </motion.div>
@@ -308,11 +308,11 @@ function ChatMessage({ message }: { message: Message }) {
             />
           ) : (
             <Image
-              src="/logo.png"
-              width={20}
-              height={20}
+              src="/betterMailLogo.png"
+              width={200}
+              height={200}
               alt="AI"
-              className="w-5 h-5"
+              className="w-5 rounded-md h-5"
             />
           )}
         </div>
@@ -370,11 +370,11 @@ function TypingIndicator() {
     >
       <div className="w-8 h-8 rounded-lg bg-white border border-neutral-200 flex items-center justify-center shadow-sm">
         <Image
-          src="/logo.png"
+          src="/betterMailLogo.png"
           width={20}
           height={20}
           alt="AI"
-          className="w-5 h-5"
+          className="w-5 h-5 rounded-lg"
         />
       </div>
       <div className="bg-white border border-neutral-200 rounded-2xl px-4 py-3 flex items-center gap-1 shadow-sm">

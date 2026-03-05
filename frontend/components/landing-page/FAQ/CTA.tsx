@@ -54,11 +54,11 @@ export default function CTASection() {
               >
                 <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 p-3 md:p-4 shadow-2xl flex items-center justify-center">
                   <Image
-                    src="/logo.png"
+                    src="/betterMailLogo.png"
                     width={80}
                     height={80}
                     alt="Bettermail"
-                    className="w-full invert h-full"
+                    className="w-full rounded-lg h-full"
                   />
                 </div>
               </motion.div>
