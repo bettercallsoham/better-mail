@@ -8,6 +8,7 @@ import { ThreadDetail } from "@/components/dashboard/thread-view/ThreadDetail";
 import { SenderPane } from "@/components/dashboard/thread-view/SenderPane";
 import { ThreadSideSheet } from "@/components/dashboard/thread-view/ThreadSheet";
 import { AIAssistantFullscreen } from "@/components/ai-assistant/AIAssistantFullscreen";
+import { OnboardingBanner } from "@/components/dashboard/OnboardingBanner";
 import { cn } from "@/lib/utils";
 import { UrlParamsSync } from "@/hooks/useUrlParamsSync";
 
@@ -253,13 +254,16 @@ export default function AppPage() {
         ) : (
           <motion.div
             key="inbox"
-            className="w-full h-full"
+            className="relative w-full h-full"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
           >
             {isMobile ? <MobileLayout /> : <DesktopLayout />}
+            <Suspense fallback={null}>
+              <OnboardingBanner />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>

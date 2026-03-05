@@ -70,7 +70,7 @@ export class TelegramService {
           [
             {
               text: "🔗 Manage Accounts",
-              url: "https://bettermail.tech/settings",
+              url: "https://bettermail.tech/",
             },
           ],
         ],

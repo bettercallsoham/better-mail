@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { useUIStore, LayoutMode } from "@/lib/store/ui.store";
+import { useRouter } from "next/navigation";
 
 // ── Layout mode config ─────────────────────────────────────────────────────
 
@@ -154,7 +155,12 @@ export function UserDropdownContent({
         .toUpperCase()
     : "?";
 
-  const handleLogout = () => console.log("logout");
+  const router = useRouter();
+  const handleLogout = () => {
+    document.cookie =
+      "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+    router.push("/auth");
+  };
   const handleFeedback = () =>
     window.open("mailto:feedback@yourapp.com?subject=Feedback", "_blank");
   const setShortcutsModalOpen = useUIStore((s) => s.setShortcutsModalOpen);

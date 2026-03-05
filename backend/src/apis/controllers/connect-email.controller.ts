@@ -149,9 +149,7 @@ export const gmailConnectCallback = asyncHandler(async (req, res) => {
 
   await invalidateUserEmailsCache(userId);
 
-  return res.redirect(
-    `${process.env.FRONTEND_URL}/app/settings?provider=gmail&email=${encodeURIComponent(identity.email)}`,
-  );
+  return res.redirect(`${process.env.FRONTEND_URL}/app/`);
 }, "gmailConnectCallback");
 
 export const outlookConnectCallback = asyncHandler(
@@ -228,9 +226,7 @@ export const outlookConnectCallback = asyncHandler(
 
     await invalidateUserEmailsCache(userId);
 
-    return res.redirect(
-      `${process.env.FRONTEND_URL}/app/settings?provider=gmail&email=${encodeURIComponent(identity.email)}`,
-    );
+    return res.redirect(`${process.env.FRONTEND_URL}/app/`);
   },
   "outlookConnectCallback",
 );
