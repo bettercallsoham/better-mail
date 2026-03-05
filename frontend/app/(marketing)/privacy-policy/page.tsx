@@ -70,8 +70,8 @@ export default function PrivacyPolicyPage() {
         </div>
 
         <P>
-          BetterMail ("we", "us", or "our") operates the BetterMail email
-          productivity application available at{" "}
+          BetterMail (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;)
+          operates the BetterMail email productivity application available at{" "}
           <a
             href={SITE_URL}
             target="_blank"
@@ -116,10 +116,12 @@ export default function PrivacyPolicyPage() {
         <UL>
           <li>Your email address</li>
           <li>Your display name</li>
-          <li>A profile avatar URL (where provided by the identity provider)</li>
           <li>
-            OAuth tokens (refresh token) required to access your mailbox on
-            your behalf
+            A profile avatar URL (where provided by the identity provider)
+          </li>
+          <li>
+            OAuth tokens (refresh token) required to access your mailbox on your
+            behalf
           </li>
         </UL>
         <P>
@@ -136,8 +138,8 @@ export default function PrivacyPolicyPage() {
         <UL>
           <li>Email subjects, senders, recipients, timestamps, and labels</li>
           <li>
-            Email body content (plain text and HTML) — used to display emails
-            in the app and to power AI features such as search and summarisation
+            Email body content (plain text and HTML) — used to display emails in
+            the app and to power AI features such as search and summarisation
           </li>
           <li>
             Thread and conversation structure — used to group related emails
@@ -224,9 +226,9 @@ export default function PrivacyPolicyPage() {
         <H3>3.2 Infrastructure Providers</H3>
         <P>
           We use trusted cloud infrastructure providers for databases, search
-          indexing, and caching. All data is encrypted in transit (TLS 1.2+)
-          and at rest. These providers are used solely to store and process data
-          on our behalf.
+          indexing, and caching. All data is encrypted in transit (TLS 1.2+) and
+          at rest. These providers are used solely to store and process data on
+          our behalf.
         </P>
 
         <H3>3.3 Legal Requirements</H3>
@@ -386,9 +388,9 @@ export default function PrivacyPolicyPage() {
 
         <H2>8. Children&apos;s Privacy</H2>
         <P>
-          BetterMail is not intended for children under the age of 13. We do
-          not knowingly collect personal information from children under 13. If
-          you believe we have inadvertently collected such information, please
+          BetterMail is not intended for children under the age of 13. We do not
+          knowingly collect personal information from children under 13. If you
+          believe we have inadvertently collected such information, please
           contact us immediately.
         </P>
 
@@ -396,7 +398,7 @@ export default function PrivacyPolicyPage() {
         <P>
           We may update this Privacy Policy from time to time. We will notify
           you of material changes by posting the new policy on this page and
-          updating the "Last updated" date. For significant changes, we will
+          updating the &quot;Last updated&quot; date. For significant changes, we will
           also notify you by email if we have your address on file.
         </P>
 

@@ -54,9 +54,10 @@ export default function TermsPage() {
         </div>
 
         <P>
-          Please read these Terms of Service ("Terms&quot;) carefully before using
-          BetterMail (the "Service") operated by BetterMail ("we&quot;, "us&quot;, or
-          "our&quot;) at{" "}
+          Please read these Terms of Service (&ldquo;Terms&rdquo;) carefully
+          before using BetterMail (the &ldquo;Service&rdquo;) operated by
+          BetterMail (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;)
+          at{" "}
           <a
             href={SITE_URL}
             target="_blank"
@@ -129,9 +130,9 @@ export default function TermsPage() {
         </UL>
         <P>
           You may revoke BetterMail&apos;s access to your Google or Microsoft
-          account at any time via your provider&apos;s account security settings.
-          Revoking access will immediately prevent BetterMail from accessing
-          your mailbox.
+          account at any time via your provider&apos;s account security
+          settings. Revoking access will immediately prevent BetterMail from
+          accessing your mailbox.
         </P>
 
         <H2>4. Acceptable Use</H2>
@@ -243,7 +244,7 @@ export default function TermsPage() {
 
         <H2>9. Disclaimers and Limitation of Liability</H2>
         <P>
-          The Service is provided on an "as is" and "as available" basis without
+          The Service is provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis without
           warranties of any kind, either express or implied, including but not
           limited to warranties of merchantability, fitness for a particular
           purpose, or non-infringement.
@@ -257,11 +258,11 @@ export default function TermsPage() {
           <li>The Service will meet your specific requirements</li>
         </UL>
         <P>
-          To the maximum extent permitted by law, BetterMail shall not be
-          liable for any indirect, incidental, special, consequential, or
-          punitive damages, including loss of data, profits, or goodwill,
-          arising from your use of the Service, even if we have been advised of
-          the possibility of such damages.
+          To the maximum extent permitted by law, BetterMail shall not be liable
+          for any indirect, incidental, special, consequential, or punitive
+          damages, including loss of data, profits, or goodwill, arising from
+          your use of the Service, even if we have been advised of the
+          possibility of such damages.
         </P>
         <P>
           Our total liability to you for any claim arising from these Terms or
@@ -274,8 +275,8 @@ export default function TermsPage() {
           You agree to indemnify and hold harmless BetterMail, its officers,
           directors, employees, and agents from any claims, losses, damages,
           liabilities, costs, or expenses (including reasonable attorneys&apos;
-          fees) arising from: (a) your use of the Service; (b) your violation
-          of these Terms; or (c) your violation of any third-party rights.
+          fees) arising from: (a) your use of the Service; (b) your violation of
+          these Terms; or (c) your violation of any third-party rights.
         </P>
 
         <H2>11. Termination</H2>
@@ -304,9 +305,9 @@ export default function TermsPage() {
         <H2>12. Changes to These Terms</H2>
         <P>
           We reserve the right to modify these Terms at any time. We will post
-          the updated Terms on this page with a new "Last updated" date.
-          Continued use of the Service after changes become effective constitutes
-          your acceptance of the new Terms.
+          the updated Terms on this page with a new &quot;Last updated&quot; date.
+          Continued use of the Service after changes become effective
+          constitutes your acceptance of the new Terms.
         </P>
         <P>
           For material changes, we will provide at least 14 days&apos; notice

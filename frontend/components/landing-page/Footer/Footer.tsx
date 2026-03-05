@@ -77,7 +77,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/pricing"
+                  href="/#"
                   className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
                 >
                   Pricing
@@ -85,7 +85,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/changelog"
+                  href="/#"
                   className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
                 >
                   Changelog
@@ -100,7 +100,7 @@ const Footer = () => {
             <ul className="space-y-3">
               <li>
                 <Link
-                  href="/about"
+                  href="/#"
                   className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
                 >
                   About
@@ -108,7 +108,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/careers"
+                  href="/#"
                   className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
                 >
                   Careers
@@ -116,7 +116,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/blog"
+                  href="/#"
                   className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
                 >
                   Blog
@@ -124,7 +124,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/contact"
+                  href="/#"
                   className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
                 >
                   Contact
@@ -139,7 +139,7 @@ const Footer = () => {
             <ul className="space-y-3">
               <li>
                 <Link
-                  href="/privacy"
+                  href="/privacy-policy"
                   className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
                 >
                   Privacy Policy
@@ -155,7 +155,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/cookies"
+                  href="/#"
                   className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
                 >
                   Cookie Policy

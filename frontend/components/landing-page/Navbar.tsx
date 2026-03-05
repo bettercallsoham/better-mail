@@ -44,9 +44,7 @@ export default function Navbar() {
                 className="object-contain h-5 w-5 transition-transform duration-300 group-hover:scale-110"
               />
             </div>
-            <span className=" text-2xl  text-neutral-950">
-              BetterMail
-            </span>
+            <span className=" text-2xl  text-neutral-950">BetterMail</span>
           </Link>
 
           {/* Nav links */}
