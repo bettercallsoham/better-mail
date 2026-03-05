@@ -373,6 +373,17 @@ export class ElasticsearchService {
               type: { type: "keyword" },
               emailId: { type: "keyword" },
               snippet: { type: "text" },
+              metadata: {
+                // ← ADD THIS
+                type: "object",
+                dynamic: false,
+                properties: {
+                  subject: { type: "text" },
+                  from: { type: "keyword" },
+                  threadId: { type: "keyword" },
+                  receivedAt: { type: "keyword" },
+                },
+              },
             },
           },
 
@@ -963,11 +974,7 @@ export class ElasticsearchService {
       size,
       from: page * size,
       _source: {
-        excludes: [
-          "searchText",
-          "embedding",
-          "attachments",
-        ],
+        excludes: ["searchText", "embedding", "attachments"],
       },
       query: {
         bool: {
