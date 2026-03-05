@@ -55,15 +55,17 @@ export function useCreateConversation() {
   });
 }
 
-export function useCreateMessage(conversationId: string) {
+export function useCreateMessage() {
   const queryClient = useQueryClient();
   const initStream = useConversationStore((s) => s.initStream);
 
   return useMutation({
-    mutationFn: (payload: CreateMessagePayload) =>
-      conversationService.createMessage(conversationId, payload),
+    mutationFn: ({ conversationId, ...rest }: CreateMessagePayload) =>
+      conversationService.createMessage(conversationId, rest),
 
     onMutate: async (payload) => {
+      const { conversationId } = payload;
+
       await queryClient.cancelQueries({
         queryKey: conversationKeys.messages(conversationId),
       });
@@ -100,13 +102,13 @@ export function useCreateMessage(conversationId: string) {
 
       initStream(conversationId);
 
-      return { previousMessages };
+      return { previousMessages, conversationId };
     },
 
     onError: (_err, _payload, context) => {
-      if (context?.previousMessages) {
+      if (context?.previousMessages && context.conversationId) {
         queryClient.setQueryData(
-          conversationKeys.messages(conversationId),
+          conversationKeys.messages(context.conversationId),
           context.previousMessages,
         );
       }

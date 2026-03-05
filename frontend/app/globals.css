@@ -271,8 +271,13 @@
 
 /* ── AI Assistant ───────────────────────────────────────────────────────────── */
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 .tool-pulse-dot {
@@ -280,12 +285,18 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgb(251 191 36); 
+  background: rgb(251 191 36);
   animation: tool-pulse 1.4s ease-in-out infinite;
 }
 
 @keyframes tool-pulse {
-  0%, 100% { opacity: 1;   transform: scale(1);    }
-  50%       { opacity: 0.4; transform: scale(0.75); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.75);
+  }
 }
-

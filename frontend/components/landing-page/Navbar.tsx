@@ -36,12 +36,12 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="relative h-8 w-8 overflow-hidden rounded-xl shrink-0">
+            <div className="relative h-9 w-9 overflow-hidden rounded-xl shrink-0">
               <Image
                 src="/betterMailLogo.png"
                 fill
                 alt="BetterMail"
-                className="object-contain h-6 w-6 transition-transform duration-300 group-hover:scale-110"
+                className="object-contain h-5 w-5 transition-transform duration-300 group-hover:scale-110"
               />
             </div>
             <span className=" text-2xl  text-neutral-950">

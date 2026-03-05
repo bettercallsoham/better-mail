@@ -24,6 +24,9 @@ interface LayoutSlice {
   mailSearchOpen: boolean;
   inboxZeroOpen: boolean;
   integrationsOpen: boolean;
+  aiAssistantOpen: boolean;
+  aiMode: boolean;
+  activeAIConversationId: string | null;
   /** Per-mode panel split percentage (thread list width %) */
   splitPct: Record<string, number>;
   /** Draft email ID pending open in ComposeDialog */
@@ -38,6 +41,9 @@ interface LayoutSlice {
   setInboxZeroOpen: (open: boolean) => void;
   setIntegrationsOpen: (open: boolean) => void;
   setPendingDraftId: (id: string | null) => void;
+  setAIAssistantOpen: (open: boolean) => void;
+  setAIMode: (active: boolean) => void;
+  setActiveAIConversationId: (id: string | null) => void;
 }
 
 interface MailboxSlice {
@@ -109,6 +115,9 @@ export const useUIStore = create<UIState>()(
       mailSearchOpen: false,
       inboxZeroOpen: false,
       integrationsOpen: false,
+      aiAssistantOpen: false,
+      aiMode: false,
+      activeAIConversationId: null,
       splitPct: { ...DEFAULT_SPLIT },
       pendingDraftId: null,
 
@@ -129,6 +138,9 @@ export const useUIStore = create<UIState>()(
       setInboxZeroOpen: (open) => set({ inboxZeroOpen: open }),
       setIntegrationsOpen: (open) => set({ integrationsOpen: open }),
       setPendingDraftId: (id) => set({ pendingDraftId: id }),
+      setAIAssistantOpen: (open) => set({ aiAssistantOpen: open }),
+      setAIMode: (active) => set({ aiMode: active, aiAssistantOpen: false }),
+      setActiveAIConversationId: (id) => set({ activeAIConversationId: id }),
 
       // ── Mailbox ─────────────────────────────────────────────────────────────
       selectedEmailAddress: null,
@@ -215,6 +227,18 @@ export const useMailboxStore = () =>
       setActiveFolder: s.setActiveFolder,
       setSearchQuery: s.setSearchQuery,
       clearSearch: s.clearSearch,
+    })),
+  );
+
+export const useAIStore = () =>
+  useUIStore(
+    useShallow((s) => ({
+      aiAssistantOpen: s.aiAssistantOpen,
+      aiMode: s.aiMode,
+      activeAIConversationId: s.activeAIConversationId,
+      setAIAssistantOpen: s.setAIAssistantOpen,
+      setAIMode: s.setAIMode,
+      setActiveAIConversationId: s.setActiveAIConversationId,
     })),
   );
 

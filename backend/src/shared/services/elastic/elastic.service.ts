@@ -329,7 +329,9 @@ export class ElasticsearchService {
       index: this.CONVERSATIONS_INDEX,
     });
 
-    if (exists) return;
+    if (exists) {
+      return;
+    }
 
     await this.client.indices.create({
       index: this.CONVERSATIONS_INDEX,
@@ -373,17 +375,7 @@ export class ElasticsearchService {
               type: { type: "keyword" },
               emailId: { type: "keyword" },
               snippet: { type: "text" },
-              metadata: {
-                // ← ADD THIS
-                type: "object",
-                dynamic: false,
-                properties: {
-                  subject: { type: "text" },
-                  from: { type: "keyword" },
-                  threadId: { type: "keyword" },
-                  receivedAt: { type: "keyword" },
-                },
-              },
+              metadata: { type: "object", enabled: false },
             },
           },
 
@@ -974,7 +966,11 @@ export class ElasticsearchService {
       size,
       from: page * size,
       _source: {
-        excludes: ["searchText", "embedding", "attachments"],
+        excludes: [
+          "searchText",
+          "embedding",
+          "attachments",
+        ],
       },
       query: {
         bool: {

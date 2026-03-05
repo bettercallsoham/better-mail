@@ -1,11 +1,13 @@
 "use client";
 
 import { Suspense, useRef, useSyncExternalStore } from "react";
-import { useUIStore } from "@/lib/store/ui.store";
+import { AnimatePresence, motion } from "motion/react";
+import { useUIStore, useAIStore } from "@/lib/store/ui.store";
 import { ThreadList } from "@/components/dashboard/thread-view/threadList/ThreadList";
 import { ThreadDetail } from "@/components/dashboard/thread-view/ThreadDetail";
 import { SenderPane } from "@/components/dashboard/thread-view/SenderPane";
 import { ThreadSideSheet } from "@/components/dashboard/thread-view/ThreadSheet";
+import { AIAssistantFullscreen } from "@/components/ai-assistant/AIAssistantFullscreen";
 import { cn } from "@/lib/utils";
 import { UrlParamsSync } from "@/hooks/useUrlParamsSync";
 
@@ -228,14 +230,39 @@ function DesktopLayout() {
 
 export default function AppPage() {
   const isMobile = useIsMobile(768);
-  // No mounted state needed — useSyncExternalStore handles SSR gracefully.
-  // Server snapshot returns false (desktop), client hydrates with real value.
+  const { aiMode } = useAIStore();
+
   return (
     <>
       <Suspense fallback={null}>
         <UrlParamsSync />
       </Suspense>
-      {isMobile ? <MobileLayout /> : <DesktopLayout />}
+
+      <AnimatePresence mode="wait">
+        {aiMode ? (
+          <motion.div
+            key="ai-mode"
+            className="w-full h-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <AIAssistantFullscreen />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="inbox"
+            className="w-full h-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            {isMobile ? <MobileLayout /> : <DesktopLayout />}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

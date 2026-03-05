@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import type { MessageSource } from "@/features/conversations/conversations.type";
 
 export interface ActionItem {
   id: string;
@@ -19,6 +20,7 @@ interface StreamingState {
   content: string;
   isStreaming: boolean;
   toolInProgress: string | null;
+  sources: MessageSource[];
 }
 
 interface ConversationSlice {
@@ -28,6 +30,7 @@ interface ConversationSlice {
   initStream: (conversationId: string) => void;
   appendToken: (conversationId: string, token: string) => void;
   setToolInProgress: (conversationId: string, tool: string | null) => void;
+  addSources: (conversationId: string, sources: MessageSource[]) => void;
   completeStream: (conversationId: string) => void;
   setPendingAction: (action: PendingAction) => void;
   clearPendingAction: () => void;
@@ -45,6 +48,7 @@ export const useConversationStore = create<ConversationSlice>()((set) => ({
           content: "",
           isStreaming: true,
           toolInProgress: null,
+          sources: [],
         },
       },
     })),
@@ -72,6 +76,30 @@ export const useConversationStore = create<ConversationSlice>()((set) => ({
         streamingMessages: {
           ...s.streamingMessages,
           [conversationId]: { ...existing, toolInProgress: tool },
+        },
+      };
+    }),
+
+  addSources: (conversationId, newSources) =>
+    set((s) => {
+      const existing = s.streamingMessages[conversationId];
+      if (!existing) return s;
+      // Deduplicate by emailId — new entry wins (richer data from get_email_content)
+      const merged = new Map(
+        existing.sources
+          .filter((src) => src.emailId)
+          .map((src) => [src.emailId!, src]),
+      );
+      for (const src of newSources) {
+        if (src.emailId) merged.set(src.emailId, src);
+      }
+      return {
+        streamingMessages: {
+          ...s.streamingMessages,
+          [conversationId]: {
+            ...existing,
+            sources: Array.from(merged.values()),
+          },
         },
       };
     }),

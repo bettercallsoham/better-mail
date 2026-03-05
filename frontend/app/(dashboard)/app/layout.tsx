@@ -12,11 +12,16 @@ import { GlobalShortcutsMount } from "@/components/shortcuts/GlobalShortcutsMoun
 
 // Lazy-load the composer (Tiptap + 8 deps, ~95 KB gz) — only needed when the
 // user actually opens it, not on every dashboard page load.
-const ComposerPortal = dynamic(
-  () =>
-    import("@/components/composer/ComposerPortal").then((m) => ({
-      default: m.ComposerPortal,
-    })),
+const ComposerPortal = dynamic(() =>
+  import("@/components/composer/ComposerPortal").then((m) => ({
+    default: m.ComposerPortal,
+  })),
+);
+
+const AIAssistantPortal = dynamic(() =>
+  import("@/components/ai-assistant").then((m) => ({
+    default: m.AIAssistantPortal,
+  })),
 );
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -34,6 +39,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <main className="flex-1 min-w-0 overflow-hidden">{children}</main>
           <Toaster />
           <ComposerPortal />
+          <AIAssistantPortal />
           <GlobalShortcutsMount />
         </div>
       </DashboardProviders>

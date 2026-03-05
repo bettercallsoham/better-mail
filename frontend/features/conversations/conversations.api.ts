@@ -13,7 +13,10 @@ export const conversationService = {
       method: "POST",
     }),
 
-  createMessage: (conversationId: string, payload: CreateMessagePayload) =>
+  createMessage: (
+    conversationId: string,
+    payload: Pick<CreateMessagePayload, "content">,
+  ) =>
     apiClient<CreateMessageResponse>(
       `/conversations/${conversationId}/messages`,
       {

@@ -1,7 +1,12 @@
 import { ActionItem } from "@/lib/store/conversations.store";
 
 export type MessageRole = "user" | "assistant" | "system";
-export type MessageStatus = "queued" | "processing" | "completed" | "failed" | "cancelled";
+export type MessageStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export interface ToolCall {
   toolName: string;
@@ -49,6 +54,7 @@ export interface ConversationSummary {
 }
 
 export interface CreateMessagePayload {
+  conversationId: string;
   content: string;
 }
 
@@ -109,5 +115,12 @@ export interface AICompleteEvent {
 
 export interface AIErrorEvent {
   error: string;
+  timestamp: number;
+}
+
+export interface AIToolResultEvent {
+  data: {
+    sources: MessageSource[];
+  };
   timestamp: number;
 }
