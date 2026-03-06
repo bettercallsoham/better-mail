@@ -165,19 +165,19 @@ const FAQ_ITEMS = [
     id: "providers",
     question: "Which email providers do you support?",
     answer:
-      "We currently support Gmail, Outlook, and Yahoo Mail. You can connect multiple accounts from different providers and manage them all in one unified inbox. More providers are coming soon!",
+      "We currently support Gmail and Outlook. You can connect multiple accounts from different providers and manage them all in one unified inbox. More providers are coming soon!",
   },
   {
     id: "security",
     question: "Is my email data secure and private?",
     answer:
-      "Absolutely. We take security seriously. All data is encrypted in transit and at rest using industry-standard encryption. We never sell your data to third parties, and you can delete your account and all associated data at any time. Our AI processes emails locally and only stores minimal metadata needed for functionality.",
+      "Absolutely. We take security seriously. All data is encrypted in transit and at rest using industry-standard encryption. We never sell your data to third parties, and you can delete your account and all associated data at any time. ",
   },
   {
     id: "trial",
     question: "Do you offer a free trial?",
     answer:
-      "Yes! We offer a 14-day free trial with full access to all features. No credit card required. After the trial, you can choose a plan that fits your needs or continue with our free tier that includes basic AI features.",
+      "BetterMail is completely FREEEEE !!!!!! For as long as we can maintain it."
   },
   {
     id: "integrations",
@@ -197,12 +197,12 @@ const FAQ_ITEMS = [
     answer:
       "Setup takes less than 2 minutes. Simply sign up, connect your email account via OAuth (secure, no password sharing), and you're ready to go. Our AI immediately starts analyzing your inbox and providing smart suggestions.",
   },
-  {
-    id: "cancel",
-    question: "What happens to my emails if I cancel my subscription?",
-    answer:
-      "You retain full access to your email accounts through their native providers. BetterMail only enhances your email experience but never holds your emails hostage. If you cancel, you can export any data or simply disconnect, and your emails remain in your original inbox.",
-  },
+  // {
+  //   id: "cancel",
+  //   question: "What happens to my emails if I cancel my subscription?",
+  //   answer:
+  //     "You retain full access to your email accounts through their native providers. BetterMail only enhances your email experience but never holds your emails hostage. If you cancel, you can export any data or simply disconnect, and your emails remain in your original inbox.",
+  // },
 ];
 
 export default function FAQ() {

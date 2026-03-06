@@ -118,8 +118,6 @@ export default function Bento() {
                 <AIComposeSkeleton />
               </CardSkeleton>
             </Card>
-
-          
           </div>
         </div>
       </div>
@@ -624,7 +622,7 @@ const CentralHub = React.forwardRef<HTMLDivElement, object>((_, ref) => {
             width={300}
             height={300}
             alt="Bettermail"
-            className="md:w-8 rounded-lg  md:h-8"
+            className="w-7 h-7 md:w-8 md:h-8 rounded-lg"
           />
         </div>
       </div>
@@ -1216,8 +1214,6 @@ const EmailRow = memo(function EmailRow({
   );
 });
 
-
-
 // ============= ANALYTICS SKELETON =============
 
 const ANALYTICS_BARS = [
@@ -1298,8 +1294,6 @@ const StatPill = memo(function StatPill({
     </motion.div>
   );
 });
-
-
 
 // ============= BASE COMPONENTS =============
 

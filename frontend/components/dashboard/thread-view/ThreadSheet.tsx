@@ -36,6 +36,7 @@ import { SmartReplies } from "@/components/composer/SmartReplies";
 function SheetContent({ threadId }: { threadId: string }) {
   const { data } = useThreadDetail(threadId);
   const setActive = useUIStore((s) => s.setActiveThread);
+  const setFocused = useUIStore((s) => s.setFocusedThread);
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
   const threadIds = useUIStore((s) => (s.threadIds as string[]) ?? []);
   const layoutMode = useUIStore((s) => s.layoutMode);
@@ -80,16 +81,20 @@ function SheetContent({ threadId }: { threadId: string }) {
     [emailAction],
   );
 
+  // Use lastReal for thread-level actions so providerMessageId matches
+  // thread.lastMessageId — required for the optimistic update in onMutate.
   const handleDelete = useCallback(() => {
-    if (emails[0]) act(emails[0], "delete");
-  }, [emails, act]);
+    const e = lastReal ?? emails[0];
+    if (e) act(e, "delete");
+  }, [lastReal, emails, act]);
   const handleStar = useCallback(() => {
-    if (emails[0]) act(emails[0], emails[0].isStarred ? "unstar" : "star");
-  }, [emails, act]);
+    const e = lastReal ?? emails[0];
+    if (e) act(e, e.isStarred ? "unstar" : "star");
+  }, [lastReal, emails, act]);
   const handleArchive = useCallback(() => {
-    if (emails[0])
-      act(emails[0], emails[0].isArchived ? "unarchive" : "archive");
-  }, [emails, act]);
+    const e = lastReal ?? emails[0];
+    if (e) act(e, e.isArchived ? "unarchive" : "archive");
+  }, [lastReal, emails, act]);
   // Always replyTo the last real (non-draft) message — its providerMessageId is the
   // correct thread anchor for the Gmail/Outlook reply API.
   const handleReply = useCallback(() => {
@@ -102,13 +107,12 @@ function SheetContent({ threadId }: { threadId: string }) {
     if (lastReal) forward(lastReal, "sheet");
   }, [lastReal, forward]);
 
-  // Keyboard shortcuts — only when this sheet IS the active view (velocity / zen).
-  // In flow mode, ThreadDetail is mounted alongside SheetContent and handles the
-  // same shortcuts — without this guard both handlers fire on every keypress.
+  // Keyboard shortcuts — action shortcuts (r/f/s/e/#) only in velocity/zen to
+  // avoid double-firing alongside ThreadDetail in flow mode.
+  // J/K navigation works in ALL modes (useThreadNavigation yields when sheet is
+  // open in flow mode, so this handler owns it).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Only active in the layout modes where the sheet panel is the reader
-      if (layoutMode !== "velocity" && layoutMode !== "zen") return;
       const t = e.target as HTMLElement;
       if (
         t.isContentEditable ||
@@ -116,6 +120,22 @@ function SheetContent({ threadId }: { threadId: string }) {
         t.tagName === "TEXTAREA"
       )
         return;
+
+      // J/K works in every layout mode
+      if (e.key === "j" || e.key === "k") {
+        e.preventDefault();
+        const idx = threadIds.indexOf(threadId);
+        const target = e.key === "j" ? threadIds[idx + 1] : threadIds[idx - 1];
+        if (target) {
+          setActive(target);
+          setFocused(target);
+        }
+        return;
+      }
+
+      // Action shortcuts only when sheet is the reader (not alongside ThreadDetail)
+      if (layoutMode !== "velocity" && layoutMode !== "zen") return;
+
       switch (e.key) {
         case "r":
           e.preventDefault();
@@ -137,28 +157,21 @@ function SheetContent({ threadId }: { threadId: string }) {
           e.preventDefault();
           handleDelete();
           break;
-        case "j":
-          e.preventDefault();
-          if (nextId) setActive(nextId);
-          break;
-        case "k":
-          e.preventDefault();
-          if (prevId) setActive(prevId);
-          break;
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [
     layoutMode,
+    threadId,
+    threadIds,
     handleReply,
     handleForward,
     handleStar,
     handleArchive,
     handleDelete,
-    nextId,
-    prevId,
     setActive,
+    setFocused,
   ]);
 
   if (!data.success || emails.length === 0) {

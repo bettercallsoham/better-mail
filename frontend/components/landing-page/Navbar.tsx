@@ -35,16 +35,18 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="relative h-9 w-9 overflow-hidden rounded-xl shrink-0">
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="relative h-7 w-7 overflow-hidden rounded-lg shrink-0">
               <Image
                 src="/betterMailLogo.png"
                 fill
                 alt="BetterMail"
-                className="object-contain h-5 w-5 transition-transform duration-300 group-hover:scale-110"
+                className="object-contain transition-transform duration-300 group-hover:scale-110"
               />
             </div>
-            <span className=" text-2xl  text-neutral-950">BetterMail</span>
+            <span className="hidden md:block text-[15px] font-semibold tracking-tight text-neutral-900">
+              BetterMail
+            </span>
           </Link>
 
           {/* Nav links */}

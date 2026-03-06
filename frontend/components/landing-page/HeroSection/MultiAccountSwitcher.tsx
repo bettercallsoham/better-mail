@@ -50,14 +50,14 @@ const accounts: EmailAccount[] = [
     emails: [
       {
         id: "e1",
-        sender: "Abhi Sharma",
-        senderAvatar: "/abhisharma.webp",
+        sender: "Abhijeet Singh",
+        senderAvatar: "/abhijeetSingh.jpeg",
         subject: "You Really Cooked with Bettermail ",
         preview: "Hey abhi , the new bettermail is f**king crazyy.",
         time: "2m ago",
-        isUnread: true,
-        isStarred: true,
-        hasAttachment: true,
+        isUnread: false,
+        isStarred: false,
+        hasAttachment: false,
         priority: "normal",
       },
       {
@@ -97,7 +97,7 @@ const accounts: EmailAccount[] = [
       {
         id: "e4",
         sender: "BetterMail.tech",
-        senderAvatar: "/abhisharma.webp",
+        senderAvatar: "/betterMailLogo.png",
         subject: "Meeting recap: System Design",
         preview: "Production mein kab jayega ? ",
         time: "30m ago",
@@ -106,18 +106,7 @@ const accounts: EmailAccount[] = [
         hasAttachment: true,
         priority: "normal",
       },
-      {
-        id: "e5",
-        sender: "Kaustabh Wadhwa",
-        senderAvatar: "/logo.png",
-        subject: "It was a good run.",
-        preview: "Unfortunately we've to let you go ",
-        time: "2h ago",
-        isUnread: false,
-        isStarred: true,
-        hasAttachment: false,
-        priority: "high",
-      },
+     
     ],
   },
   {

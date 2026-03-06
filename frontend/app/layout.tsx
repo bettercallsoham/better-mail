@@ -4,7 +4,7 @@ import "./globals.css";
 import { PostHogProvider } from "@/lib/analytics/PosthogProvider";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://mail.abhisharma.app"),
+  metadataBase: new URL("https://bettermail.tech"),
 
   title: {
     default: "BetterMail | The AI-First Email Client",
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     type: "website",
-    url: "https://mail.abhisharma.app",
+    url: "https://bettermail.tech",
     title: "BetterMail - Fastest Email Experience Ever Made",
     description: "A faster, smarter email experience built for modern teams.",
     siteName: "BetterMail",

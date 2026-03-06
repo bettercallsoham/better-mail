@@ -30,6 +30,14 @@ export function useThreadNavigation(
       )
         return;
 
+      // In flow mode don't navigate while the sheet is open — it owns J/K
+      if (
+        layoutMode === "flow" &&
+        useUIStore.getState().activeThreadId &&
+        (e.key === "j" || e.key === "k")
+      )
+        return;
+
       const idx = focusedThreadId ? threadIds.indexOf(focusedThreadId) : -1;
 
       switch (e.key.toLowerCase()) {
@@ -37,10 +45,7 @@ export function useThreadNavigation(
           e.preventDefault();
           const next = threadIds[idx + 1];
           if (!next) break;
-          // Always move the highlight
           setFocusedThread(next);
-          // In flow mode J/K actually opens the thread (like Gmail's flow)
-          if (layoutMode === "flow") setActiveThread(next);
           break;
         }
         case "k": {
@@ -48,7 +53,6 @@ export function useThreadNavigation(
           const prev = threadIds[idx - 1];
           if (!prev) break;
           setFocusedThread(prev);
-          if (layoutMode === "flow") setActiveThread(prev);
           break;
         }
         case "enter": {
@@ -75,6 +79,5 @@ export function useThreadNavigation(
     layoutMode,
     setFocusedThread,
     setActiveThread,
-    focusedActionsRef,
   ]);
 }

@@ -790,8 +790,8 @@ export class ElasticsearchService {
             { term: { isDeleted: false } },
             folderFilter(),
           ],
-          // Exclude archived and draft emails from every view except their own
-          ...(lower !== "archived" && lower !== "drafts"
+          // Only exclude archived + drafts from inbox; all other folders show everything
+          ...(lower === "inbox"
             ? {
                 must_not: [
                   { term: { isArchived: true } },
@@ -966,11 +966,7 @@ export class ElasticsearchService {
       size,
       from: page * size,
       _source: {
-        excludes: [
-          "searchText",
-          "embedding",
-          "attachments",
-        ],
+        excludes: ["searchText", "embedding", "attachments"],
       },
       query: {
         bool: {
