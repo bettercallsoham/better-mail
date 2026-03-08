@@ -724,3 +724,37 @@ export const validateGetEmailSuggestions = [
 
   handleValidationErrors,
 ];
+
+
+
+export const validateBatchBodies = [
+  body("emailAddress")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("emailAddress must be a valid email address"),
+
+  body("messages")
+    .isArray({ min: 1, max: 20 })
+    .withMessage("messages must be an array of 1–20 items"),
+
+  body("messages.*.providerMessageId")
+    .isString()
+    .notEmpty()
+    .withMessage("Each message must have a non-empty providerMessageId"),
+
+  body("messages.*.provider")
+    .isIn(["gmail", "outlook"])
+    .withMessage("Each message provider must be 'gmail' or 'outlook'"),
+
+  // Optional — echoed back in response for frontend mapping convenience
+  body("messages.*.emailId")
+    .optional()
+    .isString()
+    .withMessage("emailId must be a string if provided"),
+
+  body("messages.*.threadId")
+    .optional()
+    .isString()
+    .withMessage("threadId must be a string if provided"),
+
+];

@@ -10,6 +10,11 @@ import {
 import { logger } from "@sentry/node";
 import { scheduleSubscriptionRenewal } from "../../queues/email-subscription.queue";
 
+export interface EmailBody {
+  bodyHtml: string | null;
+  bodyText: string | null;
+}
+
 export class OutlookApiService {
   private client?: AxiosInstance;
   private email: string;
@@ -72,6 +77,23 @@ export class OutlookApiService {
 
     return accessToken;
   }
+
+  private async getClient(): Promise<AxiosInstance> {
+    if (this.client) return this.client;
+
+    const accessToken = await this.getAccessToken();
+
+    this.client = axios.create({
+      baseURL: "https://graph.microsoft.com/v1.0",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    return this.client;
+  }
+
+  /* ===================== SUBSCRIPTIONS ===================== */
 
   public async createEmailSubscription() {
     const account = await EmailAccount.findOne({
@@ -186,24 +208,19 @@ export class OutlookApiService {
     };
   }
 
-  private async getClient(): Promise<AxiosInstance> {
-    if (this.client) return this.client;
-
-    const accessToken = await this.getAccessToken();
-
-    this.client = axios.create({
-      baseURL: "https://graph.microsoft.com/v1.0",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    return this.client;
+  public async listSubscriptions() {
+    const client = await this.getClient();
+    const res = await client.get("/subscriptions");
+    return res.data.value;
   }
 
-  /**
-   * Fetch attachment metadata for a specific message
-   */
+  public async deleteSubscription(subscriptionId: string) {
+    const client = await this.getClient();
+    await client.delete(`/subscriptions/${subscriptionId}`);
+  }
+
+  /* ===================== MESSAGE FETCHING ===================== */
+
   public async fetchMessageAttachments(
     messageId: string,
   ): Promise<OutlookAttachment[]> {
@@ -220,11 +237,6 @@ export class OutlookApiService {
     }
   }
 
-  /* ===================== CORE ITERATOR ===================== */
-
-  /**
-   * Fetch a single message by ID
-   */
   public async fetchMessageById(
     messageId: string,
   ): Promise<OutlookMessage | null> {
@@ -241,6 +253,70 @@ export class OutlookApiService {
       throw error;
     }
   }
+
+  /**
+   * Fetch only the body of a single message by providerMessageId.
+   * Used by the batch-bodies endpoint and embeddings worker.
+   * Nothing is stored — caller is responsible for discarding after use.
+   */
+  public async fetchMessageBody(providerMessageId: string): Promise<EmailBody> {
+    const client = await this.getClient();
+
+    try {
+      // Use $select to fetch only body fields — avoids pulling full message payload
+      const res = await client.get(`/me/messages/${providerMessageId}`, {
+        params: {
+          $select: "body,uniqueBody",
+        },
+      });
+
+      const msg = res.data;
+
+      const isHtml =
+        msg.body?.contentType?.toLowerCase() === "html" ||
+        msg.uniqueBody?.contentType?.toLowerCase() === "html";
+
+      const content = msg.body?.content ?? msg.uniqueBody?.content ?? null;
+
+      return {
+        bodyHtml: isHtml ? content : null,
+        bodyText: !isHtml ? content : null,
+      };
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        logger.warn(`Message body not found: ${providerMessageId}`);
+        return { bodyHtml: null, bodyText: null };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch bodies for multiple messages in parallel.
+   * Returns a map of providerMessageId → EmailBody.
+   * Nothing is stored.
+   */
+  public async fetchMessageBodies(
+    providerMessageIds: string[],
+  ): Promise<Map<string, EmailBody>> {
+    const results = new Map<string, EmailBody>();
+
+    await Promise.all(
+      providerMessageIds.map(async (id) => {
+        try {
+          const body = await this.fetchMessageBody(id);
+          results.set(id, body);
+        } catch (err) {
+          logger.error(`Outlook: failed to fetch body for ${id}: ${err}`);
+          results.set(id, { bodyHtml: null, bodyText: null });
+        }
+      }),
+    );
+
+    return results;
+  }
+
+  /* ===================== ITERATOR ===================== */
 
   private async *iterateMessages(days: number, includeAttachments = false) {
     const client = await this.getClient();
@@ -259,7 +335,6 @@ export class OutlookApiService {
       const res = await client.get(url);
 
       for (const message of res.data.value ?? []) {
-        // If message has attachments and we want to include metadata
         if (includeAttachments && message.hasAttachments) {
           message.attachments = await this.fetchMessageAttachments(message.id);
         }
@@ -274,9 +349,6 @@ export class OutlookApiService {
     }
   }
 
-  /**
-   * Fetch ALL Outlook emails from last N days (all folders)
-   */
   public async fetchLastNDaysEmails(
     days = 30,
     options: {
@@ -287,10 +359,7 @@ export class OutlookApiService {
     const { includeAttachments = false, onMessage } = options;
     const results: OutlookMessage[] = [];
 
-    for await (const message of this.iterateMessages(
-      days,
-      includeAttachments,
-    )) {
+    for await (const message of this.iterateMessages(days, includeAttachments)) {
       if (onMessage) {
         await onMessage(message);
       } else {
@@ -301,16 +370,7 @@ export class OutlookApiService {
     return results;
   }
 
-  public async listSubscriptions() {
-    const client = await this.getClient();
-    const res = await client.get("/subscriptions");
-    return res.data.value;
-  }
-
-  public async deleteSubscription(subscriptionId: string) {
-    const client = await this.getClient();
-    await client.delete(`/subscriptions/${subscriptionId}`);
-  }
+  /* ===================== SEND / REPLY ===================== */
 
   private async sendNewMail(input: SendEmailInput): Promise<string> {
     const client = await this.getClient();
@@ -349,17 +409,11 @@ export class OutlookApiService {
   ): Promise<string> {
     const client = await this.getClient();
 
-    // 1. Create reply draft
     const draft = await client.post(`/me/messages/${messageId}/createReply`);
-
     const draftId = draft.data.id;
 
-    // 2. Patch body / recipients / attachments
     const updatePayload: any = {
-      body: {
-        contentType: "HTML",
-        content: input.html,
-      },
+      body: { contentType: "HTML", content: input.html },
     };
 
     if (input.cc?.length) {
@@ -370,7 +424,6 @@ export class OutlookApiService {
 
     await client.patch(`/me/messages/${draftId}`, updatePayload);
 
-    // 3. Add attachments separately if any
     if (input.attachments?.length) {
       for (const attachment of input.attachments) {
         await client.post(`/me/messages/${draftId}/attachments`, {
@@ -382,7 +435,6 @@ export class OutlookApiService {
       }
     }
 
-    // 4. Send
     await client.post(`/me/messages/${draftId}/send`);
 
     return draftId;
@@ -395,14 +447,10 @@ export class OutlookApiService {
     const client = await this.getClient();
 
     const draft = await client.post(`/me/messages/${messageId}/createReplyAll`);
-
     const draftId = draft.data.id;
 
     const updatePayload: any = {
-      body: {
-        contentType: "HTML",
-        content: input.html,
-      },
+      body: { contentType: "HTML", content: input.html },
     };
 
     if (input.cc?.length) {
@@ -413,7 +461,6 @@ export class OutlookApiService {
 
     await client.patch(`/me/messages/${draftId}`, updatePayload);
 
-    // Add attachments separately if any
     if (input.attachments?.length) {
       for (const attachment of input.attachments) {
         await client.post(`/me/messages/${draftId}/attachments`, {
@@ -440,10 +487,7 @@ export class OutlookApiService {
     const draftId = draft.data.id;
 
     const updatePayload: any = {
-      body: {
-        contentType: "HTML",
-        content: input.html,
-      },
+      body: { contentType: "HTML", content: input.html },
       toRecipients: input.to?.map((address) => ({
         emailAddress: { address },
       })),
@@ -474,7 +518,6 @@ export class OutlookApiService {
       }
     }
 
-    // 4. Send
     await client.post(`/me/messages/${draftId}/send`);
 
     return draftId;
@@ -484,29 +527,21 @@ export class OutlookApiService {
     switch (input.mode) {
       case "new":
         return this.sendNewMail(input);
-
       case "reply":
-        if (!input.replyToMessageId) {
-          throw new Error("replyToMessageId required");
-        }
+        if (!input.replyToMessageId) throw new Error("replyToMessageId required");
         return this.replyToMessage(input.replyToMessageId, input);
-
       case "reply_all":
-        if (!input.replyToMessageId) {
-          throw new Error("replyToMessageId required");
-        }
+        if (!input.replyToMessageId) throw new Error("replyToMessageId required");
         return this.replyAllToMessage(input.replyToMessageId, input);
-
       case "forward":
-        if (!input.replyToMessageId) {
-          throw new Error("replyToMessageId required for forward");
-        }
+        if (!input.replyToMessageId) throw new Error("replyToMessageId required for forward");
         return this.forwardMessage(input.replyToMessageId, input);
-
       default:
         throw new Error(`Unsupported mode: ${input.mode}`);
     }
   }
+
+  /* ===================== LABEL / FOLDER ACTIONS ===================== */
 
   private async patchMessage(
     messageId: string,
@@ -526,33 +561,6 @@ export class OutlookApiService {
     });
   }
 
-  async markRead(messageIds: string[]): Promise<void> {
-    for (const id of messageIds) {
-      await this.patchMessage(id, { isRead: true });
-    }
-  }
-
-  async markUnread(messageIds: string[]): Promise<void> {
-    for (const id of messageIds) {
-      await this.patchMessage(id, { isRead: false });
-    }
-  }
-
-  async star(messageIds: string[]): Promise<void> {
-    for (const id of messageIds) {
-      await this.patchMessage(id, {
-        flag: { flagStatus: "flagged" },
-      });
-    }
-  }
-
-  async unstar(messageIds: string[]): Promise<void> {
-    for (const id of messageIds) {
-      await this.patchMessage(id, {
-        flag: { flagStatus: "notFlagged" },
-      });
-    }
-  }
   private async getFolderId(displayName: string): Promise<string> {
     if (this.folderCache.has(displayName)) {
       return this.folderCache.get(displayName)!;
@@ -573,57 +581,55 @@ export class OutlookApiService {
     return folder.id;
   }
 
+  async markRead(messageIds: string[]): Promise<void> {
+    for (const id of messageIds) await this.patchMessage(id, { isRead: true });
+  }
+
+  async markUnread(messageIds: string[]): Promise<void> {
+    for (const id of messageIds) await this.patchMessage(id, { isRead: false });
+  }
+
+  async star(messageIds: string[]): Promise<void> {
+    for (const id of messageIds)
+      await this.patchMessage(id, { flag: { flagStatus: "flagged" } });
+  }
+
+  async unstar(messageIds: string[]): Promise<void> {
+    for (const id of messageIds)
+      await this.patchMessage(id, { flag: { flagStatus: "notFlagged" } });
+  }
+
   async archive(messageIds: string[]): Promise<void> {
     const archiveFolderId = await this.getFolderId("Archive");
-
-    for (const id of messageIds) {
-      await this.moveMessage(id, archiveFolderId);
-    }
+    for (const id of messageIds) await this.moveMessage(id, archiveFolderId);
   }
 
   async unarchive(messageIds: string[]): Promise<void> {
     const inboxFolderId = await this.getFolderId("Inbox");
-
-    for (const id of messageIds) {
-      await this.moveMessage(id, inboxFolderId);
-    }
+    for (const id of messageIds) await this.moveMessage(id, inboxFolderId);
   }
 
   async trash(messageIds: string[]): Promise<void> {
     const client = await this.getClient();
-
-    for (const id of messageIds) {
-      await client.delete(`/me/messages/${id}`);
-    }
+    for (const id of messageIds) await client.delete(`/me/messages/${id}`);
   }
 
   async restoreFromTrash(messageIds: string[]): Promise<void> {
     const inboxFolderId = await this.getFolderId("Inbox");
-
-    for (const id of messageIds) {
-      await this.moveMessage(id, inboxFolderId);
-    }
+    for (const id of messageIds) await this.moveMessage(id, inboxFolderId);
   }
 
   async applyCategory(messageIds: string[], category: string): Promise<void> {
-    for (const id of messageIds) {
-      await this.patchMessage(id, {
-        categories: [category],
-      });
-    }
+    for (const id of messageIds)
+      await this.patchMessage(id, { categories: [category] });
   }
 
   async removeCategory(messageIds: string[], category: string): Promise<void> {
-    for (const id of messageIds) {
-      await this.patchMessage(id, {
-        categories: [],
-      });
-    }
+    for (const id of messageIds)
+      await this.patchMessage(id, { categories: [] });
   }
 
-  // --------------------
-  // DRAFT OPERATIONS
-  // --------------------
+  /* ===================== DRAFT OPERATIONS ===================== */
 
   async createDraft(input: SendEmailInput): Promise<string> {
     const client = await this.getClient();
@@ -639,20 +645,18 @@ export class OutlookApiService {
       })),
     };
 
-    if (input.cc && input.cc.length > 0) {
+    if (input.cc?.length)
       body.ccRecipients = input.cc.map((email) => ({
         emailAddress: { address: email },
       }));
-    }
 
-    if (input.bcc && input.bcc.length > 0) {
+    if (input.bcc?.length)
       body.bccRecipients = input.bcc.map((email) => ({
         emailAddress: { address: email },
       }));
-    }
 
     const res = await client.post("/me/messages", body);
-    return res.data.id; // Returns draft ID
+    return res.data.id;
   }
 
   async updateDraft(draftId: string, input: SendEmailInput): Promise<void> {
@@ -669,17 +673,15 @@ export class OutlookApiService {
       })),
     };
 
-    if (input.cc && input.cc.length > 0) {
+    if (input.cc?.length)
       body.ccRecipients = input.cc.map((email) => ({
         emailAddress: { address: email },
       }));
-    }
 
-    if (input.bcc && input.bcc.length > 0) {
+    if (input.bcc?.length)
       body.bccRecipients = input.bcc.map((email) => ({
         emailAddress: { address: email },
       }));
-    }
 
     await client.patch(`/me/messages/${draftId}`, body);
   }
@@ -692,7 +694,7 @@ export class OutlookApiService {
   async sendDraft(draftId: string): Promise<string> {
     const client = await this.getClient();
     await client.post(`/me/messages/${draftId}/send`);
-    return draftId; // Outlook doesn't return new ID, same message becomes sent
+    return draftId;
   }
 
   async getDraft(draftId: string): Promise<any> {

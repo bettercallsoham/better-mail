@@ -5,12 +5,13 @@ import { UnifiedEmailDocument } from "./interface";
 export class ElasticsearchService {
   private readonly client: Client;
 
-  private readonly EMAILS_INDEX = "emails_v1";
-  private readonly THREADS_INDEX = "threads_v1";
-  private readonly SAVED_SEARCHES_INDEX = "saved_searches_v1";
-  private readonly SEARCH_HISTORY_INDEX = "search_history_v1";
-  private readonly CONVERSATIONS_INDEX = "conversations_v1";
-  private readonly CONVERSATION_SUMMARIES_INDEX = "conversation_summaries_v1";
+  private readonly EMAILS_INDEX = "emails_secure";
+  private readonly THREADS_INDEX = "threads_secure";
+  private readonly SAVED_SEARCHES_INDEX = "saved_searches_secure";
+  private readonly SEARCH_HISTORY_INDEX = "search_history_secure";
+  private readonly CONVERSATIONS_INDEX = "conversations_secure";
+  private readonly CONVERSATION_SUMMARIES_INDEX =
+    "conversation_summaries_secure";
 
   constructor(client: Client) {
     this.client = client;
@@ -59,28 +60,23 @@ export class ElasticsearchService {
           },
         },
       },
+
       mappings: {
         dynamic: "strict",
         properties: {
-          // --- Identifiers ---
           id: { type: "keyword" },
           emailAddress: { type: "keyword" },
-
-          // UPGRADE 1: Authorization list (handles shared emails/webhooks natively)
           authorizedEmails: { type: "keyword" },
-
           provider: { type: "keyword" },
           providerMessageId: { type: "keyword" },
           providerThreadId: { type: "keyword" },
           threadId: { type: "keyword" },
           isThreadRoot: { type: "boolean" },
 
-          // --- Dates ---
           receivedAt: { type: "date" },
           sentAt: { type: "date" },
           indexedAt: { type: "date" },
 
-          // --- Contacts ---
           from: {
             properties: {
               name: { type: "text" },
@@ -109,28 +105,17 @@ export class ElasticsearchService {
             },
           },
 
-          // --- Content (Optimized with copy_to) ---
+          
           subject: {
             type: "text",
             analyzer: "email_search",
-            copy_to: "searchText",
           },
-          bodyText: {
-            type: "text",
-            analyzer: "email_search",
-            copy_to: "searchText",
-          },
-          bodyHtml: { type: "text", index: false },
           snippet: {
             type: "text",
             analyzer: "email_search",
-            copy_to: "searchText",
           },
 
-          // UPGRADE 2: Centralized BM25 search field
-          searchText: { type: "text", analyzer: "email_search" },
 
-          // --- Attachments ---
           hasAttachments: { type: "boolean" },
           attachments: {
             type: "nested",
@@ -143,7 +128,6 @@ export class ElasticsearchService {
             },
           },
 
-          // --- Metadata & State ---
           isRead: { type: "boolean" },
           isStarred: { type: "boolean" },
           isArchived: { type: "boolean" },
@@ -151,7 +135,6 @@ export class ElasticsearchService {
           labels: { type: "keyword" },
           providerLabels: { type: "keyword" },
 
-          // --- Drafts & Snooze ---
           isDraft: { type: "boolean" },
           draftData: {
             properties: {
@@ -162,14 +145,13 @@ export class ElasticsearchService {
           inboxState: { type: "keyword" },
           snoozeUntil: { type: "date" },
 
-          // UPGRADE 3: High-speed quantized vectors (int8)
           embedding: {
             type: "dense_vector",
             dims: 1536,
             index: true,
             similarity: "cosine",
             index_options: {
-              type: "int8_hnsw", // Use int8 for massive memory savings in 2026
+              type: "int8_hnsw",
             },
           },
         },
@@ -474,7 +456,6 @@ export class ElasticsearchService {
     const { emailAddresses, query, size = 20, page = 0, filters = {} } = params;
     const trimmed = query.trim();
 
-    // ── Email filters ──────────────────────────────────────────────────────────
     const mustFilters: object[] = [
       { terms: { emailAddress: emailAddresses } },
       { term: { isDeleted: false } },
@@ -515,12 +496,7 @@ export class ElasticsearchService {
     if (trimmed) {
       const { responses } = await this.client.msearch({
         searches: [
-          // ── [0] Notes probe ── threads index, lightweight ──────────────────
-          // emailAddress filter intentionally omitted: existing notes were saved
-          // before emailAddress was added to the upsert. Once all notes have it
-          // (going forward), restore: filter: [{ terms: { emailAddress: emailAddresses } }]
-          // Security: note threadIds are UUIDs; the email results query still
-          // enforces emailAddress ownership so boosted results stay scoped.
+        
           { index: this.THREADS_INDEX },
           {
             size: 50,
@@ -562,13 +538,11 @@ export class ElasticsearchService {
                   {
                     bool: {
                       should: [
-                        // Exact phrase on subject — highest priority
                         {
                           match_phrase: {
                             subject: { query: trimmed, boost: 4 },
                           },
                         },
-                        // BM25 across all content fields (searchText = subject + bodyText + snippet via copy_to)
                         {
                           multi_match: {
                             query: trimmed,
@@ -584,7 +558,6 @@ export class ElasticsearchService {
                             boost: 2,
                           },
                         },
-                        // Phrase prefix for partial/autocomplete typing
                         {
                           multi_match: {
                             query: trimmed,

@@ -131,9 +131,6 @@ export function transformGmailToUnified(
     bcc: parseEmailList(getHeader("Bcc")),
 
     subject: getHeader("Subject"),
-    snippet: msg.snippet || "",
-    bodyHtml: extractGmailBody(msg.payload),
-    searchText: `${getHeader("Subject")} ${msg.snippet}`,
 
     hasAttachments: msg.payload?.parts?.some((p) => p.filename) || false,
     attachments: [],

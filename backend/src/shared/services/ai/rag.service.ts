@@ -26,11 +26,7 @@ export class RAGService {
   ): Promise<{ context: string; raw: { emails: any[] } }> {
     const queryVector = await this.embeddingsService.generate(query);
     const { emails: verifiedEmails } = await getUserEmails(userId);
-    const emailHits = await this.searchEmails(
-      query,
-      queryVector,
-      verifiedEmails,
-    );
+    const emailHits = await this.searchEmails(query, queryVector, verifiedEmails);
 
     const context =
       emailHits.length > 0
@@ -46,7 +42,6 @@ export class RAGService {
     currentConvId: string,
   ): Promise<RAGResponse> {
     const queryVector = await this.embeddingsService.generate(query);
-
     const { emails: verifiedEmails } = await getUserEmails(userId);
 
     const [emailHits, chatHits] = await Promise.all([
@@ -54,7 +49,6 @@ export class RAGService {
       this.searchConversations(query, queryVector, userId, currentConvId),
     ]);
 
-    // 4. Construct Context
     const context = [
       "RELEVANT EMAIL DATA: ",
       emailHits.length > 0
@@ -111,16 +105,20 @@ export class RAGService {
     return hits
       .map((h, i) => {
         const src = h._source;
-        const fullBody: string = src.bodyText || src.snippet || "";
-        const bodyExcerpt =
-          fullBody.length > 800 ? fullBody.slice(0, 800) + "…" : fullBody;
+        // Body no longer stored in ES — snippet is the PII-safe preview available at search time
+        // Full body is fetched on-demand by the caller when needed (ai.controller, getEmailContentTool)
+        const bodyExcerpt = src.snippet
+          ? src.snippet.length > 800
+            ? src.snippet.slice(0, 800) + "…"
+            : src.snippet
+          : "(no preview)";
         const labels = src.labels?.length ? src.labels.join(", ") : undefined;
 
         return (
           `Email ${i + 1} [Score: ${h._score.toFixed(2)}] [emailId: ${h._id}]:\n` +
           `From: ${src.from.email}${src.from.name ? ` (${src.from.name})` : ""} | Subject: ${src.subject}\n` +
           `Date: ${src.receivedAt}${labels ? ` | Labels: ${labels}` : ""}\n` +
-          `Body: ${bodyExcerpt || "(no body)"}\n---`
+          `Body: ${bodyExcerpt}\n---`
         );
       })
       .join("\n");

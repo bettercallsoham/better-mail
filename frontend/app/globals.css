@@ -127,27 +127,6 @@
   --app-sidebar-muted: #d4d4d4;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   DARK MODE
-   Strategy: Warm neutral grays. A consistent +4 warm bias (R channel leads B)
-   applied uniformly across all elevation levels. Feels editorial and premium
-   rather than clinical. Inspired by Raycast / Linear dark palette.
-
-   Elevation ladder (darker = further back):
-     sidebar:        #121110              (receded, deepest)
-     base body:      #1c1a18              (main canvas — warm neutral)
-     card/surface:   #201e1b              (slightly raised)
-     popover:        #27241f              (floating surfaces — clear step up)
-     hover/select:   rgba(255,255,255,0.055) over base
-     active:         rgba(255,255,255,0.08)  over base
-
-   Text opacity ladder:
-     primary/unread: white/88
-     secondary:      white/60
-     read sender:    white/52  (font-medium, weight-first hierarchy)
-     read body:      white/42
-     muted/dates:    white/32
-───────────────────────────────────────────────────────────────────────────── */
 .dark {
   /* Body / page background */
   --background: #1a1a1a;

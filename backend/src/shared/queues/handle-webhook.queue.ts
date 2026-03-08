@@ -10,6 +10,7 @@ export interface GmailWebhookJobData {
 export interface OutlookWebhookJobData {
   email: string;
   messageId: string;
+  changeType:string;
 }
 
 export const gmailWebhookQueue = new Queue<GmailWebhookJobData>(

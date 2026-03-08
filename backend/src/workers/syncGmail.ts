@@ -16,7 +16,7 @@ const BATCH_SIZE = 100;
 async function processGmailSync(job: Job<GmailSyncData>) {
   const { email, daysBack = 30 } = job.data;
 
-  logger.info(`Syncing Gmail: ${email} `);
+  logger.info(`Syncing Gmail: ${email}`);
 
   const emailAccount = await EmailAccount.findOne({
     where: { email: email.toLowerCase() },
@@ -31,27 +31,24 @@ async function processGmailSync(job: Job<GmailSyncData>) {
   let totalSynced = 0;
 
   const processBatch = async () => {
-    if (batch.length > 0) {
-      job.log(JSON.stringify(batch));
-      await elasticService.bulkIndexEmails(batch);
-      totalSynced += batch.length;
-      logger.info(
-        `Synced batch: ${batch.length} emails (total: ${totalSynced})`,
-      );
+    if (batch.length === 0) return;
 
-      // Queue emails for embedding generation
-      await Promise.all(
-        batch.map((email) =>
-          embeddingsQueue.add("generate-embedding", {
-            emailAddress: email.emailAddress,
-            provider: email.provider,
-            providerMessageId: email.providerMessageId,
-          }),
-        ),
-      );
+    await elasticService.bulkIndexEmails(batch);
 
-      batch = [];
-    }
+    totalSynced += batch.length;
+    logger.info(`Synced batch: ${batch.length} emails (total: ${totalSynced})`);
+
+    await Promise.all(
+      batch.map((doc) =>
+        embeddingsQueue.add("generate-embedding", {
+          emailAddress: doc.emailAddress,
+          provider: doc.provider,
+          providerMessageId: doc.providerMessageId,
+        }),
+      ),
+    );
+
+    batch = [];
   };
 
   try {
@@ -63,16 +60,11 @@ async function processGmailSync(job: Job<GmailSyncData>) {
       }
     });
 
-    // Process remaining
     await processBatch();
 
     logger.info(`Gmail sync completed: ${email}, total: ${totalSynced}`);
 
-    return {
-      success: true,
-      email,
-      totalSynced,
-    };
+    return { success: true, email, totalSynced };
   } catch (error) {
     logger.error(`Gmail sync failed for ${email}:`, {
       error: error instanceof Error ? error.message : String(error),

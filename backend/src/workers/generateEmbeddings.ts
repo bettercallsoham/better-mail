@@ -10,8 +10,10 @@ import { ElasticsearchService } from "../shared/services/elastic/elastic.service
 import { elasticClient } from "../shared/config/elastic";
 import { logger } from "../shared/utils/logger";
 import { EmbeddingJobData } from "../shared/queues/generate-embeddings.queue";
+import { piiService } from "../shared/services/ai/pii.service";
+import { GmailApiService } from "../shared/services/gmail/gmail-api.service";
+import { OutlookApiService } from "../shared/services/outlook/outlook-api.service";
 
-// Validate required environment variables
 if (!AZURE_OPEN_AI_KEY) {
   throw new Error("AZURE_OPEN_AI_KEY environment variable is required");
 }
@@ -31,20 +33,34 @@ async function processEmbedding(job: Job<EmbeddingJobData>) {
   const compositeId = `${provider}_${providerMessageId}`;
 
   const email = await elasticService.getEmailById(compositeId);
-
-  if (!email) {
-    throw new Error(`Email not found: ${compositeId}`);
+  if (!email || !emailAddress) {
+    throw new Error(`Email metadata not found: ${compositeId}`);
   }
 
-  // Combine email fields for embedding - structured for better RAG accuracy
-  const textToEmbed = [
-    `Subject: ${email.subject}`,
-    `From: ${email.from.name || email.from.email}`,
-    `To: ${email.to.map((t) => t.name || t.email).join(", ")}`,
-    `Body: ${email.bodyText || email.snippet || ""}`,
-  ].join("\n\n");
+  let rawBody = "";
+  try {
+    if (provider === "gmail") {
+      const gmailService = new GmailApiService({ email: emailAddress });
+      const body = await gmailService.fetchMessageBody(providerMessageId);
+      rawBody = body.bodyText ?? body.bodyHtml ?? "";
+    } else if (provider === "outlook") {
+      const outlookService = new OutlookApiService({ email: emailAddress });
+      const body = await outlookService.fetchMessageBody(providerMessageId);
+      rawBody = body.bodyText ?? body.bodyHtml ?? "";
+    }
+  } catch (err) {
+    logger.warn(
+      `Body fetch failed for ${compositeId}, embedding metadata only`,
+    );
+    rawBody = email.snippet ?? "";
+  }
 
-  // Generate embedding - OpenAI handles token limits automatically
+  const rawText = [`Subject: ${email.subject}`, `Body: ${rawBody}`].join(
+    "\n\n",
+  );
+
+  const textToEmbed = await piiService.sanitize(rawText);
+
   const response = await embeddingsClient.embeddings.create({
     model: EMBEDDINGS_MODEL_DEPLOYMENT!,
     input: textToEmbed,
@@ -52,7 +68,6 @@ async function processEmbedding(job: Job<EmbeddingJobData>) {
 
   const embedding = response.data[0].embedding;
 
-  // Upsert to Elasticsearch with embedding
   await elasticService.upsertEmailWithEmbedding(compositeId, embedding);
 
   logger.info(
@@ -61,7 +76,6 @@ async function processEmbedding(job: Job<EmbeddingJobData>) {
 
   return { compositeId, embeddingLength: embedding.length };
 }
-
 export const embeddingsWorker = new Worker<EmbeddingJobData>(
   "generate-embeddings",
   processEmbedding,
