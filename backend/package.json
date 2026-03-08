@@ -11,12 +11,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@azure/ai-language-text": "^1.1.0",
     "@bull-board/api": "^6.16.4",
     "@bull-board/express": "^6.16.4",
     "@elastic/elasticsearch": "^8.19.1",
     "@langchain/core": "^1.1.24",
     "@langchain/langgraph": "^1.1.4",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.0",
+    "@langchain/langgraph-checkpoint-redis": "^1.0.3",
     "@langchain/openai": "^1.2.7",
     "@notionhq/client": "^5.9.0",
     "@openai/agents": "^0.4.8",
