@@ -33,6 +33,7 @@ export function createApp() {
       "https://app.bettermail.tech",
       "https://bettermail.tech",
       "www.bettermail.tech",
+      "http://localhost:3000",
     ],
     credentials: true,
   };
@@ -61,7 +62,7 @@ export function createApp() {
 
   app.use(
     "/admin/queues",
-    allowOnlyMyIP,
+    // allowOnlyMyIP,
     bullBoardEnvCheck,
     bullBoardAuth,
     serverAdapter.getRouter(),

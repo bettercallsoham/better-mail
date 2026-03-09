@@ -726,35 +726,33 @@ export const validateGetEmailSuggestions = [
 ];
 
 
-
 export const validateBatchBodies = [
   body("emailAddress")
     .isEmail()
     .normalizeEmail()
     .withMessage("emailAddress must be a valid email address"),
 
-  body("messages")
-    .isArray({ min: 1, max: 20 })
-    .withMessage("messages must be an array of 1–20 items"),
-
-  body("messages.*.providerMessageId")
+  body("threadId")
+    .optional()
     .isString()
     .notEmpty()
-    .withMessage("Each message must have a non-empty providerMessageId"),
+    .withMessage("threadId must be a non-empty string"),
 
-  body("messages.*.provider")
-    .isIn(["gmail", "outlook"])
-    .withMessage("Each message provider must be 'gmail' or 'outlook'"),
+  body("messageIds")
+    .optional()
+    .isArray({ min: 1, max: 20 })
+    .withMessage("messageIds must be an array of 1–20 strings"),
 
-  // Optional — echoed back in response for frontend mapping convenience
-  body("messages.*.emailId")
+  body("messageIds.*")
     .optional()
     .isString()
-    .withMessage("emailId must be a string if provided"),
+    .notEmpty()
+    .withMessage("Each messageId must be a non-empty string"),
 
-  body("messages.*.threadId")
-    .optional()
-    .isString()
-    .withMessage("threadId must be a string if provided"),
-
+  body().custom((value) => {
+    if (!value.threadId && !value.messageIds) {
+      throw new Error("Either threadId or messageIds is required");
+    }
+    return true;
+  }),
 ];

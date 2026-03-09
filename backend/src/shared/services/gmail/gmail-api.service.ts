@@ -6,11 +6,15 @@ import { GmailMessage, SendEmailInput } from "./interfaces";
 import { Rfc822Builder } from "../RFC.service";
 import { logger } from "@sentry/node";
 import { scheduleSubscriptionRenewal } from "../../queues/email-subscription.queue";
+import { chunkArray, parseMultipartResponse } from "../../utils/multipart.util";
 
 export interface EmailBody {
   bodyHtml: string | null;
   bodyText: string | null;
 }
+
+const GMAIL_BATCH_URL = "https://www.googleapis.com/batch/gmail/v1";
+const GMAIL_BATCH_SIZE = 50;
 
 export class GmailApiService {
   private client?: AxiosInstance;
@@ -81,7 +85,7 @@ export class GmailApiService {
 
   /* ===================== CORE FETCH LOGIC ===================== */
 
-  private async *iterateMessageIds(days: number) {
+  public async *iterateMessageIds(days: number) {
     const client = await this.getClient();
 
     const after = Math.floor((Date.now() - days * 24 * 60 * 60 * 1000) / 1000);
@@ -178,7 +182,7 @@ export class GmailApiService {
     };
   }
 
-  private async fetchMessage(messageId: string): Promise<GmailMessage | null> {
+  public async fetchMessage(messageId: string): Promise<GmailMessage | null> {
     const client = await this.getClient();
 
     try {
@@ -235,7 +239,12 @@ export class GmailApiService {
       }
 
       // Simple body (not multipart)
-      if (!part.mimeType?.startsWith("multipart/") && part.body?.data && !bodyHtml && !bodyText) {
+      if (
+        !part.mimeType?.startsWith("multipart/") &&
+        part.body?.data &&
+        !bodyHtml &&
+        !bodyText
+      ) {
         const decoded = Buffer.from(part.body.data, "base64").toString("utf-8");
         if (part.mimeType === "text/html") bodyHtml = decoded;
         else bodyText = decoded;
@@ -270,31 +279,114 @@ export class GmailApiService {
   }
 
   /**
-   * Fetch bodies for multiple messages in parallel.
-   * Returns a map of providerMessageId → EmailBody.
-   * Nothing is stored.
+   * Fetches all messages in a Gmail thread in a single API call.
+   * Extracts bodies from payload — nothing stored.
    */
-  public async fetchMessageBodies(
-    providerMessageIds: string[],
+  public async fetchThreadBodies(
+    providerThreadId: string,
   ): Promise<Map<string, EmailBody>> {
+    const client = await this.getClient();
+
+    const res = await client.get(`/users/me/threads/${providerThreadId}`, {
+      params: {
+        format: "full",
+        fields: "messages(id,payload)",
+      },
+    });
+
     const results = new Map<string, EmailBody>();
 
-    await Promise.all(
-      providerMessageIds.map(async (id) => {
-        try {
-          const body = await this.fetchMessageBody(id);
-          results.set(id, body);
-        } catch (err) {
-          logger.error(`Gmail: failed to fetch body for ${id}: ${err}`);
-          // Partial failure — bodyFetchFailed flag on frontend handles this
-          results.set(id, { bodyHtml: null, bodyText: null });
-        }
-      }),
-    );
+    for (const msg of res.data.messages ?? []) {
+      results.set(msg.id, this.extractBodyFromPayload(msg.payload));
+    }
 
     return results;
   }
 
+  // ─── Batch message bodies (multipart HTTP batch, 1 round trip per 50) ─────────
+
+  /**
+   * Fetches bodies for arbitrary message IDs using Gmail's multipart batch API.
+   * Reduces N round trips to ceil(N/50) with full parallelism across chunks.
+   */
+  public async fetchMessageBodies(
+    providerMessageIds: string[],
+  ): Promise<Map<string, EmailBody>> {
+    if (providerMessageIds.length === 0) return new Map();
+
+    const accessToken = await this.getAccessToken();
+    const chunks = chunkArray(providerMessageIds, GMAIL_BATCH_SIZE);
+
+    const chunkResults = await Promise.all(
+      chunks.map((chunk) => this.fetchMessageBodiesChunk(chunk, accessToken)),
+    );
+
+    return new Map(chunkResults.flatMap((m) => [...m]));
+  }
+
+  private async fetchMessageBodiesChunk(
+    messageIds: string[],
+    accessToken: string,
+  ): Promise<Map<string, EmailBody>> {
+    const boundary = `batch_${crypto.randomUUID().replace(/-/g, "")}`;
+
+    const bodyParts = messageIds
+      .map((id) =>
+        [
+          `--${boundary}`,
+          `Content-Type: application/http`,
+          `Content-ID: <${id}>`,
+          ``,
+          `GET /gmail/v1/users/me/messages/${id}?format=full&fields=id,payload HTTP/1.1`,
+          ``,
+        ].join("\r\n"),
+      )
+      .join("\r\n");
+
+    const requestBody = `${bodyParts}\r\n--${boundary}--`;
+
+    const res = await axios.post(GMAIL_BATCH_URL, requestBody, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": `multipart/mixed; boundary=${boundary}`,
+      },
+      responseType: "text",
+    });
+
+    return this.parseGmailBatchResponse(
+      res.data as string,
+      res.headers["content-type"],
+    );
+  }
+
+  private parseGmailBatchResponse(
+    rawBody: string,
+    contentTypeHeader: string,
+  ): Map<string, EmailBody> {
+    const results = new Map<string, EmailBody>();
+    const parts = parseMultipartResponse(rawBody, contentTypeHeader);
+
+    for (const { contentId, body } of parts) {
+      const messageId = contentId?.replace(/^<response-|>$/g, "");
+      if (!messageId) continue;
+
+      const jsonStart = body.indexOf("{");
+
+      if (jsonStart === -1) {
+        results.set(messageId, { bodyHtml: null, bodyText: null });
+        continue;
+      }
+
+      try {
+        const msg = JSON.parse(body.slice(jsonStart)) as GmailMessage;
+        results.set(messageId, this.extractBodyFromPayload(msg.payload));
+      } catch {
+        results.set(messageId, { bodyHtml: null, bodyText: null });
+      }
+    }
+
+    return results;
+  }
   /* ===================== REPLY HELPERS ===================== */
 
   private resolveRecipients(mode: "reply" | "reply_all", ctx: any, me: string) {
@@ -601,3 +693,4 @@ export class GmailApiService {
     return res.data;
   }
 }
+

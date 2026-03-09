@@ -10,6 +10,7 @@ import { gpt41LLM } from "../../../config/llm";
 import crypto from "crypto";
 import { logger } from "@sentry/node";
 import { TelegramHandler } from "../../../../modules/telegram/telegram.handler";
+import { piiService } from "../pii.service";
 
 export class AIOrchestratorService {
   private telegramHandler = new TelegramHandler();
@@ -21,37 +22,39 @@ export class AIOrchestratorService {
   ) {}
 
   async processMessage(input: {
-    conversationId: string;
-    userId: string;
-    messageContent: string;
-  }) {
-    const { conversationId, userId, messageContent } = input;
-    const config = this.getAgentConfig(conversationId, userId);
-    const isTelegram = conversationId.startsWith("tg_");
+  conversationId: string;
+  userId: string;
+  messageContent: string;
+}) {
+  const { conversationId, userId, messageContent } = input;
+  const config = this.getAgentConfig(conversationId, userId);
+  const isTelegram = conversationId.startsWith("tg_");
 
-    try {
-      const agent = await this.agentFactory.createChatAgent();
+  try {
+    const agent = await this.agentFactory.createChatAgent();
 
-      const state = (await agent.getState(config)) as any;
-      const isFirstMessage =
-        !state.values?.messages || state.values.messages.length === 0;
+    const safeContent = await piiService.sanitize(messageContent);
 
-      const stream = await agent.stream(
-        { messages: [new HumanMessage(messageContent)] },
-        { ...config, streamMode: ["messages", "updates"] },
-      );
+    const state = (await agent.getState(config)) as any;
+    const isFirstMessage =
+      !state.values?.messages || state.values.messages.length === 0;
 
-      await this.handleStream(stream, {
-        conversationId,
-        userId,
-        isTelegram,
-        isFirstMessage,
-        messageContent,
-      });
-    } catch (error: any) {
-      this.handleError(conversationId, error, isTelegram);
-    }
+    const stream = await agent.stream(
+      { messages: [new HumanMessage(safeContent)] },
+      { ...config, streamMode: ["messages", "updates"] },
+    );
+
+    await this.handleStream(stream, {
+      conversationId,
+      userId,
+      isTelegram,
+      isFirstMessage,
+      messageContent: safeContent,
+    });
+  } catch (error: any) {
+    this.handleError(conversationId, error, isTelegram);
   }
+}
 
   async handleApproval(input: {
     conversationId: string;

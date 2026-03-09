@@ -9,11 +9,14 @@ import {
 } from "./interfaces";
 import { logger } from "@sentry/node";
 import { scheduleSubscriptionRenewal } from "../../queues/email-subscription.queue";
+import { chunkArray } from "../../utils/multipart.util";
 
 export interface EmailBody {
   bodyHtml: string | null;
   bodyText: string | null;
 }
+
+const OUTLOOK_BATCH_SIZE = 4;
 
 export class OutlookApiService {
   private client?: AxiosInstance;
@@ -291,34 +294,101 @@ export class OutlookApiService {
     }
   }
 
-  /**
-   * Fetch bodies for multiple messages in parallel.
-   * Returns a map of providerMessageId → EmailBody.
-   * Nothing is stored.
-   */
-  public async fetchMessageBodies(
-    providerMessageIds: string[],
+  // ─── Constants ────────────────────────────────────────────────────────────────
+
+  public async fetchThreadBodies(
+    conversationId: string,
   ): Promise<Map<string, EmailBody>> {
+    const client = await this.getClient();
+
+    const res = await client.get("/me/messages", {
+      params: {
+        $filter: `conversationId eq '${conversationId}'`,
+        $select: "id,body,uniqueBody",
+        $top: 50,
+      },
+    });
+
     const results = new Map<string, EmailBody>();
 
-    await Promise.all(
-      providerMessageIds.map(async (id) => {
-        try {
-          const body = await this.fetchMessageBody(id);
-          results.set(id, body);
-        } catch (err) {
-          logger.error(`Outlook: failed to fetch body for ${id}: ${err}`);
-          results.set(id, { bodyHtml: null, bodyText: null });
-        }
-      }),
-    );
+    for (const msg of res.data.value ?? []) {
+      results.set(msg.id, this.extractBody(msg));
+    }
 
     return results;
   }
 
+  // ─── Batch message bodies (Graph JSON batch, chunks of 4 in parallel) ─────────
+
+  /**
+   * Fetches bodies for arbitrary message IDs using Graph JSON batch API.
+   * Chunks into groups of 4 (Outlook mailbox throttle limit) fired in parallel.
+   */
+  public async fetchMessageBodies(
+    providerMessageIds: string[],
+  ): Promise<Map<string, EmailBody>> {
+    if (providerMessageIds.length === 0) return new Map();
+
+    const client = await this.getClient();
+    const chunks = chunkArray(providerMessageIds, OUTLOOK_BATCH_SIZE);
+
+    const chunkResults = await Promise.all(
+      chunks.map((chunk) => this.fetchMessageBodiesChunk(chunk, client)),
+    );
+
+    return new Map(chunkResults.flatMap((m) => [...m]));
+  }
+
+  private async fetchMessageBodiesChunk(
+    messageIds: string[],
+    client: AxiosInstance,
+  ): Promise<Map<string, EmailBody>> {
+    const requests = messageIds.map((id, index) => ({
+      id: String(index),
+      method: "GET",
+      url: `/me/messages/${id}?$select=body,uniqueBody`,
+    }));
+
+    const res = await client.post("/$batch", { requests });
+
+    const results = new Map<string, EmailBody>();
+
+    for (const response of res.data.responses as Array<{
+      id: string;
+      status: number;
+      body: any;
+    }>) {
+      const messageId = messageIds[parseInt(response.id)];
+
+      if (!messageId) continue;
+
+      results.set(
+        messageId,
+        response.status === 200
+          ? this.extractBody(response.body)
+          : { bodyHtml: null, bodyText: null },
+      );
+    }
+
+    return results;
+  }
+
+  private extractBody(msg: any): EmailBody {
+    const contentType =
+      msg?.body?.contentType?.toLowerCase() ??
+      msg?.uniqueBody?.contentType?.toLowerCase();
+
+    const content = msg?.body?.content ?? msg?.uniqueBody?.content ?? null;
+    const isHtml = contentType === "html";
+
+    return {
+      bodyHtml: isHtml ? content : null,
+      bodyText: !isHtml ? content : null,
+    };
+  }
   /* ===================== ITERATOR ===================== */
 
-  private async *iterateMessages(days: number, includeAttachments = false) {
+  public async *iterateMessages(days: number, includeAttachments = false) {
     const client = await this.getClient();
 
     const sinceDate = new Date(
@@ -359,7 +429,10 @@ export class OutlookApiService {
     const { includeAttachments = false, onMessage } = options;
     const results: OutlookMessage[] = [];
 
-    for await (const message of this.iterateMessages(days, includeAttachments)) {
+    for await (const message of this.iterateMessages(
+      days,
+      includeAttachments,
+    )) {
       if (onMessage) {
         await onMessage(message);
       } else {
@@ -528,13 +601,16 @@ export class OutlookApiService {
       case "new":
         return this.sendNewMail(input);
       case "reply":
-        if (!input.replyToMessageId) throw new Error("replyToMessageId required");
+        if (!input.replyToMessageId)
+          throw new Error("replyToMessageId required");
         return this.replyToMessage(input.replyToMessageId, input);
       case "reply_all":
-        if (!input.replyToMessageId) throw new Error("replyToMessageId required");
+        if (!input.replyToMessageId)
+          throw new Error("replyToMessageId required");
         return this.replyAllToMessage(input.replyToMessageId, input);
       case "forward":
-        if (!input.replyToMessageId) throw new Error("replyToMessageId required for forward");
+        if (!input.replyToMessageId)
+          throw new Error("replyToMessageId required for forward");
         return this.forwardMessage(input.replyToMessageId, input);
       default:
         throw new Error(`Unsupported mode: ${input.mode}`);
@@ -703,3 +779,4 @@ export class OutlookApiService {
     return res.data;
   }
 }
+

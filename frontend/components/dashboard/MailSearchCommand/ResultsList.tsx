@@ -10,27 +10,32 @@ import { useCreateSavedSearch } from "@/features/mailbox/mailbox.query";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function fmtDate(iso: string): string {
-  const d       = new Date(iso);
-  const now     = new Date();
-  const diffMs  = now.getTime() - d.getTime();
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
   const diffMin = Math.floor(diffMs / 60_000);
-  const diffHr  = Math.floor(diffMs / 3_600_000);
+  const diffHr = Math.floor(diffMs / 3_600_000);
 
-  if (diffMin < 1)  return "just now";
+  if (diffMin < 1) return "just now";
   if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr  < 24) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (diffHr  < 48) return "Yesterday";
+  if (diffHr < 24)
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (diffHr < 48) return "Yesterday";
   if (d.getFullYear() === now.getFullYear())
     return d.toLocaleDateString([], { month: "short", day: "numeric" });
-  return d.toLocaleDateString([], { month: "short", day: "numeric", year: "2-digit" });
+  return d.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: "2-digit",
+  });
 }
 
-export function stripMark(html: string): string {
-  return html.replace(/<\/?mark[^>]*>/g, "");
+export function stripMark(html: string | undefined | null): string {
+  return html?.replace(/<\/?mark[^>]*>/g, "") ?? "";
 }
 
-export function applyHighlight(html: string): string {
-  return html.replace(
+export function applyHighlight(html: string | undefined | null): string {
+  return (html ?? "").replace(
     /<mark>(.*?)<\/mark>/g,
     '<mark class="bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 rounded-[2px] px-px not-italic font-semibold">$1</mark>',
   );
@@ -43,10 +48,12 @@ export function applyHighlight(html: string): string {
 export function SectionHead({ label, meta }: { label: string; meta?: string }) {
   return (
     <div className="flex items-center justify-between px-3 pt-4 pb-1.5">
-      <span className={cn(
-        "text-[10px] font-semibold tracking-[0.09em] uppercase select-none",
-        "text-gray-400/70 dark:text-white/25",
-      )}>
+      <span
+        className={cn(
+          "text-[10px] font-semibold tracking-[0.09em] uppercase select-none",
+          "text-gray-400/70 dark:text-white/25",
+        )}
+      >
         {label}
       </span>
       {meta && (
@@ -70,7 +77,7 @@ const SaveBtn = memo(function SaveBtn({ text }: { text: string }) {
   }
 
   return (
-    <button
+    <div
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -83,7 +90,7 @@ const SaveBtn = memo(function SaveBtn({ text }: { text: string }) {
       )}
     >
       <Bookmark className="w-3 h-3" />
-    </button>
+    </div>
   );
 });
 
@@ -108,7 +115,9 @@ export const RecentRow = memo(function RecentRow({
       style={{ width: "calc(100% - 8px)" }}
     >
       <Clock className="w-3 h-3 text-gray-300 dark:text-white/15 shrink-0" />
-      <span className="flex-1 text-[13px] text-gray-500 dark:text-white/42 truncate">{text}</span>
+      <span className="flex-1 text-[13px] text-gray-500 dark:text-white/42 truncate">
+        {text}
+      </span>
       <SaveBtn text={text} />
     </button>
   );
@@ -131,93 +140,109 @@ interface ThreadRowProps {
   onClick: () => void;
 }
 
-export const ThreadRow = memo(function ThreadRow({
-  from,
-  subject,
-  snippet,
-  date,
-  isUnread,
-  hasAttachment,
-  isStarred,
-  focused,
-  onHover,
-  onClick,
-}: ThreadRowProps) {
-  const highlightedSubject = useMemo(() => applyHighlight(subject), [subject]);
-  const formattedDate      = useMemo(() => fmtDate(date),           [date]);
-  const plainSnippet       = useMemo(() => snippet ? stripMark(snippet).slice(0, 90) : null, [snippet]);
+export const ThreadRow = memo(
+  function ThreadRow({
+    from,
+    subject,
+    snippet,
+    date,
+    isUnread,
+    hasAttachment,
+    isStarred,
+    focused,
+    onHover,
+    onClick,
+  }: ThreadRowProps) {
+    const highlightedSubject = useMemo(
+      () => applyHighlight(subject),
+      [subject],
+    );
+    const formattedDate = useMemo(() => fmtDate(date), [date]);
+    const plainSnippet = useMemo(
+      () => (snippet ? stripMark(snippet).slice(0, 90) : null),
+      [snippet],
+    );
 
-  return (
-    <button
-      onMouseEnter={onHover}
-      onClick={onClick}
-      className={cn(
-        "w-full flex items-center gap-3 px-3 py-1.75 text-left transition-colors rounded-lg mx-1",
-        focused
-          ? "bg-gray-100/80 dark:bg-white/6"
-          : "hover:bg-gray-50 dark:hover:bg-white/3",
-      )}
-      style={{ width: "calc(100% - 8px)" }}
-    >
-      {/* Unread dot */}
-      <div className="w-1.5 shrink-0 flex items-center justify-center">
-        {isUnread
-          ? <span className="block w-1.5 h-1.5 rounded-full bg-blue-500" />
-          : <span className="block w-1.5 h-1.5" />
-        }
-      </div>
+    return (
+      <button
+        onMouseEnter={onHover}
+        onClick={onClick}
+        className={cn(
+          "w-full flex items-center gap-3 px-3 py-1.75 text-left transition-colors rounded-lg mx-1",
+          focused
+            ? "bg-gray-100/80 dark:bg-white/6"
+            : "hover:bg-gray-50 dark:hover:bg-white/3",
+        )}
+        style={{ width: "calc(100% - 8px)" }}
+      >
+        {/* Unread dot */}
+        <div className="w-1.5 shrink-0 flex items-center justify-center">
+          {isUnread ? (
+            <span className="block w-1.5 h-1.5 rounded-full bg-blue-500" />
+          ) : (
+            <span className="block w-1.5 h-1.5" />
+          )}
+        </div>
 
-      {/* From */}
-      <span className={cn(
-        "text-[13px] shrink-0 w-32.5 truncate",
-        isUnread
-          ? "font-semibold text-gray-900 dark:text-white/88"
-          : "text-gray-500 dark:text-white/38",
-      )}>
-        {from}
-      </span>
-
-      {/* Subject + snippet */}
-      <div className="flex-1 flex items-center gap-1.5 min-w-0">
+        {/* From */}
         <span
           className={cn(
-            "text-[13px] shrink-0 truncate max-w-[45%]",
+            "text-[13px] shrink-0 w-32.5 truncate",
             isUnread
-              ? "text-gray-800 dark:text-white/82"
-              : "text-gray-600 dark:text-white/45",
+              ? "font-semibold text-gray-900 dark:text-white/88"
+              : "text-gray-500 dark:text-white/38",
           )}
-          dangerouslySetInnerHTML={{ __html: highlightedSubject }}
-        />
-        {plainSnippet && (
-          <>
-            <span className="text-gray-200 dark:text-white/10 text-[11px] shrink-0 select-none">—</span>
-            <span className="text-[12.5px] text-gray-400 dark:text-white/25 truncate">
-              {plainSnippet}
-            </span>
-          </>
-        )}
-      </div>
-
-      {/* Right meta */}
-      <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-2">
-        {isStarred     && <Star      className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />}
-        {hasAttachment && <Paperclip className="w-2.5 h-2.5 text-gray-300 dark:text-white/20" />}
-        <span className="text-[11.5px] tabular-nums text-gray-400 dark:text-white/25">
-          {formattedDate}
+        >
+          {from}
         </span>
-      </div>
-    </button>
-  );
-},
-(prev, next) =>
-  prev.focused       === next.focused   &&
-  prev.isUnread      === next.isUnread  &&
-  prev.subject       === next.subject   &&
-  prev.from          === next.from      &&
-  prev.snippet       === next.snippet   &&
-  prev.date          === next.date      &&
-  prev.isStarred     === next.isStarred &&
-  prev.hasAttachment === next.hasAttachment,
+
+        {/* Subject + snippet */}
+        <div className="flex-1 flex items-center gap-1.5 min-w-0">
+          <span
+            className={cn(
+              "text-[13px] shrink-0 truncate max-w-[45%]",
+              isUnread
+                ? "text-gray-800 dark:text-white/82"
+                : "text-gray-600 dark:text-white/45",
+            )}
+            dangerouslySetInnerHTML={{ __html: highlightedSubject }}
+          />
+          {plainSnippet && (
+            <>
+              <span className="text-gray-200 dark:text-white/10 text-[11px] shrink-0 select-none">
+                —
+              </span>
+              <span className="text-[12.5px] text-gray-400 dark:text-white/25 truncate">
+                {plainSnippet}
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* Right meta */}
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-2">
+          {isStarred && (
+            <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+          )}
+          {hasAttachment && (
+            <Paperclip className="w-2.5 h-2.5 text-gray-300 dark:text-white/20" />
+          )}
+          <span className="text-[11.5px] tabular-nums text-gray-400 dark:text-white/25">
+            {formattedDate}
+          </span>
+        </div>
+      </button>
+    );
+  },
+  (prev, next) =>
+    prev.focused === next.focused &&
+    prev.isUnread === next.isUnread &&
+    prev.subject === next.subject &&
+    prev.from === next.from &&
+    prev.snippet === next.snippet &&
+    prev.date === next.date &&
+    prev.isStarred === next.isStarred &&
+    prev.hasAttachment === next.hasAttachment,
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

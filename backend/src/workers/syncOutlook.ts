@@ -5,82 +5,76 @@ import { OutlookApiService } from "../shared/services/outlook/outlook-api.servic
 import { ElasticsearchService } from "../shared/services/elastic/elastic.service";
 import { elasticClient } from "../shared/config/elastic";
 import { logger } from "../shared/utils/logger";
-import { UnifiedEmailDocument } from "../shared/services/elastic/interface";
 import { OutlookSyncData } from "../shared/queues/sync-outlook.queue";
 import { transformOutlookToUnified } from "../shared/utils/helpers/outlook-helper";
 import { OutlookMessage } from "../shared/services/outlook/interfaces";
 import { embeddingsQueue } from "../shared/queues/generate-embeddings.queue";
+import pLimit from "p-limit";
 
 const elasticService = new ElasticsearchService(elasticClient);
+
+const BATCH_SIZE = 50;
+const PAGE_CONCURRENCY = 3;
 
 async function processOutlookSync(job: Job<OutlookSyncData>) {
   const { email, daysBack = 30 } = job.data;
 
-  logger.info(`Syncing Outlook: ${email}`);
-
   const emailAccount = await EmailAccount.findOne({
     where: { email: email.toLowerCase() },
   });
-
-  if (!emailAccount) {
-    throw new Error(`Email account not found: ${email}`);
-  }
+  if (!emailAccount) throw new Error(`Email account not found: ${email}`);
 
   const outlookService = new OutlookApiService({ email });
-  let batch: UnifiedEmailDocument[] = [];
+  const limit = pLimit(PAGE_CONCURRENCY);
+
   let totalSynced = 0;
 
-  const processBatch = async () => {
-    if (batch.length > 0) {
-      await elasticService.bulkIndexEmails(batch);
-      totalSynced += batch.length;
-      logger.info(
-        `Synced batch: ${batch.length} emails (total: ${totalSynced})`,
+  const pagePromises: Promise<void>[] = [];
+
+  const flushPage = async (msgs: OutlookMessage[]) => {
+    const docs = msgs.map((msg) => transformOutlookToUnified(msg, email));
+
+    await elasticService.bulkIndexEmails(docs);
+
+    embeddingsQueue
+      .addBulk(
+        docs.map((doc) => ({
+          name: "generate-embedding",
+          data: {
+            emailAddress: doc.emailAddress,
+            provider: doc.provider,
+            providerMessageId: doc.providerMessageId,
+          },
+        })),
+      )
+      .catch((err) =>
+        logger.warn(`Failed to queue embeddings: ${err.message}`),
       );
 
-      // Queue emails for embedding generation
-      await Promise.all(
-        batch.map((email) =>
-          embeddingsQueue.add("generate-embedding", {
-            emailAddress: email.emailAddress,
-            provider: email.provider,
-            providerMessageId: email.providerMessageId,
-          }),
-        ),
-      );
-
-      batch = [];
-    }
+    totalSynced += docs.length;
+    logger.info(`Outlook: indexed ${totalSynced} for ${email}`);
+    await job.updateProgress(totalSynced);
   };
 
-  try {
-    await outlookService.fetchLastNDaysEmails(daysBack, {
-      onMessage: async (msg: OutlookMessage) => {
-        batch.push(transformOutlookToUnified(msg, email));
+  let currentPage: OutlookMessage[] = [];
 
-        // Index every 50 emails (as API returns them)
-        if (batch.length >= 50) {
-          await processBatch();
-        }
-      },
-    });
+  for await (const msg of outlookService.iterateMessages(daysBack)) {
+    currentPage.push(msg);
 
-    // Process remaining
-    await processBatch();
-
-    logger.info(`Outlook sync completed: ${email}, total: ${totalSynced}`);
-
-    return {
-      success: true,
-      email,
-      totalSynced,
-    };
-  } catch (error) {
-    logger.error(`Outlook sync failed for ${email}:`, {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
+    if (currentPage.length >= BATCH_SIZE) {
+      const page = [...currentPage];
+      currentPage = [];
+      pagePromises.push(limit(() => flushPage(page)));
+    }
   }
+
+  if (currentPage.length > 0) {
+    pagePromises.push(limit(() => flushPage(currentPage)));
+  }
+
+  await Promise.all(pagePromises);
+
+  return { success: true, email, totalSynced };
 }
 
 export const outlookSyncWorker = new Worker<OutlookSyncData>(

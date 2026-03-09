@@ -9,68 +9,68 @@ import { UnifiedEmailDocument } from "../shared/services/elastic/interface";
 import { GmailSyncData } from "../shared/queues/sync-gmail.queue";
 import { transformGmailToUnified } from "../shared/utils/helpers/gmail-helper";
 import { embeddingsQueue } from "../shared/queues/generate-embeddings.queue";
+import pLimit from "p-limit"; // npm i p-limit
 
 const elasticService = new ElasticsearchService(elasticClient);
 const BATCH_SIZE = 100;
 
+
+const FETCH_CONCURRENCY = 20; 
+
 async function processGmailSync(job: Job<GmailSyncData>) {
   const { email, daysBack = 30 } = job.data;
-
-  logger.info(`Syncing Gmail: ${email}`);
 
   const emailAccount = await EmailAccount.findOne({
     where: { email: email.toLowerCase() },
   });
-
-  if (!emailAccount) {
-    throw new Error(`Email account not found: ${email}`);
-  }
+  if (!emailAccount) throw new Error(`Email account not found: ${email}`);
 
   const gmailService = new GmailApiService({ email });
-  let batch: UnifiedEmailDocument[] = [];
+  const limit = pLimit(FETCH_CONCURRENCY);
+
   let totalSynced = 0;
 
-  const processBatch = async () => {
-    if (batch.length === 0) return;
+  const messageIds: string[] = [];
+  for await (const id of gmailService.iterateMessageIds(daysBack)) {
+    messageIds.push(id);
+  }
 
-    await elasticService.bulkIndexEmails(batch);
+  logger.info(`Gmail: found ${messageIds.length} messages for ${email}`);
 
-    totalSynced += batch.length;
-    logger.info(`Synced batch: ${batch.length} emails (total: ${totalSynced})`);
+  for (let i = 0; i < messageIds.length; i += BATCH_SIZE) {
+    const chunk = messageIds.slice(i, i + BATCH_SIZE);
 
-    await Promise.all(
-      batch.map((doc) =>
-        embeddingsQueue.add("generate-embedding", {
-          emailAddress: doc.emailAddress,
-          provider: doc.provider,
-          providerMessageId: doc.providerMessageId,
-        }),
-      ),
+    const messages = await Promise.all(
+      chunk.map((id) => limit(() => gmailService.fetchMessage(id))),
     );
 
-    batch = [];
-  };
+    const docs = messages
+      .filter(Boolean)
+      .map((msg) => transformGmailToUnified(msg!, email));
 
-  try {
-    await gmailService.fetchLastNDaysEmails(daysBack, async (msg) => {
-      batch.push(transformGmailToUnified(msg, email));
+    await elasticService.bulkIndexEmails(docs);
+    totalSynced += docs.length;
 
-      if (batch.length >= BATCH_SIZE) {
-        await processBatch();
-      }
-    });
+    await embeddingsQueue
+      .addBulk(
+        docs.map((doc) => ({
+          name: "generate-embedding",
+          data: {
+            emailAddress: doc.emailAddress,
+            provider: doc.provider,
+            providerMessageId: doc.providerMessageId,
+          },
+        })),
+      )
+      .catch((err) => logger.warn(`Failed to queue embeddings: ${err.message}`));
 
-    await processBatch();
+    logger.info(`Gmail: indexed ${totalSynced}/${messageIds.length} for ${email}`);
 
-    logger.info(`Gmail sync completed: ${email}, total: ${totalSynced}`);
-
-    return { success: true, email, totalSynced };
-  } catch (error) {
-    logger.error(`Gmail sync failed for ${email}:`, {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
+    // Update job progress so frontend can show progress bar
+    await job.updateProgress(Math.round((totalSynced / messageIds.length) * 100));
   }
+
+  return { success: true, email, totalSynced };
 }
 
 export const gmailSyncWorker = new Worker<GmailSyncData>(

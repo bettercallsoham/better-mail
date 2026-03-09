@@ -52,7 +52,14 @@ export const getConnectedMailboxes = asyncHandler(
 
     const EmailAccounts = await EmailAccount.findAll({
       where: { user_id: userId },
-      attributes: ["id", "email", "name", "provider", "avatar_url", "created_at"],
+      attributes: [
+        "id",
+        "email",
+        "name",
+        "provider",
+        "avatar_url",
+        "created_at",
+      ],
     });
 
     res.json({ success: true, data: EmailAccounts });
@@ -70,7 +77,9 @@ export const getThreadEmails = asyncHandler(
     const { email, size, page, folder } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const { emails: emailAddresses, error } = await getUserEmails(
@@ -119,7 +128,6 @@ export const getThreadEmails = asyncHandler(
 // --------------------
 // THREAD METADATA (no body)
 // --------------------
-
 export const getEmailsByThreadId = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
@@ -127,7 +135,9 @@ export const getEmailsByThreadId = asyncHandler(
     const { email } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const { emails: emailAddresses, error } = await getUserEmails(
@@ -135,60 +145,105 @@ export const getEmailsByThreadId = asyncHandler(
       email as string | undefined,
     );
 
-    if (error) {
-      return res.status(403).json({ success: false, message: error });
-    }
 
-    if (emailAddresses.length === 0) {
-      return res.status(404).json({ success: false, message: "No connected email accounts" });
+    if (error || emailAddresses.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: error ?? "No connected email accounts",
+      });
     }
 
     const elasticService = new ElasticsearchService(elasticClient);
 
-    const result = await elasticService.getEmailsByThreadId({
-      threadId: Array.isArray(threadId) ? threadId[0] : threadId,
-      emailAddresses,
+    const { emails: rawEmails, total } =
+      await elasticService.getEmailsByThreadId({
+        threadId: Array.isArray(threadId) ? threadId[0] : threadId,
+        emailAddresses,
+      });
+
+    if (rawEmails.length === 0) {
+      return res.json({ success: true, data: { total: 0, emails: [] } });
+    }
+    console.log("bodyMap");
+    const threadGroups = groupByProviderThread(rawEmails);
+    console.log(threadGroups);
+
+    const bodyMap = await fetchAllThreadBodies(threadGroups);
+
+    console.log("bodyMap");
+    console.log(bodyMap);
+
+    // Step 3: merge metadata + bodies
+    const emails = rawEmails.map((email) => {
+      const { embedding, ...metadata } = email;
+      const body = bodyMap.get(email.providerMessageId);
+
+      return {
+        ...metadata,
+        bodyHtml: body?.bodyHtml ?? null,
+        bodyText: body?.bodyText ?? null,
+        bodyFetchFailed:
+          !body || (body.bodyHtml === null && body.bodyText === null),
+      };
     });
 
-    // Strip any body fields that may exist on old indexed docs
-    const emails = result.emails.map((email: any) => {
-      const { bodyText, bodyHtml, searchText, embedding, ...metadata } = email;
-      return metadata;
-    });
-
-    res.json({
-      success: true,
-      data: {
-        total: result.total,
-        emails,
-      },
-    });
+    return res.json({ success: true, data: { total, emails } });
   },
   "getEmailsByThreadId",
 );
 
-// --------------------
-// BATCH BODIES — core new endpoint
-// --------------------
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+interface ThreadGroup {
+  provider: "gmail" | "outlook";
+  providerThreadId: string;
+  emailAddress: string;
+}
 
 /**
- * POST /api/v1/mail/batch-bodies
- *
- * Frontend sends the providerMessageIds it already has from thread metadata.
- * No ES call needed — we go straight to the provider API.
- * Nothing is stored anywhere. Pure live fetch, discarded after response.
- *
- * Body:
- * {
- *   emailAddress: string,
- *   messages: Array<{
- *     providerMessageId: string,
- *     provider: "gmail" | "outlook",
- *     emailId?: string,      // optional — echoed back for frontend mapping
- *     threadId?: string,     // optional — echoed back for frontend mapping
- *   }>
- * }
+ * Deduplicates ES emails into unique (provider, providerThreadId) pairs.
+ * All messages in a thread share the same providerThreadId — we only
+ * need one API call per thread, not one per message.
  */
+const groupByProviderThread = (
+  emails: UnifiedEmailDocument[],
+): ThreadGroup[] => {
+  const seen = new Set<string>();
+  const groups: ThreadGroup[] = [];
+
+  for (const email of emails) {
+    const key = `${email.provider}:${email.providerThreadId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    groups.push({
+      provider: email.provider as "gmail" | "outlook",
+      providerThreadId: email.providerThreadId,
+      emailAddress: email.emailAddress,
+    });
+  }
+
+  return groups;
+};
+
+const fetchAllThreadBodies = async (
+  groups: ThreadGroup[],
+): Promise<Map<string, EmailBody>> => {
+  const maps = await Promise.all(
+    groups.map(({ provider, providerThreadId, emailAddress }) =>
+      provider === "gmail"
+        ? new GmailApiService({ email: emailAddress }).fetchThreadBodies(
+            providerThreadId,
+          )
+        : new OutlookApiService({ email: emailAddress }).fetchThreadBodies(
+            providerThreadId,
+          ),
+    ),
+  );
+
+  return new Map(maps.flatMap((m) => [...m]));
+};
+
 export const batchGetEmailBodies = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
@@ -198,7 +253,9 @@ export const batchGetEmailBodies = asyncHandler(
     };
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -216,7 +273,10 @@ export const batchGetEmailBodies = asyncHandler(
     }
 
     // Verify user owns this emailAddress
-    const { emails: emailAddresses, error } = await getUserEmails(userId, emailAddress);
+    const { emails: emailAddresses, error } = await getUserEmails(
+      userId,
+      emailAddress,
+    );
 
     if (error || emailAddresses.length === 0) {
       return res.status(403).json({
@@ -257,7 +317,8 @@ export const batchGetEmailBodies = asyncHandler(
     // without needing an index or secondary lookup
     const results: BatchEmailResult[] = messages.map((msg) => {
       const body = allBodies.get(msg.providerMessageId);
-      const failed = !body || (body.bodyHtml === null && body.bodyText === null);
+      const failed =
+        !body || (body.bodyHtml === null && body.bodyText === null);
 
       return {
         ...msg,
@@ -307,7 +368,9 @@ export const getFolders = asyncHandler(async (req: Request, res: Response) => {
   const { email } = req.query;
 
   if (!userId) {
-    return res.status(401).json({ success: false, message: "User not authenticated" });
+    return res
+      .status(401)
+      .json({ success: false, message: "User not authenticated" });
   }
 
   const { emails: emailAddresses, error } = await getUserEmails(
@@ -323,7 +386,14 @@ export const getFolders = asyncHandler(async (req: Request, res: Response) => {
     return res.json({
       success: true,
       data: {
-        system: { unread: 0, starred: 0, archived: 0, inbox: 0, sent: 0, important: 0 },
+        system: {
+          unread: 0,
+          starred: 0,
+          archived: 0,
+          inbox: 0,
+          sent: 0,
+          important: 0,
+        },
         labels: [],
       },
       message: "No connected email accounts",
@@ -356,7 +426,9 @@ export const replyEmail = asyncHandler(async (req: Request, res: Response) => {
   } = req.body;
 
   if (!userId) {
-    return res.status(401).json({ success: false, message: "User not authenticated" });
+    return res
+      .status(401)
+      .json({ success: false, message: "User not authenticated" });
   }
 
   const { emails: emailAddresses, error } = await getUserEmails(userId, from);
@@ -374,18 +446,40 @@ export const replyEmail = asyncHandler(async (req: Request, res: Response) => {
     if (provider === "GOOGLE") {
       const gmailService = new GmailApiService({ email: from });
       messageId = await gmailService.sendEmail({
-        mode, from, to, cc, bcc, subject, html, replyToMessageId, attachments,
+        mode,
+        from,
+        to,
+        cc,
+        bcc,
+        subject,
+        html,
+        replyToMessageId,
+        attachments,
       });
     } else if (provider === "OUTLOOK") {
       const outlookService = new OutlookApiService({ email: from });
       messageId = await outlookService.sendEmail({
-        mode, from, to, cc, bcc, subject, html, replyToMessageId, attachments,
+        mode,
+        from,
+        to,
+        cc,
+        bcc,
+        subject,
+        html,
+        replyToMessageId,
+        attachments,
       });
     } else {
-      return res.status(400).json({ success: false, message: "Unsupported email provider" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Unsupported email provider" });
     }
 
-    res.json({ success: true, data: { messageId }, message: "Email sent successfully" });
+    res.json({
+      success: true,
+      data: { messageId },
+      message: "Email sent successfully",
+    });
   } catch (error: any) {
     logger.error("Failed to send reply:", error);
 
@@ -403,7 +497,10 @@ export const replyEmail = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    res.status(500).json({ success: false, message: error.message || "Failed to send email" });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send email",
+    });
   }
 }, "replyEmail");
 
@@ -412,7 +509,9 @@ export const sendEmail = asyncHandler(async (req: Request, res: Response) => {
   const { from, provider, to, subject, html, cc, bcc, attachments } = req.body;
 
   if (!userId) {
-    return res.status(401).json({ success: false, message: "User not authenticated" });
+    return res
+      .status(401)
+      .json({ success: false, message: "User not authenticated" });
   }
 
   const { emails: emailAddresses, error } = await getUserEmails(userId, from);
@@ -429,15 +528,39 @@ export const sendEmail = asyncHandler(async (req: Request, res: Response) => {
 
     if (provider === "GOOGLE") {
       const gmailService = new GmailApiService({ email: from });
-      messageId = await gmailService.sendEmail({ mode: "new", from, to, cc, bcc, subject, html, attachments });
+      messageId = await gmailService.sendEmail({
+        mode: "new",
+        from,
+        to,
+        cc,
+        bcc,
+        subject,
+        html,
+        attachments,
+      });
     } else if (provider === "OUTLOOK") {
       const outlookService = new OutlookApiService({ email: from });
-      messageId = await outlookService.sendEmail({ mode: "new", from, to, cc, bcc, subject, html, attachments });
+      messageId = await outlookService.sendEmail({
+        mode: "new",
+        from,
+        to,
+        cc,
+        bcc,
+        subject,
+        html,
+        attachments,
+      });
     } else {
-      return res.status(400).json({ success: false, message: "Unsupported email provider" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Unsupported email provider" });
     }
 
-    res.json({ success: true, data: { messageId }, message: "Email sent successfully" });
+    res.json({
+      success: true,
+      data: { messageId },
+      message: "Email sent successfully",
+    });
   } catch (error: any) {
     logger.error("Failed to send email:", error);
 
@@ -449,10 +572,16 @@ export const sendEmail = asyncHandler(async (req: Request, res: Response) => {
     }
 
     if (error.response?.status === 429) {
-      return res.status(429).json({ success: false, message: "Rate limit exceeded. Please try again later." });
+      return res.status(429).json({
+        success: false,
+        message: "Rate limit exceeded. Please try again later.",
+      });
     }
 
-    res.status(500).json({ success: false, message: error.message || "Failed to send email" });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send email",
+    });
   }
 }, "sendEmail");
 
@@ -465,7 +594,9 @@ export const emailAction = asyncHandler(async (req: Request, res: Response) => {
   const { from, provider, messageIds, action } = req.body;
 
   if (!userId) {
-    return res.status(401).json({ success: false, message: "User not authenticated" });
+    return res
+      .status(401)
+      .json({ success: false, message: "User not authenticated" });
   }
 
   const { emails: emailAddresses, error } = await getUserEmails(userId, from);
@@ -481,24 +612,52 @@ export const emailAction = asyncHandler(async (req: Request, res: Response) => {
     if (provider === "GOOGLE") {
       const gmailService = new GmailApiService({ email: from });
       switch (action) {
-        case "mark_read":    await gmailService.markRead(messageIds); break;
-        case "mark_unread":  await gmailService.markUnread(messageIds); break;
-        case "star":         await gmailService.star(messageIds); break;
-        case "unstar":       await gmailService.unstar(messageIds); break;
-        case "archive":      await gmailService.archive(messageIds); break;
-        case "unarchive":    await gmailService.unarchive(messageIds); break;
-        case "delete":       await gmailService.trash(messageIds); break;
+        case "mark_read":
+          await gmailService.markRead(messageIds);
+          break;
+        case "mark_unread":
+          await gmailService.markUnread(messageIds);
+          break;
+        case "star":
+          await gmailService.star(messageIds);
+          break;
+        case "unstar":
+          await gmailService.unstar(messageIds);
+          break;
+        case "archive":
+          await gmailService.archive(messageIds);
+          break;
+        case "unarchive":
+          await gmailService.unarchive(messageIds);
+          break;
+        case "delete":
+          await gmailService.trash(messageIds);
+          break;
       }
     } else if (provider === "OUTLOOK") {
       const outlookService = new OutlookApiService({ email: from });
       switch (action) {
-        case "mark_read":    await outlookService.markRead(messageIds); break;
-        case "mark_unread":  await outlookService.markUnread(messageIds); break;
-        case "star":         await outlookService.star(messageIds); break;
-        case "unstar":       await outlookService.unstar(messageIds); break;
-        case "archive":      await outlookService.archive(messageIds); break;
-        case "delete":       await outlookService.trash(messageIds); break;
-        case "unarchive":    await outlookService.unarchive(messageIds); break;
+        case "mark_read":
+          await outlookService.markRead(messageIds);
+          break;
+        case "mark_unread":
+          await outlookService.markUnread(messageIds);
+          break;
+        case "star":
+          await outlookService.star(messageIds);
+          break;
+        case "unstar":
+          await outlookService.unstar(messageIds);
+          break;
+        case "archive":
+          await outlookService.archive(messageIds);
+          break;
+        case "delete":
+          await outlookService.trash(messageIds);
+          break;
+        case "unarchive":
+          await outlookService.unarchive(messageIds);
+          break;
       }
     }
 
@@ -525,20 +684,33 @@ export const emailAction = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    res.status(500).json({ success: false, message: error.message || "Failed to perform action" });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to perform action",
+    });
   }
 }, "emailAction");
 
-function getElasticUpdates(action: string): Partial<UnifiedEmailDocument> | null {
+function getElasticUpdates(
+  action: string,
+): Partial<UnifiedEmailDocument> | null {
   switch (action) {
-    case "mark_read":   return { isRead: true };
-    case "mark_unread": return { isRead: false };
-    case "star":        return { isStarred: true };
-    case "unstar":      return { isStarred: false };
-    case "archive":     return { isArchived: true };
-    case "unarchive":   return { isArchived: false };
-    case "delete":      return { isDeleted: true };
-    default:            return null;
+    case "mark_read":
+      return { isRead: true };
+    case "mark_unread":
+      return { isRead: false };
+    case "star":
+      return { isStarred: true };
+    case "unstar":
+      return { isStarred: false };
+    case "archive":
+      return { isArchived: true };
+    case "unarchive":
+      return { isArchived: false };
+    case "delete":
+      return { isDeleted: true };
+    default:
+      return null;
   }
 }
 
@@ -566,7 +738,9 @@ export const searchEmails = asyncHandler(
     } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const { emails: emailAddresses, error } = await getUserEmails(
@@ -601,8 +775,10 @@ export const searchEmails = asyncHandler(
       filters: {
         isRead: isRead !== undefined ? isRead === "true" : undefined,
         isStarred: isStarred !== undefined ? isStarred === "true" : undefined,
-        isArchived: isArchived !== undefined ? isArchived === "true" : undefined,
-        hasAttachments: hasAttachments !== undefined ? hasAttachments === "true" : undefined,
+        isArchived:
+          isArchived !== undefined ? isArchived === "true" : undefined,
+        hasAttachments:
+          hasAttachments !== undefined ? hasAttachments === "true" : undefined,
         from: filterFrom as string | undefined,
         to: filterTo as string | undefined,
         labels: parsedLabels,
@@ -620,8 +796,12 @@ export const searchEmails = asyncHandler(
         filters: {
           isRead: isRead !== undefined ? isRead === "true" : undefined,
           isStarred: isStarred !== undefined ? isStarred === "true" : undefined,
-          isArchived: isArchived !== undefined ? isArchived === "true" : undefined,
-          hasAttachments: hasAttachments !== undefined ? hasAttachments === "true" : undefined,
+          isArchived:
+            isArchived !== undefined ? isArchived === "true" : undefined,
+          hasAttachments:
+            hasAttachments !== undefined
+              ? hasAttachments === "true"
+              : undefined,
           from: filterFrom as string | undefined,
           to: filterTo as string | undefined,
           labels: parsedLabels,
@@ -656,7 +836,9 @@ export const getInboxZero = asyncHandler(
     const { from: fromEmail, size, page } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const { emails: emailAddresses, error } = await getUserEmails(
@@ -688,7 +870,10 @@ export const getInboxZero = asyncHandler(
       });
     } catch (error: any) {
       logger.error("Failed to fetch inbox zero emails:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to fetch inbox zero emails" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to fetch inbox zero emails",
+      });
     }
   },
   "getInboxZero",
@@ -704,10 +889,15 @@ export const updateInboxState = asyncHandler(
     const { email, provider, messageIds, action, snoozeUntil } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
-    const { emails: emailAddresses, error } = await getUserEmails(userId, email);
+    const { emails: emailAddresses, error } = await getUserEmails(
+      userId,
+      email,
+    );
 
     if (error || emailAddresses.length === 0) {
       return res.status(403).json({
@@ -727,10 +917,19 @@ export const updateInboxState = asyncHandler(
         snoozeUntil,
       });
 
-      res.json({ success: true, action, updated: result.updated, errors: result.errors, messageIds });
+      res.json({
+        success: true,
+        action,
+        updated: result.updated,
+        errors: result.errors,
+        messageIds,
+      });
     } catch (error: any) {
       logger.error("Failed to update inbox state:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to update inbox state" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to update inbox state",
+      });
     }
   },
   "updateInboxState",
@@ -746,7 +945,9 @@ export const createSavedSearch = asyncHandler(
     const { name, description, query, isPinned, color } = req.body;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     try {
@@ -754,8 +955,14 @@ export const createSavedSearch = asyncHandler(
       const id = `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       const doc = {
-        id, userId, name, description, query,
-        usageCount: 0, isPinned: isPinned || false, color,
+        id,
+        userId,
+        name,
+        description,
+        query,
+        usageCount: 0,
+        isPinned: isPinned || false,
+        color,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -765,7 +972,10 @@ export const createSavedSearch = asyncHandler(
       res.status(201).json({ success: true, data: doc });
     } catch (error: any) {
       logger.error("Failed to create saved search:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to create saved search" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to create saved search",
+      });
     }
   },
   "createSavedSearch",
@@ -776,7 +986,9 @@ export const getSavedSearches = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     try {
@@ -785,7 +997,10 @@ export const getSavedSearches = asyncHandler(
       res.json({ success: true, data: searches });
     } catch (error: any) {
       logger.error("Failed to get saved searches:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to get saved searches" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get saved searches",
+      });
     }
   },
   "getSavedSearches",
@@ -798,25 +1013,39 @@ export const updateSavedSearch = asyncHandler(
     const updates = req.body;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     if (!id || Array.isArray(id)) {
-      return res.status(400).json({ success: false, message: "Invalid search ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid search ID" });
     }
 
     try {
       const elasticService = new ElasticsearchService(elasticClient);
-      const success = await elasticService.updateSavedSearch(id, userId, updates);
+      const success = await elasticService.updateSavedSearch(
+        id,
+        userId,
+        updates,
+      );
 
       if (!success) {
-        return res.status(404).json({ success: false, message: "Saved search not found or access denied" });
+        return res.status(404).json({
+          success: false,
+          message: "Saved search not found or access denied",
+        });
       }
 
       res.json({ success: true, message: "Saved search updated" });
     } catch (error: any) {
       logger.error("Failed to update saved search:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to update saved search" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to update saved search",
+      });
     }
   },
   "updateSavedSearch",
@@ -828,11 +1057,15 @@ export const deleteSavedSearch = asyncHandler(
     const { id } = req.params;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     if (!id || Array.isArray(id)) {
-      return res.status(400).json({ success: false, message: "Invalid search ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid search ID" });
     }
 
     try {
@@ -840,13 +1073,19 @@ export const deleteSavedSearch = asyncHandler(
       const success = await elasticService.deleteSavedSearch(id, userId);
 
       if (!success) {
-        return res.status(404).json({ success: false, message: "Saved search not found or access denied" });
+        return res.status(404).json({
+          success: false,
+          message: "Saved search not found or access denied",
+        });
       }
 
       res.json({ success: true, message: "Saved search deleted" });
     } catch (error: any) {
       logger.error("Failed to delete saved search:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to delete saved search" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to delete saved search",
+      });
     }
   },
   "deleteSavedSearch",
@@ -859,18 +1098,25 @@ export const executeSavedSearch = asyncHandler(
     const { size, page } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     if (!id || Array.isArray(id)) {
-      return res.status(400).json({ success: false, message: "Invalid search ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid search ID" });
     }
 
     const elasticService = new ElasticsearchService(elasticClient);
 
     const savedSearch = await elasticService.getSavedSearchById(id, userId);
     if (!savedSearch) {
-      return res.status(404).json({ success: false, message: "Saved search not found or access denied" });
+      return res.status(404).json({
+        success: false,
+        message: "Saved search not found or access denied",
+      });
     }
 
     await elasticService.incrementSearchUsage(id);
@@ -879,7 +1125,10 @@ export const executeSavedSearch = asyncHandler(
     if (!emailAddresses?.length) {
       const { emails, error } = await getUserEmails(userId);
       if (error || emails.length === 0) {
-        return res.status(403).json({ success: false, message: error || "No connected email accounts found" });
+        return res.status(403).json({
+          success: false,
+          message: error || "No connected email accounts found",
+        });
       }
       emailAddresses = emails;
     }
@@ -910,7 +1159,9 @@ export const getRecentSearches = asyncHandler(
     const { limit } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     try {
@@ -922,7 +1173,10 @@ export const getRecentSearches = asyncHandler(
       res.json({ success: true, data: searches });
     } catch (error: any) {
       logger.error("Failed to get recent searches:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to get recent searches" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get recent searches",
+      });
     }
   },
   "getRecentSearches",
@@ -934,16 +1188,23 @@ export const getRecentSearches = asyncHandler(
 
 export const createDraft = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
-  const { from, provider, to, cc, bcc, subject, html, text, threadId } = req.body;
+  const { from, provider, to, cc, bcc, subject, html, text, threadId } =
+    req.body;
 
   if (!userId) {
-    return res.status(401).json({ success: false, message: "User not authenticated" });
+    return res
+      .status(401)
+      .json({ success: false, message: "User not authenticated" });
   }
 
   try {
-    const { emails: emailAddresses, error: emailError } = await getUserEmails(userId);
+    const { emails: emailAddresses, error: emailError } =
+      await getUserEmails(userId);
     if (emailError || !emailAddresses.includes(from.toLowerCase())) {
-      return res.status(403).json({ success: false, message: "You don't have access to this email account" });
+      return res.status(403).json({
+        success: false,
+        message: "You don't have access to this email account",
+      });
     }
 
     const providerKey = provider === "GOOGLE" ? "gmail" : "outlook";
@@ -951,10 +1212,28 @@ export const createDraft = asyncHandler(async (req: Request, res: Response) => {
 
     if (providerKey === "gmail") {
       const gmailService = new GmailApiService({ email: from });
-      providerDraftId = await gmailService.createDraft({ mode: "new", from, to, cc, bcc, subject, html, text });
+      providerDraftId = await gmailService.createDraft({
+        mode: "new",
+        from,
+        to,
+        cc,
+        bcc,
+        subject,
+        html,
+        text,
+      });
     } else {
       const outlookService = new OutlookApiService({ email: from });
-      providerDraftId = await outlookService.createDraft({ mode: "new", from, to, cc, bcc, subject, html, text });
+      providerDraftId = await outlookService.createDraft({
+        mode: "new",
+        from,
+        to,
+        cc,
+        bcc,
+        subject,
+        html,
+        text,
+      });
     }
 
     // Index draft metadata only — no body stored
@@ -973,7 +1252,9 @@ export const createDraft = asyncHandler(async (req: Request, res: Response) => {
       from: { email: from.toLowerCase() },
       to: to.map((email: string) => ({ email: email.toLowerCase() })),
       cc: cc ? cc.map((email: string) => ({ email: email.toLowerCase() })) : [],
-      bcc: bcc ? bcc.map((email: string) => ({ email: email.toLowerCase() })) : [],
+      bcc: bcc
+        ? bcc.map((email: string) => ({ email: email.toLowerCase() }))
+        : [],
       subject,
       // No bodyText / bodyHtml stored
       snippet: (text || html || "").substring(0, 200),
@@ -998,7 +1279,10 @@ export const createDraft = asyncHandler(async (req: Request, res: Response) => {
     res.json({ success: true, data: { id: draftDoc.id, providerDraftId } });
   } catch (error: any) {
     logger.error("Failed to create draft:", error);
-    res.status(500).json({ success: false, message: error.message || "Failed to create draft" });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create draft",
+    });
   }
 }, "createDraft");
 
@@ -1007,33 +1291,47 @@ export const sendDraft = asyncHandler(async (req: Request, res: Response) => {
   const id = req.params.id as string;
 
   if (!userId) {
-    return res.status(401).json({ success: false, message: "User not authenticated" });
+    return res
+      .status(401)
+      .json({ success: false, message: "User not authenticated" });
   }
 
   try {
     const { emails: emailAddresses, error } = await getUserEmails(userId);
     if (error || emailAddresses.length === 0) {
-      return res.status(403).json({ success: false, message: error || "No connected email accounts" });
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
     }
 
     const elasticService = new ElasticsearchService(elasticClient);
     const existingDraft = await elasticService.getEmailById(id, emailAddresses);
 
     if (!existingDraft || !existingDraft.isDraft) {
-      return res.status(404).json({ success: false, message: "Draft not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Draft not found" });
     }
 
     const providerDraftId = existingDraft.draftData?.providerDraftId;
     if (!providerDraftId) {
-      return res.status(400).json({ success: false, message: "Invalid draft: missing provider draft ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid draft: missing provider draft ID",
+      });
     }
 
     let sentMessageId: string;
     if (existingDraft.provider === "gmail") {
-      const gmailService = new GmailApiService({ email: existingDraft.emailAddress });
+      const gmailService = new GmailApiService({
+        email: existingDraft.emailAddress,
+      });
       sentMessageId = await gmailService.sendDraft(providerDraftId);
     } else {
-      const outlookService = new OutlookApiService({ email: existingDraft.emailAddress });
+      const outlookService = new OutlookApiService({
+        email: existingDraft.emailAddress,
+      });
       sentMessageId = await outlookService.sendDraft(providerDraftId);
     }
 
@@ -1045,10 +1343,17 @@ export const sendDraft = asyncHandler(async (req: Request, res: Response) => {
       sentAt: new Date().toISOString(),
     });
 
-    res.json({ success: true, message: "Draft sent successfully", data: { sentMessageId } });
+    res.json({
+      success: true,
+      message: "Draft sent successfully",
+      data: { sentMessageId },
+    });
   } catch (error: any) {
     logger.error("Failed to send draft:", error);
-    res.status(500).json({ success: false, message: error.message || "Failed to send draft" });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send draft",
+    });
   }
 }, "sendDraft");
 
@@ -1058,29 +1363,40 @@ export const getEmailById = asyncHandler(
     const id = req.params.id as string;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     try {
       const { emails: emailAddresses, error } = await getUserEmails(userId);
       if (error || emailAddresses.length === 0) {
-        return res.status(403).json({ success: false, message: error || "No connected email accounts" });
+        return res.status(403).json({
+          success: false,
+          message: error || "No connected email accounts",
+        });
       }
 
       const elasticService = new ElasticsearchService(elasticClient);
       const email = await elasticService.getEmailById(id, emailAddresses);
 
       if (!email) {
-        return res.status(404).json({ success: false, message: "Email not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Email not found" });
       }
 
       // Strip body fields
-      const { bodyText, bodyHtml, searchText, embedding, ...metadata } = email as any;
+      const { bodyText, bodyHtml, searchText, embedding, ...metadata } =
+        email as any;
 
       res.json({ success: true, data: metadata });
     } catch (error: any) {
       logger.error("Failed to get email:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to get email" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get email",
+      });
     }
   },
   "getEmailById",
@@ -1092,20 +1408,27 @@ export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
   const { to, cc, bcc, subject, html, text } = req.body;
 
   if (!userId) {
-    return res.status(401).json({ success: false, message: "User not authenticated" });
+    return res
+      .status(401)
+      .json({ success: false, message: "User not authenticated" });
   }
 
   try {
     const { emails: emailAddresses, error } = await getUserEmails(userId);
     if (error || emailAddresses.length === 0) {
-      return res.status(403).json({ success: false, message: error || "No connected email accounts" });
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
     }
 
     const elasticService = new ElasticsearchService(elasticClient);
     const existingEmail = await elasticService.getEmailById(id, emailAddresses);
 
     if (!existingEmail) {
-      return res.status(404).json({ success: false, message: "Email not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Email not found" });
     }
 
     if (!existingEmail.isDraft) {
@@ -1117,11 +1440,16 @@ export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
 
     const providerDraftId = existingEmail.draftData?.providerDraftId;
     if (!providerDraftId) {
-      return res.status(400).json({ success: false, message: "Invalid draft: missing provider draft ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid draft: missing provider draft ID",
+      });
     }
 
     if (existingEmail.provider === "gmail") {
-      const gmailService = new GmailApiService({ email: existingEmail.emailAddress });
+      const gmailService = new GmailApiService({
+        email: existingEmail.emailAddress,
+      });
       await gmailService.updateDraft(providerDraftId, {
         mode: "new",
         from: existingEmail.emailAddress,
@@ -1133,7 +1461,9 @@ export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
         text,
       });
     } else {
-      const outlookService = new OutlookApiService({ email: existingEmail.emailAddress });
+      const outlookService = new OutlookApiService({
+        email: existingEmail.emailAddress,
+      });
       await outlookService.updateDraft(providerDraftId, {
         mode: "new",
         from: existingEmail.emailAddress,
@@ -1148,9 +1478,9 @@ export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
 
     // Update metadata only in ES — no body stored
     const updates: any = {};
-    if (to)      updates.to = to.map((e: string) => ({ email: e.toLowerCase() }));
-    if (cc)      updates.cc = cc.map((e: string) => ({ email: e.toLowerCase() }));
-    if (bcc)     updates.bcc = bcc.map((e: string) => ({ email: e.toLowerCase() }));
+    if (to) updates.to = to.map((e: string) => ({ email: e.toLowerCase() }));
+    if (cc) updates.cc = cc.map((e: string) => ({ email: e.toLowerCase() }));
+    if (bcc) updates.bcc = bcc.map((e: string) => ({ email: e.toLowerCase() }));
     if (subject) updates.subject = subject;
     if (text || html) updates.snippet = (text || html || "").substring(0, 200);
 
@@ -1159,7 +1489,10 @@ export const updateEmail = asyncHandler(async (req: Request, res: Response) => {
     res.json({ success: true, message: "Email updated successfully" });
   } catch (error: any) {
     logger.error("Failed to update email:", error);
-    res.status(500).json({ success: false, message: error.message || "Failed to update email" });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update email",
+    });
   }
 }, "updateEmail");
 
@@ -1168,36 +1501,48 @@ export const deleteEmail = asyncHandler(async (req: Request, res: Response) => {
   const id = req.params.id as string;
 
   if (!userId) {
-    return res.status(401).json({ success: false, message: "User not authenticated" });
+    return res
+      .status(401)
+      .json({ success: false, message: "User not authenticated" });
   }
 
   try {
     const { emails: emailAddresses, error } = await getUserEmails(userId);
     if (error || emailAddresses.length === 0) {
-      return res.status(403).json({ success: false, message: error || "No connected email accounts" });
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
     }
 
     const elasticService = new ElasticsearchService(elasticClient);
     const existingEmail = await elasticService.getEmailById(id, emailAddresses);
 
     if (!existingEmail) {
-      return res.status(404).json({ success: false, message: "Email not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Email not found" });
     }
 
     if (!existingEmail.isDraft) {
       return res.status(400).json({
         success: false,
-        message: "Cannot delete sent/received emails. Only drafts can be deleted.",
+        message:
+          "Cannot delete sent/received emails. Only drafts can be deleted.",
       });
     }
 
     const providerDraftId = existingEmail.draftData?.providerDraftId;
     if (providerDraftId) {
       if (existingEmail.provider === "gmail") {
-        const gmailService = new GmailApiService({ email: existingEmail.emailAddress });
+        const gmailService = new GmailApiService({
+          email: existingEmail.emailAddress,
+        });
         await gmailService.deleteDraft(providerDraftId);
       } else {
-        const outlookService = new OutlookApiService({ email: existingEmail.emailAddress });
+        const outlookService = new OutlookApiService({
+          email: existingEmail.emailAddress,
+        });
         await outlookService.deleteDraft(providerDraftId);
       }
     }
@@ -1207,7 +1552,10 @@ export const deleteEmail = asyncHandler(async (req: Request, res: Response) => {
     res.json({ success: true, message: "Email deleted successfully" });
   } catch (error: any) {
     logger.error("Failed to delete email:", error);
-    res.status(500).json({ success: false, message: error.message || "Failed to delete email" });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to delete email",
+    });
   }
 }, "deleteEmail");
 
@@ -1220,12 +1568,16 @@ export const upsertThreadNote = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const emailAddresses = await getUserEmails(userId);
     if (emailAddresses.emails.length === 0) {
-      return res.status(400).json({ success: false, message: "No connected email accounts found" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No connected email accounts found" });
     }
 
     const { threadId } = req.params;
@@ -1236,9 +1588,15 @@ export const upsertThreadNote = asyncHandler(
         ? requestedEmail
         : emailAddresses.emails[0];
 
-    const note = await threadNoteService.upsertNote(emailAddress, threadId as string, content);
+    const note = await threadNoteService.upsertNote(
+      emailAddress,
+      threadId as string,
+      content,
+    );
 
-    res.status(200).json({ success: true, message: "Note saved successfully", data: note });
+    res
+      .status(200)
+      .json({ success: true, message: "Note saved successfully", data: note });
   },
   "upsertThreadNote",
 );
@@ -1248,25 +1606,33 @@ export const getThreadNote = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const threadIdParam = req.params.threadId;
     const emailAddressParam = req.params.emailAddress;
 
-    const threadId = typeof threadIdParam === "string" ? threadIdParam : undefined;
+    const threadId =
+      typeof threadIdParam === "string" ? threadIdParam : undefined;
 
     if (!threadId) {
-      return res.status(400).json({ success: false, message: "Thread ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Thread ID is required" });
     }
 
     const emailAddresses = await getUserEmails(userId);
 
     if (!emailAddresses.emails.length) {
-      return res.status(400).json({ success: false, message: "No connected email accounts found" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No connected email accounts found" });
     }
 
-    const emailAddress = typeof emailAddressParam === "string" ? emailAddressParam : undefined;
+    const emailAddress =
+      typeof emailAddressParam === "string" ? emailAddressParam : undefined;
 
     const emailToUse =
       emailAddress && emailAddresses.emails.includes(emailAddress)
@@ -1285,23 +1651,34 @@ export const deleteThreadNote = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const emailAddresses = await getUserEmails(userId);
     if (emailAddresses.emails.length === 0) {
-      return res.status(400).json({ success: false, message: "No connected email accounts found" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No connected email accounts found" });
     }
 
     const { threadId } = req.params;
 
-    const deleted = await threadNoteService.deleteNote(emailAddresses.emails[0], threadId as string);
+    const deleted = await threadNoteService.deleteNote(
+      emailAddresses.emails[0],
+      threadId as string,
+    );
 
     if (!deleted) {
-      return res.status(404).json({ success: false, message: "Note not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Note not found" });
     }
 
-    res.status(200).json({ success: true, message: "Note deleted successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Note deleted successfully" });
   },
   "deleteThreadNote",
 );
@@ -1311,12 +1688,16 @@ export const listThreadNotes = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const emailAddresses = await getUserEmails(userId);
     if (emailAddresses.emails.length === 0) {
-      return res.status(400).json({ success: false, message: "No connected email accounts found" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No connected email accounts found" });
     }
 
     const { limit, offset, query } = req.query;
@@ -1352,13 +1733,18 @@ export const getEmailsFromUser = asyncHandler(
     const { size, page } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const { emails: emailAddresses, error } = await getUserEmails(userId);
 
     if (error || emailAddresses.length === 0) {
-      return res.status(403).json({ success: false, message: error || "No connected email accounts" });
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
     }
 
     try {
@@ -1381,7 +1767,10 @@ export const getEmailsFromUser = asyncHandler(
       });
     } catch (error: any) {
       logger.error("Failed to get emails from user:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to get emails from user" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get emails from user",
+      });
     }
   },
   "getEmailsFromUser",
@@ -1393,13 +1782,18 @@ export const getEmailSuggestions = asyncHandler(
     const { query, limit } = req.query;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res
+        .status(401)
+        .json({ success: false, message: "User not authenticated" });
     }
 
     const { emails: emailAddresses, error } = await getUserEmails(userId);
 
     if (error || emailAddresses.length === 0) {
-      return res.status(403).json({ success: false, message: error || "No connected email accounts" });
+      return res.status(403).json({
+        success: false,
+        message: error || "No connected email accounts",
+      });
     }
 
     try {
@@ -1417,7 +1811,10 @@ export const getEmailSuggestions = asyncHandler(
       });
     } catch (error: any) {
       logger.error("Failed to get email suggestions:", error);
-      res.status(500).json({ success: false, message: error.message || "Failed to get email suggestions" });
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get email suggestions",
+      });
     }
   },
   "getEmailSuggestions",
