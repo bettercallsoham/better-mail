@@ -29,7 +29,11 @@ export function createApp() {
 
   app.set("trust proxy", 1);
   const corsOptions = {
-    origin: ["https://staging.abhisharma.app", "https://mail.abhisharma.app"],
+    origin: [
+      "https://staging.abhisharma.app",
+      "https://mail.abhisharma.app",
+      "http://localhost:3000",
+    ],
     credentials: true,
   };
 
