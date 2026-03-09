@@ -271,7 +271,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
     httpOnly: true,
     sameSite: "lax",
     secure: true,
-    domain: ".bettermail.tech",
+    domain: ".abhisharma.app",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
@@ -365,7 +365,7 @@ export const outlookCallback = asyncHandler(async (req, res) => {
     httpOnly: true,
     sameSite: "lax",
     secure: true,
-    domain: ".bettermail.tech",
+    domain: ".abhisharma.app",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
