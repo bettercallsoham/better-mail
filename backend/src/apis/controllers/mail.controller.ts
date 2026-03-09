@@ -126,7 +126,7 @@ export const getThreadEmails = asyncHandler(
 );
 
 // --------------------
-// THREAD METADATA (no body)
+// THREAD METADATA 
 // --------------------
 export const getEmailsByThreadId = asyncHandler(
   async (req: Request, res: Response) => {
@@ -152,7 +152,6 @@ export const getEmailsByThreadId = asyncHandler(
         message: error ?? "No connected email accounts",
       });
     }
-
     const elasticService = new ElasticsearchService(elasticClient);
 
     const { emails: rawEmails, total } =
@@ -161,27 +160,22 @@ export const getEmailsByThreadId = asyncHandler(
         emailAddresses,
       });
 
+
     if (rawEmails.length === 0) {
       return res.json({ success: true, data: { total: 0, emails: [] } });
     }
-    console.log("bodyMap");
+
     const threadGroups = groupByProviderThread(rawEmails);
-    console.log(threadGroups);
 
     const bodyMap = await fetchAllThreadBodies(threadGroups);
 
-    console.log("bodyMap");
-    console.log(bodyMap);
-
-    // Step 3: merge metadata + bodies
     const emails = rawEmails.map((email) => {
       const { embedding, ...metadata } = email;
       const body = bodyMap.get(email.providerMessageId);
 
       return {
         ...metadata,
-        bodyHtml: body?.bodyHtml ?? null,
-        bodyText: body?.bodyText ?? null,
+        bodyHtml: body?.bodyHtml ?? body?.bodyText ?? null,
         bodyFetchFailed:
           !body || (body.bodyHtml === null && body.bodyText === null),
       };
@@ -862,10 +856,61 @@ export const getInboxZero = asyncHandler(
         page: page ? parseInt(page as string) : 0,
       });
 
+    
+      const gmailGroups = new Map<string, string[]>();   
+      const outlookGroups = new Map<string, string[]>(); 
+
+      for (const email of result.emails) {
+        const map = email.provider === "gmail" ? gmailGroups : outlookGroups;
+        if (!map.has(email.emailAddress)) map.set(email.emailAddress, []);
+        map.get(email.emailAddress)!.push(email.providerMessageId);
+      }
+
+      const bodyFetches: Promise<[string, string | null][]>[] = [];
+
+      for (const [addr, ids] of gmailGroups) {
+        bodyFetches.push(
+          new GmailApiService({ email: addr })
+            .fetchMessageBodies(ids)
+            .then((m) =>
+              [...m.entries()].map(
+                ([id, b]) => [id, b.bodyHtml ?? b.bodyText ?? null] as [string, string | null],
+              ),
+            )
+            .catch(() => ids.map((id) => [id, null] as [string, string | null])),
+        );
+      }
+
+      for (const [addr, ids] of outlookGroups) {
+        bodyFetches.push(
+          new OutlookApiService({ email: addr })
+            .fetchMessageBodies(ids)
+            .then((m) =>
+              [...m.entries()].map(
+                ([id, b]) => [id, b.bodyHtml ?? b.bodyText ?? null] as [string, string | null],
+              ),
+            )
+            .catch(() => ids.map((id) => [id, null] as [string, string | null])),
+        );
+      }
+
+      const bodyEntries = (await Promise.all(bodyFetches)).flat();
+      const bodyMap = new Map<string, string | null>(bodyEntries);
+
+      const emails = result.emails.map((email) => {
+        const { embedding, ...metadata } = email as any;
+        const body = bodyMap.get(email.providerMessageId);
+        return {
+          ...metadata,
+          bodyHtml: body ?? null,
+          bodyFetchFailed: body === undefined,
+        };
+      });
+
       res.json({
         success: true,
         total: result.total,
-        emails: result.emails,
+        emails,
         nextPage: result.nextPage,
       });
     } catch (error: any) {
