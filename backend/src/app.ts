@@ -30,9 +30,8 @@ export function createApp() {
   app.set("trust proxy", 1);
   const corsOptions = {
     origin: [
-      "https://app.bettermail.tech",
       "https://bettermail.tech",
-      "www.bettermail.tech",
+      "https://mail.abhisharma.app"
     ],
     credentials: true,
   };

@@ -37,8 +37,6 @@ export interface UnifiedEmailDocument {
 
   // ---- Content ----
   subject: string;
-  bodyText?: string;
-  bodyHtml?: string;
   snippet?: string;
 
   // ---- Attachments ----
@@ -66,7 +64,6 @@ export interface UnifiedEmailDocument {
   snoozeUntil?: string;
 
   // ---- Search / AI ----
-  searchText: string;
   embedding?: number[];
 
   // ---- Provider Raw (debug only) ----

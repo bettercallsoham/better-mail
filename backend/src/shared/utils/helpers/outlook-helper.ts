@@ -36,9 +36,6 @@ export function transformOutlookToUnified(
     bcc: [],
 
     subject: msg.subject || "",
-    snippet: msg.bodyPreview || "",
-    bodyHtml: msg.body?.content || "",
-    searchText: `${msg.subject} ${msg.bodyPreview}`,
 
     hasAttachments: msg.hasAttachments || false,
     attachments: [],
@@ -54,7 +51,6 @@ export function transformOutlookToUnified(
     providerLabels: isDraft ? ["DRAFT"] : [],
   };
 
-  // Set inboxState based on draft status or webhook
   if (isDraft) {
     doc.inboxState = "DRAFT";
     doc.draftData = {
@@ -80,17 +76,6 @@ export async function refreshOutlookAccessToken({
   emailAccountId: string;
   refreshToken: string;
 }) {
-  // const cacheKey = `outlook:access_token:${emailAccountId}`;
-
-  // const cachedToken = await redis.get(cacheKey);
-  // if (cachedToken) {
-  //   return {
-  //     access_token: cachedToken,
-  //     refresh_token: refreshToken,
-  //     source: "cache",
-  //   };
-  // }
-
   const response = await axios.post(
     TOKEN_URL,
     new URLSearchParams({
@@ -105,8 +90,6 @@ export async function refreshOutlookAccessToken({
   );
 
   const { access_token, refresh_token, expires_in } = response.data;
-
-  // await redis.setex(cacheKey, Math.max(expires_in - 60, 60), access_token);
 
   return {
     access_token,

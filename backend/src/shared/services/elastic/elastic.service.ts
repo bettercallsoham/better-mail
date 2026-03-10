@@ -59,28 +59,23 @@ export class ElasticsearchService {
           },
         },
       },
+
       mappings: {
         dynamic: "strict",
         properties: {
-          // --- Identifiers ---
           id: { type: "keyword" },
           emailAddress: { type: "keyword" },
-
-          // UPGRADE 1: Authorization list (handles shared emails/webhooks natively)
           authorizedEmails: { type: "keyword" },
-
           provider: { type: "keyword" },
           providerMessageId: { type: "keyword" },
           providerThreadId: { type: "keyword" },
           threadId: { type: "keyword" },
           isThreadRoot: { type: "boolean" },
 
-          // --- Dates ---
           receivedAt: { type: "date" },
           sentAt: { type: "date" },
           indexedAt: { type: "date" },
 
-          // --- Contacts ---
           from: {
             properties: {
               name: { type: "text" },
@@ -109,28 +104,15 @@ export class ElasticsearchService {
             },
           },
 
-          // --- Content (Optimized with copy_to) ---
           subject: {
             type: "text",
             analyzer: "email_search",
-            copy_to: "searchText",
           },
-          bodyText: {
-            type: "text",
-            analyzer: "email_search",
-            copy_to: "searchText",
-          },
-          bodyHtml: { type: "text", index: false },
           snippet: {
             type: "text",
             analyzer: "email_search",
-            copy_to: "searchText",
           },
 
-          // UPGRADE 2: Centralized BM25 search field
-          searchText: { type: "text", analyzer: "email_search" },
-
-          // --- Attachments ---
           hasAttachments: { type: "boolean" },
           attachments: {
             type: "nested",
@@ -143,7 +125,6 @@ export class ElasticsearchService {
             },
           },
 
-          // --- Metadata & State ---
           isRead: { type: "boolean" },
           isStarred: { type: "boolean" },
           isArchived: { type: "boolean" },
@@ -151,7 +132,6 @@ export class ElasticsearchService {
           labels: { type: "keyword" },
           providerLabels: { type: "keyword" },
 
-          // --- Drafts & Snooze ---
           isDraft: { type: "boolean" },
           draftData: {
             properties: {
@@ -162,14 +142,13 @@ export class ElasticsearchService {
           inboxState: { type: "keyword" },
           snoozeUntil: { type: "date" },
 
-          // UPGRADE 3: High-speed quantized vectors (int8)
           embedding: {
             type: "dense_vector",
             dims: 1536,
             index: true,
             similarity: "cosine",
             index_options: {
-              type: "int8_hnsw", // Use int8 for massive memory savings in 2026
+              type: "int8_hnsw",
             },
           },
         },
@@ -457,6 +436,7 @@ export class ElasticsearchService {
   async searchEmails(params: {
     emailAddresses: string[];
     query: string;
+    queryEmbedding?: number[]; // caller generates this — keeps ES service pure
     size?: number;
     page?: number;
     filters?: {
@@ -471,37 +451,104 @@ export class ElasticsearchService {
       dateTo?: string;
     };
   }) {
-    const { emailAddresses, query, size = 20, page = 0, filters = {} } = params;
-    const trimmed = query.trim();
+    const {
+      emailAddresses,
+      query,
+      queryEmbedding,
+      size = 20,
+      page = 0,
+      filters = {},
+    } = params;
 
-    // ── Email filters ──────────────────────────────────────────────────────────
-    const mustFilters: object[] = [
+    const trimmed = query.trim();
+    const mustFilters = this.buildMustFilters(emailAddresses, filters);
+    const sourceExcludes = ["embedding", "searchText", "bodyHtml", "bodyText"];
+
+    // ── No query — plain filtered list, no scoring needed ─────────────────────
+    if (!trimmed) {
+      return this.plainFilteredSearch({
+        mustFilters,
+        sourceExcludes,
+        size,
+        page,
+      });
+    }
+
+
+    const emailQuery = this.buildHybridEmailQuery({
+      trimmed,
+      queryEmbedding,
+      mustFilters,
+      sourceExcludes,
+      size,
+      page,
+    });
+
+    const { responses } = await this.client.msearch({
+      searches: [
+        // ── [0] Notes search ──────────────────────────────────────────────────
+        { index: this.THREADS_INDEX },
+        {
+          size: 50,
+          _source: ["threadId"],
+          query: {
+            match: {
+              notes: { query: trimmed, operator: "or", fuzziness: "AUTO" },
+            },
+          },
+        },
+
+        // ── [1] Hybrid email search ───────────────────────────────────────────
+        { index: this.EMAILS_INDEX },
+        emailQuery,
+      ],
+    });
+
+    const noteThreadIds = this.extractNoteThreadIds(responses[0]);
+    return this.parseHybridEmailResponse({
+      response: responses[1],
+      noteThreadIds,
+      size,
+      page,
+    });
+  }
+
+  // ─── Private helpers ──────────────────────────────────────────────────────────
+
+  private buildMustFilters(
+    emailAddresses: string[],
+    filters: NonNullable<Parameters<typeof this.searchEmails>[0]["filters"]>,
+  ): object[] {
+    const must: object[] = [
       { terms: { emailAddress: emailAddresses } },
       { term: { isDeleted: false } },
     ];
 
-    if (filters.isRead !== undefined)
-      mustFilters.push({ term: { isRead: filters.isRead } });
+    const termFilter = (field: string, value: unknown) =>
+      must.push({ term: { [field]: value } });
+
+    if (filters.isRead !== undefined) termFilter("isRead", filters.isRead);
     if (filters.isStarred !== undefined)
-      mustFilters.push({ term: { isStarred: filters.isStarred } });
+      termFilter("isStarred", filters.isStarred);
     if (filters.isArchived !== undefined)
-      mustFilters.push({ term: { isArchived: filters.isArchived } });
+      termFilter("isArchived", filters.isArchived);
     if (filters.hasAttachments !== undefined)
-      mustFilters.push({ term: { hasAttachments: filters.hasAttachments } });
-    if (filters.from)
-      mustFilters.push({ term: { "from.email": filters.from.toLowerCase() } });
+      termFilter("hasAttachments", filters.hasAttachments);
+    if (filters.from) termFilter("from.email", filters.from.toLowerCase());
+    if (filters.labels?.length)
+      must.push({ terms: { labels: filters.labels } });
+
     if (filters.to) {
-      mustFilters.push({
+      must.push({
         nested: {
           path: "to",
           query: { term: { "to.email": filters.to.toLowerCase() } },
         },
       });
     }
-    if (filters.labels?.length)
-      mustFilters.push({ terms: { labels: filters.labels } });
+
     if (filters.dateFrom || filters.dateTo) {
-      mustFilters.push({
+      must.push({
         range: {
           receivedAt: {
             ...(filters.dateFrom && { gte: filters.dateFrom }),
@@ -511,158 +558,160 @@ export class ElasticsearchService {
       });
     }
 
-    // ── With query: single msearch — [0] notes, [1] emails ────────────────────
-    if (trimmed) {
-      const { responses } = await this.client.msearch({
-        searches: [
-          // ── [0] Notes probe ── threads index, lightweight ──────────────────
-          // emailAddress filter intentionally omitted: existing notes were saved
-          // before emailAddress was added to the upsert. Once all notes have it
-          // (going forward), restore: filter: [{ terms: { emailAddress: emailAddresses } }]
-          // Security: note threadIds are UUIDs; the email results query still
-          // enforces emailAddress ownership so boosted results stay scoped.
-          { index: this.THREADS_INDEX },
-          {
-            size: 50,
-            _source: ["threadId"],
-            query: {
-              bool: {
-                must: [
-                  {
-                    match: {
-                      notes: {
+    return must;
+  }
+
+  private buildHybridEmailQuery({
+    trimmed,
+    queryEmbedding,
+    mustFilters,
+    sourceExcludes,
+    size,
+    page,
+  }: {
+    trimmed: string;
+    queryEmbedding?: number[];
+    mustFilters: object[];
+    sourceExcludes: string[];
+    size: number;
+    page: number;
+  }): object {
+    const highlight = {
+      fields: {
+        subject: {
+          number_of_fragments: 0,
+          pre_tags: ["<mark>"],
+          post_tags: ["</mark>"],
+        },
+        snippet: {
+          number_of_fragments: 1,
+          fragment_size: 150,
+          pre_tags: ["<mark>"],
+          post_tags: ["</mark>"],
+        },
+      },
+    };
+
+    const lexicalRetriever = {
+      standard: {
+        query: {
+          bool: {
+            must: [
+              {
+                bool: {
+                  should: [
+                    { match_phrase: { subject: { query: trimmed, boost: 4 } } },
+                    {
+                      multi_match: {
                         query: trimmed,
+                        fields: ["subject^3", "snippet^1.5", "from.email"],
+                        type: "best_fields",
                         operator: "or",
                         fuzziness: "AUTO",
+                        boost: 2,
                       },
                     },
-                  },
-                ],
-              },
-            },
-          },
-
-          // ── [1] Email search ── emails index ───────────────────────────────
-          { index: this.EMAILS_INDEX },
-          {
-            size,
-            from: page * size,
-            _source: {
-              excludes: [
-                "bodyText",
-                "bodyHtml",
-                "searchText",
-                "embedding",
-                "attachments",
-              ],
-            },
-            query: {
-              bool: {
-                must: [
-                  {
-                    bool: {
-                      should: [
-                        // Exact phrase on subject — highest priority
-                        {
-                          match_phrase: {
-                            subject: { query: trimmed, boost: 4 },
-                          },
-                        },
-                        // BM25 across all content fields (searchText = subject + bodyText + snippet via copy_to)
-                        {
-                          multi_match: {
-                            query: trimmed,
-                            fields: [
-                              "subject^3",
-                              "searchText^2",
-                              "snippet^1.5",
-                              "from.email",
-                            ],
-                            type: "best_fields" as const,
-                            operator: "or" as const,
-                            fuzziness: "AUTO",
-                            boost: 2,
-                          },
-                        },
-                        // Phrase prefix for partial/autocomplete typing
-                        {
-                          multi_match: {
-                            query: trimmed,
-                            fields: ["subject^2", "searchText"],
-                            type: "phrase_prefix" as const,
-                            boost: 1.5,
-                          },
-                        },
-                      ],
-                      minimum_should_match: 1,
+                    {
+                      multi_match: {
+                        query: trimmed,
+                        fields: ["subject^2", "snippet"],
+                        type: "phrase_prefix",
+                        boost: 1.5,
+                      },
                     },
-                  },
-                ],
-                filter: mustFilters,
+                  ],
+                  minimum_should_match: 1,
+                },
               },
-            },
-            sort: [
-              { _score: { order: "desc" } },
-              { receivedAt: { order: "desc" } },
             ],
-            highlight: {
-              fields: {
-                subject: {
-                  number_of_fragments: 0,
-                  pre_tags: ["<mark>"],
-                  post_tags: ["</mark>"],
-                },
-                snippet: {
-                  number_of_fragments: 1,
-                  fragment_size: 150,
-                  pre_tags: ["<mark>"],
-                  post_tags: ["</mark>"],
-                },
-              },
-            },
+            filter: mustFilters,
           },
-        ],
-      });
+        },
+      },
+    };
 
-      // ── Extract note threadIds from response[0] ────────────────────────────
-      const noteSet = new Set<string>();
-      const notesResp = responses[0];
-      if (notesResp && "hits" in notesResp) {
-        for (const h of notesResp.hits.hits) {
-          const tid = (h._source as { threadId?: string })?.threadId;
-          if (tid) noteSet.add(tid);
-        }
-      }
-
-      // ── Parse + re-rank email hits from response[1] ────────────────────────
-      const emailsResp = responses[1];
-      if (!emailsResp || !("hits" in emailsResp)) {
-        return { emails: [], total: 0, page, nextPage: null };
-      }
-
-      const NOTE_BOOST = 3;
-      const hits = emailsResp.hits.hits;
-
-      // O(n) re-rank on page size only — negligible
-      const ranked = hits
-        .map((hit) => {
-          const src = hit._source as UnifiedEmailDocument;
-          const base = hit._score ?? 0;
-          return {
-            hit,
-            src,
-            score: noteSet.has(src.threadId) ? base + NOTE_BOOST : base,
-          };
-        })
-        .sort((a, b) => b.score - a.score);
-
+    // No embedding available — lexical only, no kNN overhead
+    if (!queryEmbedding) {
       return {
-        emails: ranked.map(({ hit, src, score }) => ({
+        size,
+        from: page * size,
+        _source: { excludes: sourceExcludes },
+        retriever: { standard: lexicalRetriever.standard },
+        highlight,
+      };
+    }
+
+    // Hybrid RRF — k and rank_window_size sized to 2x page, let BBQ manage num_candidates
+    return {
+      size,
+      from: page * size,
+      _source: { excludes: sourceExcludes },
+      retriever: {
+        rrf: {
+          retrievers: [
+            lexicalRetriever,
+            {
+              knn: {
+                field: "embedding",
+                query_vector: queryEmbedding,
+                k: size * 2, // reasonable fusion net
+                filter: mustFilters, // security enforced on kNN path too
+              }, // num_candidates omitted — ES BBQ defaults are optimal
+            },
+          ],
+          rank_window_size: size * 2,
+          rank_constant: 60,
+        },
+      },
+      highlight,
+    };
+  }
+
+  private extractNoteThreadIds(response: unknown): Set<string> {
+    const noteSet = new Set<string>();
+    if (!response || typeof response !== "object" || !("hits" in response))
+      return noteSet;
+
+    for (const h of (response as any).hits.hits) {
+      const tid = (h._source as { threadId?: string })?.threadId;
+      if (tid) noteSet.add(tid);
+    }
+
+    return noteSet;
+  }
+
+  private parseHybridEmailResponse({
+    response,
+    noteThreadIds,
+    size,
+    page,
+  }: {
+    response: unknown;
+    noteThreadIds: Set<string>;
+    size: number;
+    page: number;
+  }) {
+    if (!response || typeof response !== "object" || !("hits" in response)) {
+      return { emails: [], total: 0, page, nextPage: null };
+    }
+
+    const resp = response as any;
+    const hits = resp.hits.hits;
+    const NOTE_BOOST = 3;
+
+    const emails = hits
+      .map((hit: any) => {
+        const src = hit._source as UnifiedEmailDocument;
+        const score =
+          (hit._score ?? 0) +
+          (noteThreadIds.has(src.threadId) ? NOTE_BOOST : 0);
+
+        return {
+          score,
           id: hit._id,
           threadId: src.threadId,
-          score,
-          subject: (hit as any).highlight?.subject?.[0] ?? src.subject,
-          snippet: (hit as any).highlight?.snippet?.[0] ?? src.snippet,
+          subject: hit.highlight?.subject?.[0] ?? src.subject,
+          snippet: hit.highlight?.snippet?.[0] ?? src.snippet,
           receivedAt: src.receivedAt,
           from: src.from,
           to: src.to,
@@ -673,39 +722,47 @@ export class ElasticsearchService {
           labels: src.labels,
           emailAddress: src.emailAddress,
           provider: src.provider,
-        })),
-        total: (emailsResp.hits.total as { value: number }).value,
-        page,
-        nextPage: hits.length === size ? page + 1 : null,
-      };
-    }
+        };
+      })
+      .sort((a: any, b: any) => b.score - a.score);
 
-    // ── No query — plain filtered search, zero notes overhead ─────────────────
+    return {
+      emails,
+      total: (resp.hits.total as { value: number }).value,
+      page,
+      nextPage: hits.length === size ? page + 1 : null,
+    };
+  }
+
+  private async plainFilteredSearch({
+    mustFilters,
+    sourceExcludes,
+    size,
+    page,
+  }: {
+    mustFilters: object[];
+    sourceExcludes: string[];
+    size: number;
+    page: number;
+  }) {
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
       size,
       from: page * size,
-      _source: {
-        excludes: [
-          "bodyText",
-          "bodyHtml",
-          "searchText",
-          "embedding",
-          "attachments",
-        ],
-      },
+      _source: { excludes: sourceExcludes },
       query: { bool: { filter: mustFilters } },
       sort: [{ receivedAt: { order: "desc" } }],
     });
 
     const hits = result.hits.hits;
+
     return {
       emails: hits.map((hit) => {
         const src = hit._source as UnifiedEmailDocument;
         return {
+          score: 0,
           id: hit._id,
           threadId: src.threadId,
-          score: 0,
           subject: src.subject,
           snippet: src.snippet,
           receivedAt: src.receivedAt,
@@ -857,10 +914,12 @@ export class ElasticsearchService {
     emailAddresses: string[];
   }) {
     const { threadId, emailAddresses } = params;
-
     const result = await this.client.search({
       index: this.EMAILS_INDEX,
       size: 100,
+      _source: {
+        excludes: ["embedding", "attachments"],
+      },
       query: {
         bool: {
           filter: [
@@ -986,7 +1045,6 @@ export class ElasticsearchService {
                 ],
               },
             },
-            // Emails without inboxState (legacy, treat as INBOX)
           ],
           minimum_should_match: 1,
         },

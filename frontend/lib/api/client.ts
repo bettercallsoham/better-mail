@@ -3,7 +3,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 type ApiError = {
   message?: string;
 };
-
 export async function apiClient<T>(
   endpoint: string,
   options?: RequestInit,

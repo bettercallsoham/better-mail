@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect, memo } from "react";
+import { useRef, useState, useCallback, useEffect, memo, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface EmailIframeProps {
@@ -17,7 +17,6 @@ export const EmailIframe = memo(function EmailIframe({
   const [ready, setReady] = useState(false);
   const [isDark, setIsDark] = useState(false);
 
-  // Mirror the app's class-based dark mode (same pattern as AnimatedThemeToggler)
   useEffect(() => {
     const update = () =>
       setIsDark(document.documentElement.classList.contains("dark"));
@@ -30,23 +29,22 @@ export const EmailIframe = memo(function EmailIframe({
     return () => observer.disconnect();
   }, []);
 
-  const srcDoc = buildSrcDoc(html, isDark);
+  // ✅ Memoized — iframe only reloads when html or theme actually changes
+  const srcDoc = useMemo(() => buildSrcDoc(html, isDark), [html, isDark]);
 
   const measure = useCallback((iframe: HTMLIFrameElement) => {
     try {
       const body = iframe.contentDocument?.body;
       if (!body) return;
-
       iframe.style.height = "1px";
       const h = body.scrollHeight;
-
       if (h > 0) {
         iframe.style.height = `${h}px`;
         setHeight(h);
         setReady(true);
       }
     } catch {}
-  }, []);
+  }, []); // ✅ stable reference, no deps
 
   const patchLinks = useCallback((iframe: HTMLIFrameElement) => {
     try {
@@ -62,20 +60,18 @@ export const EmailIframe = memo(function EmailIframe({
   const onLoad = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
-
     patchLinks(iframe);
     measure(iframe);
-
-    // re-measure after images load
     iframe.contentDocument?.querySelectorAll("img").forEach((img) => {
       img.addEventListener("load", () => measure(iframe));
     });
   }, [measure, patchLinks]);
 
+  // ✅ Reset only when html changes (new email), NOT on theme change
   useEffect(() => {
     setReady(false);
     setHeight(0);
-  }, [isDark]);
+  }, [html]);
 
   return (
     <div
@@ -148,7 +144,6 @@ function buildSrcDoc(html: string, isDark: boolean): string {
     font-size: 14px;
     line-height: 1.6;
 
-    /* Theme-aware defaults — only apply to emails that don't set their own colors */
     color: ${color};
     background: ${bg};
 
@@ -156,7 +151,6 @@ function buildSrcDoc(html: string, isDark: boolean): string {
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Let email tables behave normally */
   table {
     border-collapse: collapse;
     max-width: 100%;
@@ -166,13 +160,11 @@ function buildSrcDoc(html: string, isDark: boolean): string {
     word-break: break-word;
   }
 
-  /* Only constrain images — do not force full width */
   img {
     max-width: 100%;
     height: auto;
   }
 
-  /* Prevent giant horizontal overflow */
   div, table {
     max-width: 100%;
   }

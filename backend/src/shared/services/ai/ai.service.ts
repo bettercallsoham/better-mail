@@ -7,9 +7,10 @@ import {
 } from "../../config/llm";
 import { logger } from "../../utils/logger";
 import { RAGService } from "./rag.service";
+import { piiService } from "./pii.service";
 
 // ---------------------------------------------------------------------------
-// Zod schemas — single source of truth for structured LLM output shapes
+// Zod schemas
 // ---------------------------------------------------------------------------
 
 export const ThreadSummarySchema = z.object({
@@ -32,7 +33,7 @@ export const ReplySuggestionsSchema = z.object({
 export type ParsedReplySuggestions = z.infer<typeof ReplySuggestionsSchema>;
 
 // ---------------------------------------------------------------------------
-// Summary service (stateless LLM call, no agent needed)
+// Summary service
 // ---------------------------------------------------------------------------
 
 interface SummaryInput {
@@ -45,6 +46,10 @@ export class AISummaryService {
 
   async summarizeThread(input: SummaryInput): Promise<ParsedThreadSummary> {
     const { emailsText, previousSummary } = input;
+
+    // PII-redact the full email text before it reaches the LLM
+    // Names/emails in From:/To: headers are intentional context — only redact body content
+    const sanitizedEmailsText = await piiService.sanitize(emailsText);
 
     const systemPrompt = `You're an assistant that summarizes email threads.
 Provide a comprehensive summary in pure JSON format (no markdown, no code blocks) with these fields:
@@ -63,10 +68,10 @@ Return ONLY the JSON object, nothing else.`;
 ${previousSummary}
 
 New Emails:
-${emailsText}
+${sanitizedEmailsText}
 
 Update the summary. For action items, distinguish between resolved, ongoing, and new ones.`
-      : `Emails:\n${emailsText}\n\nSummarize this email thread.`;
+      : `Emails:\n${sanitizedEmailsText}\n\nSummarize this email thread.`;
 
     const response = await azureClient4o_mini.chat.completions.create({
       model: GPT_4O_MINI_MODEL!,
@@ -87,8 +92,7 @@ Update the summary. For action items, distinguish between resolved, ongoing, and
 }
 
 // ---------------------------------------------------------------------------
-// Reply service — direct RAG fetch + stateless LLM + Zod validation
-// No agent involved: eliminates non-deterministic tool-call behaviour
+// Reply service
 // ---------------------------------------------------------------------------
 
 interface ReplyInput {
@@ -115,7 +119,9 @@ export class AIReplyService {
       threadId,
     } = input;
 
-    // 1. Fetch RAG context directly — same data the unified tool would provide
+    const sanitizedEmailsText = await piiService.sanitize(emailsText);
+
+    // Fetch RAG context
     let ragContext = "";
     try {
       const { context } = await this.ragService.getUnifiedContext(
@@ -130,7 +136,6 @@ export class AIReplyService {
       });
     }
 
-    // 2. Build prompt
     const systemPrompt = `You are an expert email reply assistant for BetterMail.
 You are composing replies ON BEHALF OF: ${userEmailAddress}
 Using the provided thread emails and relevant context, generate exactly 3 reply suggestions in different tones.
@@ -146,7 +151,7 @@ Rules:
 - You are replying as ${userEmailAddress} — never impersonate or address yourself.
 - Address the LAST email in the thread specifically (from: ${lastEmailFrom}, to: ${lastEmailTo}).
 - Keep replies relevant and contextually accurate.
-- Copy user's writing style `;
+- Copy user's writing style`;
 
     const userPrompt = `Subject: ${subject}
 Replying as: ${userEmailAddress}
@@ -156,9 +161,8 @@ Last email from: ${lastEmailFrom} → to: ${lastEmailTo}
 ${ragContext || "No additional context available."}
 
 --- THREAD ---
-${emailsText}`;
+${sanitizedEmailsText}`;
 
-    // 3. Stateless LLM call with forced JSON output
     const response = await azureClient4o_mini.chat.completions.create({
       model: GPT_4O_MINI_MODEL!,
       messages: [
@@ -171,8 +175,6 @@ ${emailsText}`;
     });
 
     const content = response.choices[0]?.message?.content || "{}";
-
-    // 4. Parse + Zod validate — throws ZodError if shape is wrong
     const validated = ReplySuggestionsSchema.parse(JSON.parse(content));
     logger.info("Reply suggestions generated and validated successfully");
     return validated;
@@ -180,7 +182,8 @@ ${emailsText}`;
 }
 
 // ---------------------------------------------------------------------------
-// Email composer / rewriter — pure stateless LLM, no agent, no RAG
+// Email composer / rewriter
+// No PII redaction here — user is composing fresh content intentionally
 // ---------------------------------------------------------------------------
 
 export const SUGGEST_EMAIL_TONES = [
@@ -200,17 +203,12 @@ export type SuggestEmailOutput = z.infer<typeof SuggestEmailOutputSchema>;
 
 interface SuggestEmailInput {
   mode: "compose" | "rewrite" | "refine";
-  /** compose mode: what the email should be about */
   topic?: string;
-  /** rewrite / refine mode: the existing draft HTML to improve */
   draft?: string;
-  /** refine mode: specific instruction to apply to the draft */
   refineInstruction?: string;
   tone?: SuggestEmailTone;
-  /** optional hints for richer output */
   recipientName?: string;
   subjectHint?: string;
-  /** email address of the person sending — used for sign-off name */
   senderEmail?: string;
 }
 
@@ -271,9 +269,7 @@ Requirements:
 - Use a ${tone} tone (${toneDesc})`;
     } else if (mode === "rewrite") {
       userPrompt = `Rewrite the following email draft so it sounds ${tone} (${toneDesc}).${
-        refineInstruction
-          ? `userInstructions = ${refineInstruction}`
-          : ""
+        refineInstruction ? `userInstructions = ${refineInstruction}` : ""
       }
 
 Requirements:
@@ -284,7 +280,6 @@ Requirements:
 Original draft:
 ${draft}`;
     } else {
-      // refine
       userPrompt = `Apply the following instruction to the email draft below. Change only what the instruction targets — preserve everything else exactly.
 
 Instruction: ${refineInstruction}

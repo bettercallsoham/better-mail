@@ -14,10 +14,11 @@ import {
   ThreadService,
   ThreadSummary,
 } from "../../shared/services/elastic/thread.service";
+import { GmailApiService } from "../../shared/services/gmail/gmail-api.service";
+import { OutlookApiService } from "../../shared/services/outlook/outlook-api.service";
 import { logger } from "../../shared/utils/logger";
 import sanitizeHtml from "sanitize-html";
 
-// Initialize services with proper dependency injection
 const elasticService = new ElasticsearchService(elasticClient);
 const threadService = new ThreadService(elasticService);
 const vectorSearchService = new VectorSearchService(elasticClient);
@@ -32,9 +33,48 @@ function stripQuotedReplies(text: string): string {
     .split("\n")
     .filter((line) => !line.startsWith(">"))
     .join("\n")
-    .replace(/On .+wrote:\s*/gs, "") // "On Mon, John wrote:"
-    .replace(/[-_]{3,}/g, "") // horizontal dividers
+    .replace(/On .+wrote:\s*/gs, "")
+    .replace(/[-_]{3,}/g, "")
     .trim();
+}
+
+/**
+ * Fetch plain text body for a single email from its provider.
+ * HTML stripped, quoted replies removed.
+ * Falls back to empty string on failure — caller uses snippet instead.
+ */
+async function fetchBodyText(email: {
+  provider: string;
+  emailAddress: string;
+  providerMessageId: string;
+}): Promise<string> {
+  try {
+    let bodyHtml: string | null = null;
+    let bodyText: string | null = null;
+
+    if (email.provider === "gmail") {
+      const svc = new GmailApiService({ email: email.emailAddress });
+      const body = await svc.fetchMessageBody(email.providerMessageId);
+      bodyHtml = body.bodyHtml;
+      bodyText = body.bodyText;
+    } else {
+      const svc = new OutlookApiService({ email: email.emailAddress });
+      const body = await svc.fetchMessageBody(email.providerMessageId);
+      bodyHtml = body.bodyHtml;
+      bodyText = body.bodyText;
+    }
+
+    const raw = bodyHtml
+      ? sanitizeHtml(bodyHtml, { allowedTags: [], allowedAttributes: {} })
+      : bodyText ?? "";
+
+    return stripQuotedReplies(raw);
+  } catch (err) {
+    logger.warn(
+      `Failed to fetch body for ${email.providerMessageId}: ${err}`,
+    );
+    return "";
+  }
 }
 
 /**
@@ -49,36 +89,24 @@ export const summarizeThread = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated",
-      });
+      return res.status(401).json({ success: false, message: "User not authenticated" });
     }
 
     if (!emailAddress) {
-      return res.status(400).json({
-        success: false,
-        message: "emailAddress is required in request body",
-      });
+      return res.status(400).json({ success: false, message: "emailAddress is required in request body" });
     }
 
     try {
       logger.info(`Summarizing thread ${threadId} for user ${userId}`);
 
-      // 1. Fetch emails and existing summary in parallel
+      // Metadata from ES + existing summary in parallel — no body in ES
       const [{ emails }, existingSummary] = await Promise.all([
-        elasticService.getEmailsByThreadId({
-          threadId,
-          emailAddresses: [emailAddress],
-        }),
+        elasticService.getEmailsByThreadId({ threadId, emailAddresses: [emailAddress] }),
         threadService.getThreadSummary(threadId, emailAddress),
       ]);
 
       if (emails.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "Thread not found or empty",
-        });
+        return res.status(404).json({ success: false, message: "Thread not found or empty" });
       }
 
       const latestEmailDate = emails[emails.length - 1].receivedAt;
@@ -87,31 +115,31 @@ export const summarizeThread = asyncHandler(
         latestEmailDate,
       );
 
-      // Return cached summary if valid and not forcing refresh
+      // Return cached summary if still valid
       if (existingSummary && !needsUpdate && !forceRefresh) {
-        return res.json({
-          success: true,
-          cached: true,
-          summary: existingSummary.summary,
-        });
+        return res.json({ success: true, cached: true, summary: existingSummary.summary });
       }
 
-      // 3. Format emails for AI
+      // Fetch bodies live from provider in parallel — nothing stored
+      const bodiesMap = new Map<string, string>();
+      await Promise.all(
+        emails.map(async (email) => {
+          const body = await fetchBodyText({
+            provider: email.provider,
+            emailAddress: email.emailAddress,
+            providerMessageId: email.providerMessageId,
+          });
+          bodiesMap.set(email.providerMessageId, body);
+        }),
+      );
+
       const emailsText = emails
         .map((email, i) => {
-          // Skip sanitization for plain text, only sanitize HTML
-          const body = email.bodyHtml
-            ? sanitizeHtml(email.bodyHtml, {
-                allowedTags: [],
-                allowedAttributes: {},
-              })
-            : email.bodyText || "";
-
-          const cleanedBody = stripQuotedReplies(body);
+          const body = bodiesMap.get(email.providerMessageId) || email.snippet || "";
           const truncatedBody =
-            cleanedBody.length > 1000
-              ? cleanedBody.substring(0, 800) + "\n[...truncated...]"
-              : cleanedBody;
+            body.length > 1000
+              ? body.substring(0, 800) + "\n[...truncated...]"
+              : body;
 
           return `Email ${i + 1}:
 From: ${email.from.name || email.from.email}
@@ -126,7 +154,6 @@ ${truncatedBody}
         })
         .join("\n\n");
 
-      // 4. Call AI service — returns Zod-validated ParsedThreadSummary
       const summaryData = await aiService.summarizeThread({
         emailsText,
         previousSummary: existingSummary?.summary.text,
@@ -147,11 +174,7 @@ ${truncatedBody}
         summarizedUpToDate: latestEmailDate,
       });
 
-      res.json({
-        success: true,
-        cached: false,
-        summary,
-      });
+      res.json({ success: true, cached: false, summary });
 
       logger.info(`Thread ${threadId} summarized successfully`);
     } catch (error: any) {
@@ -165,7 +188,7 @@ ${truncatedBody}
 /**
  * Suggest AI replies for an email thread
  * POST /api/ai/threads/:threadId/suggest-reply
- * Body: { emailAddress: string, tone?: string }
+ * Body: { emailAddress: string }
  */
 export const suggestReply = asyncHandler(
   async (req: Request, res: Response) => {
@@ -174,28 +197,34 @@ export const suggestReply = asyncHandler(
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated",
-      });
+      return res.status(401).json({ success: false, message: "User not authenticated" });
     }
 
     try {
-      logger.info(
-        `Generating reply suggestions for thread ${threadId}, user ${userId}`,
-      );
+      logger.info(`Generating reply suggestions for thread ${threadId}, user ${userId}`);
 
+      // Metadata from ES — no body
       const { emails } = await elasticService.getEmailsByThreadId({
         threadId,
         emailAddresses: [emailAddress],
       });
 
       if (emails.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "Thread not found or empty",
-        });
+        return res.status(404).json({ success: false, message: "Thread not found or empty" });
       }
+
+      // Fetch bodies live from provider in parallel — nothing stored
+      const bodiesMap = new Map<string, string>();
+      await Promise.all(
+        emails.map(async (email) => {
+          const body = await fetchBodyText({
+            provider: email.provider,
+            emailAddress: email.emailAddress,
+            providerMessageId: email.providerMessageId,
+          });
+          bodiesMap.set(email.providerMessageId, body);
+        }),
+      );
 
       const lastEmail = emails[emails.length - 1];
       const subject = lastEmail.subject || "(no subject)";
@@ -208,18 +237,11 @@ export const suggestReply = asyncHandler(
 
       const emailsText = emails
         .map((email, i) => {
-          const body = email.bodyHtml
-            ? sanitizeHtml(email.bodyHtml, {
-                allowedTags: [],
-                allowedAttributes: {},
-              })
-            : email.bodyText || "";
-
-          const cleanedBody = stripQuotedReplies(body);
+          const body = bodiesMap.get(email.providerMessageId) || email.snippet || "";
           const truncatedBody =
-            cleanedBody.length > 1000
-              ? cleanedBody.substring(0, 800) + "\n[...truncated...]"
-              : cleanedBody;
+            body.length > 1000
+              ? body.substring(0, 800) + "\n[...truncated...]"
+              : body;
 
           return `Email ${i + 1}:
 From: ${email.from.name || email.from.email}
@@ -233,7 +255,6 @@ ${truncatedBody}
         })
         .join("\n\n");
 
-      // suggestReplies returns Zod-validated ParsedReplySuggestions
       const { suggestions } = await aiReplyService.suggestReplies({
         emailsText,
         subject,
@@ -244,10 +265,7 @@ ${truncatedBody}
         threadId,
       });
 
-      return res.json({
-        success: true,
-        suggestions,
-      });
+      return res.json({ success: true, suggestions });
     } catch (error: any) {
       logger.error("Reply suggestion error:", { error: error.message });
       throw error;
@@ -259,17 +277,13 @@ ${truncatedBody}
 /**
  * Compose a new email or rewrite an existing draft
  * POST /api/ai/suggest-email
- * Body: { mode, topic?, draft?, tone?, recipientName?, subjectHint? }
  */
 export const suggestEmail = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated",
-      });
+      return res.status(401).json({ success: false, message: "User not authenticated" });
     }
 
     const {
@@ -297,10 +311,7 @@ export const suggestEmail = asyncHandler(
         senderEmail,
       });
 
-      return res.json({
-        success: true,
-        ...result,
-      });
+      return res.json({ success: true, ...result });
     } catch (error: any) {
       logger.error("Suggest email error:", { error: error.message });
       throw error;

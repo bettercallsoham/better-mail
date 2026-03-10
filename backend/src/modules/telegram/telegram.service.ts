@@ -3,13 +3,13 @@ import { redis } from "../../shared/config/redis";
 import { logger } from "../../shared/utils/logger";
 import { elasticClient } from "../../shared/config/elastic";
 import { ElasticsearchService } from "../../shared/services/elastic/elastic.service";
+import { GmailApiService } from "../../shared/services/gmail/gmail-api.service";
+import { OutlookApiService } from "../../shared/services/outlook/outlook-api.service";
 import { getUserEmails } from "../../apis/utils/email-helper";
 import { Context } from "grammy";
 import crypto from "crypto";
-import {
-  UnifiedEmailDocument,
-  SavedSearchFilters,
-} from "../../shared/services/elastic/interface";
+import { SavedSearchFilters } from "../../shared/services/elastic/interface";
+import sanitizeHtml from "sanitize-html";
 
 interface UIEmailItem {
   id: string;
@@ -17,12 +17,11 @@ interface UIEmailItem {
   from: string;
   snippet: string;
   date: string;
-  content: string; // This now holds the full body
 }
 
 export class TelegramService {
   private readonly CACHE_TTL: number = 7200;
-  private readonly MAX_TG_LENGTH: number = 3800; // Safe margin for HTML parsing
+  private readonly MAX_TG_LENGTH: number = 3800;
   private elasticService: ElasticsearchService = new ElasticsearchService(
     elasticClient,
   );
@@ -46,11 +45,7 @@ export class TelegramService {
     try {
       const today = new Date().toISOString().split("T")[0];
       const emails = await this.executeEmailSearch(userId, { dateFrom: today });
-      await this.renderEmailGrid(
-        ctx,
-        emails,
-        "🗓️ <b>Today's Inbox Activity</b>",
-      );
+      await this.renderEmailGrid(ctx, emails, "🗓️ <b>Today's Inbox Activity</b>");
     } catch (error) {
       this.logAndReplyError(ctx, "Summary", error);
     }
@@ -67,12 +62,7 @@ export class TelegramService {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [
-            {
-              text: "🔗 Manage Accounts",
-              url: "https://bettermail.tech/",
-            },
-          ],
+          [{ text: "🔗 Manage Accounts", url: "https://bettermail.tech/" }],
         ],
       },
     });
@@ -94,7 +84,7 @@ export class TelegramService {
     });
 
     return Promise.all(
-      result.emails.map(async (e:any) => {
+      result.emails.map(async (e: any) => {
         const shortId = crypto.randomBytes(4).toString("hex");
         await redis.set(`tg:btn:${shortId}`, e.threadId, "EX", 7200);
 
@@ -102,8 +92,8 @@ export class TelegramService {
           id: shortId,
           subject: this.escapeHtml(e.subject || "(No Subject)"),
           from: this.escapeHtml(e.from?.name || e.from?.email || "Unknown"),
+          // Snippet is always available from ES — no body fetch needed for the list view
           snippet: this.escapeHtml(e.snippet || ""),
-          content: e.bodyText || e.bodyHtml || e.snippet || "No content", // Full body captured here
           date: new Date(e.receivedAt).toLocaleDateString(),
         };
       }),
@@ -165,7 +155,40 @@ export class TelegramService {
         threadId,
         emailAddresses: addrs || [],
       });
+
       if (!emails?.length) return void ctx.reply("❌ Thread not accessible.");
+
+      // Fetch bodies live from provider in parallel — nothing stored
+      const bodiesMap = new Map<string, string>();
+      await Promise.all(
+        emails.map(async (e) => {
+          try {
+            let bodyHtml: string | null = null;
+            let bodyText: string | null = null;
+
+            if (e.provider === "gmail") {
+              const svc = new GmailApiService({ email: e.emailAddress });
+              const body = await svc.fetchMessageBody(e.providerMessageId);
+              bodyHtml = body.bodyHtml;
+              bodyText = body.bodyText;
+            } else {
+              const svc = new OutlookApiService({ email: e.emailAddress });
+              const body = await svc.fetchMessageBody(e.providerMessageId);
+              bodyHtml = body.bodyHtml;
+              bodyText = body.bodyText;
+            }
+
+            const plain = bodyHtml
+              ? sanitizeHtml(bodyHtml, { allowedTags: [], allowedAttributes: {} })
+              : bodyText ?? "";
+
+            bodiesMap.set(e.providerMessageId, plain);
+          } catch {
+            // Fall back to snippet if provider fetch fails
+            bodiesMap.set(e.providerMessageId, e.snippet ?? "");
+          }
+        }),
+      );
 
       const subject = this.escapeHtml(emails[0].subject || "(No Subject)");
       const header = `🧵 <b>THREAD: ${subject}</b>\n📂 <code>${threadId}</code>\n\n`;
@@ -182,7 +205,7 @@ export class TelegramService {
           const from = this.escapeHtml(e.from.name || e.from.email);
           const date = new Date(e.receivedAt).toLocaleString();
           const body = this.escapeHtml(
-            e.bodyText || e.snippet || "No content.",
+            bodiesMap.get(e.providerMessageId) || e.snippet || "No content.",
           );
 
           const emailHeader = `👤 <b>From:</b> ${from}\n📅 <b>Date:</b> ${date}\n\n`;
@@ -198,7 +221,7 @@ export class TelegramService {
           } else {
             if (fullEmailBlock.length > this.MAX_TG_LENGTH) {
               if (currentChunk) allChunks.push(currentChunk);
-              let massiveBody = emailHeader + body;
+              const massiveBody = emailHeader + body;
               const subParts =
                 massiveBody.match(
                   new RegExp(`.{1,${this.MAX_TG_LENGTH}}`, "gs"),

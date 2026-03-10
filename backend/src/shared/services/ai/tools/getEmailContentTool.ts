@@ -2,7 +2,10 @@ import { tool } from "langchain";
 import { z } from "zod";
 import { elasticClient } from "../../../config/elastic";
 import { gpt4oMiniLLM } from "../../../config/llm";
+import { GmailApiService } from "../../gmail/gmail-api.service";
+import { OutlookApiService } from "../../outlook/outlook-api.service";
 import { UnifiedEmailDocument } from "../../elastic/interface";
+import sanitizeHtml from "sanitize-html";
 
 const BODY_CHAR_LIMIT = 3000;
 
@@ -26,6 +29,36 @@ async function summarizeOverflow(overflow: string): Promise<string> {
     : String(response.content);
 }
 
+async function fetchBodyText(
+  provider: string,
+  emailAddress: string,
+  providerMessageId: string,
+): Promise<string> {
+  try {
+    let bodyHtml: string | null = null;
+    let bodyText: string | null = null;
+
+    if (provider === "gmail") {
+      const svc = new GmailApiService({ email: emailAddress });
+      const body = await svc.fetchMessageBody(providerMessageId);
+      bodyHtml = body.bodyHtml;
+      bodyText = body.bodyText;
+    } else {
+      const svc = new OutlookApiService({ email: emailAddress });
+      const body = await svc.fetchMessageBody(providerMessageId);
+      bodyHtml = body.bodyHtml;
+      bodyText = body.bodyText;
+    }
+
+    if (bodyHtml) {
+      return sanitizeHtml(bodyHtml, { allowedTags: [], allowedAttributes: {} });
+    }
+    return bodyText ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export const getEmailContentTool = tool(
   async (input, config) => {
     const userId = config.configurable?.userId;
@@ -34,11 +67,13 @@ export const getEmailContentTool = tool(
     }
 
     try {
+      // 1. Fetch metadata from ES — no body stored there
       const mgetResponse = await elasticClient.mget<UnifiedEmailDocument>({
         index: "emails_v1",
         ids: input.emailIds,
       });
 
+      // 2. Fetch bodies live from provider in parallel
       const results = await Promise.all(
         mgetResponse.docs.map(async (doc: any) => {
           if (!doc.found) {
@@ -46,7 +81,15 @@ export const getEmailContentTool = tool(
           }
 
           const src: UnifiedEmailDocument = doc._source;
-          const fullBody = src.bodyText || src.snippet || "";
+
+          // Fetch body live — falls back to snippet if provider call fails
+          const rawBody = await fetchBodyText(
+            src.provider,
+            src.emailAddress,
+            src.providerMessageId,
+          );
+
+          const fullBody = rawBody || src.snippet || "";
           const bodyText = fullBody.slice(0, BODY_CHAR_LIMIT);
           const overflow =
             fullBody.length > BODY_CHAR_LIMIT

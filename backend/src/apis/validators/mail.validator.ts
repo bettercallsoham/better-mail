@@ -724,3 +724,35 @@ export const validateGetEmailSuggestions = [
 
   handleValidationErrors,
 ];
+
+
+export const validateBatchBodies = [
+  body("emailAddress")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("emailAddress must be a valid email address"),
+
+  body("threadId")
+    .optional()
+    .isString()
+    .notEmpty()
+    .withMessage("threadId must be a non-empty string"),
+
+  body("messageIds")
+    .optional()
+    .isArray({ min: 1, max: 20 })
+    .withMessage("messageIds must be an array of 1–20 strings"),
+
+  body("messageIds.*")
+    .optional()
+    .isString()
+    .notEmpty()
+    .withMessage("Each messageId must be a non-empty string"),
+
+  body().custom((value) => {
+    if (!value.threadId && !value.messageIds) {
+      throw new Error("Either threadId or messageIds is required");
+    }
+    return true;
+  }),
+];

@@ -61,7 +61,7 @@ export async function getUserEmails(
   const emails = userAccounts.map((acc) => acc.email.toLowerCase());
 
   if (!specificEmail) {
-    redis
+    await redis
       .setex(cacheKey, USER_EMAILS_CACHE_TTL, JSON.stringify(emails))
       .catch((err) => {
         logger.warn("Failed to cache user emails:", err);
@@ -75,26 +75,22 @@ export async function getUserEmails(
   return { emails };
 }
 
-
 export async function invalidateUserEmailsCache(userId: string): Promise<void> {
   try {
     await redis.del(`user:${userId}:emails`);
   } catch (err) {
-    logger.warn("Failed to invalidate email cache:"+ err);
+    logger.warn("Failed to invalidate email cache:" + err);
   }
 }
 
-
-const EMAIL_USERS_CACHE_TTL = 3600; 
+const EMAIL_USERS_CACHE_TTL = 3600;
 
 /**
  * Get all user IDs that own a specific email (with Redis caching)
  * @param email - Email address
  * @returns Array of user IDs
  */
-export async function getUserIdsByEmail(
-  email: string,
-): Promise<string[]> {
+export async function getUserIdsByEmail(email: string): Promise<string[]> {
   const normalized = email.toLowerCase();
   const cacheKey = `email:${normalized}:users`;
 
@@ -116,11 +112,9 @@ export async function getUserIdsByEmail(
     return [];
   }
 
-  const userIds = [
-    ...new Set(accounts.map((acc) => acc.user_id)),
-  ];
+  const userIds = [...new Set(accounts.map((acc) => acc.user_id))];
 
-  redis
+  await redis
     .setex(cacheKey, EMAIL_USERS_CACHE_TTL, JSON.stringify(userIds))
     .catch((err) => {
       logger.warn("Failed to cache email→users:", err);
@@ -128,4 +122,3 @@ export async function getUserIdsByEmail(
 
   return userIds;
 }
-
