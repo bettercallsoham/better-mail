@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "BetterMail's Privacy Policy explains what data we collect, how we use it, and how we protect your information.",
 };
 
-const LAST_UPDATED = "March 6, 2025";
+const LAST_UPDATED = "March 10, 2026";
 const CONTACT_EMAIL = "admin@bettermail.tech";
 const SITE_URL = "https://bettermail.tech";
 
@@ -129,32 +129,46 @@ export default function PrivacyPolicyPage() {
           handled entirely by Google or Microsoft.
         </P>
 
-        <H3>1.2 Email Data</H3>
+        <H3>1.2 Email Data Processing</H3>
         <P>
-          To provide core email client functionality, BetterMail accesses your
-          email messages and mailbox metadata via the Google Gmail API and
-          Microsoft Graph API. Specifically:
+          To provide BetterMail&apos;s features, the application temporarily
+          processes email message content retrieved via the Google Gmail API or
+          Microsoft Graph API.
+        </P>
+        <P>
+          <strong>
+            BetterMail does not permanently store raw email message bodies or
+            attachments on its servers.
+          </strong>
+        </P>
+        <P>
+          Instead, BetterMail generates <strong>derived representations</strong>{" "}
+          of email content used to power features such as semantic search and AI
+          assistance. These derived representations include:
         </P>
         <UL>
-          <li>Email subjects, senders, recipients, timestamps, and labels</li>
           <li>
-            Email body content (plain text and HTML) — used to display emails in
-            the app and to power AI features such as search and summarisation
+            <strong>PII-redacted summaries</strong> — concise descriptions of
+            email content with personally identifiable information removed
           </li>
           <li>
-            Thread and conversation structure — used to group related emails
+            <strong>PII-redacted vector embeddings</strong> — mathematical
+            representations of email meaning, generated after PII redaction
           </li>
           <li>
-            Attachment metadata (filename, MIME type, size) — attachment content
-            is not stored on our servers
+            <strong>Non-sensitive metadata</strong> — such as message
+            timestamps, labels, sender/recipient domains, and thread structure
           </li>
-          <li>Mailbox folder and label structure</li>
         </UL>
         <P>
-          Email content is indexed in an encrypted search index solely to power
-          in-app search, AI summarisation, and the AI assistant feature. We do
-          not process email content for advertising purposes, and we do not sell
-          email data to third parties.
+          These derived representations <strong>cannot be used to reconstruct
+          the original email message</strong>. Email content may be processed
+          transiently in memory during feature execution but is not retained in
+          its original form.
+        </P>
+        <P>
+          We do not process email content for advertising purposes and we do not
+          sell email data to third parties.
         </P>
 
         <H3>1.3 Usage Data</H3>
@@ -183,8 +197,8 @@ export default function PrivacyPolicyPage() {
           <li>
             <strong>Power AI features</strong> — AI-based search, email
             summarisation, smart compose suggestions, and the conversational AI
-            assistant, which analyses email content to answer your questions
-            about your inbox
+            assistant, which analyses derived email representations to answer
+            your questions about your inbox
           </li>
           <li>
             <strong>Authenticate you</strong> — verifying your identity on each
@@ -215,20 +229,23 @@ export default function PrivacyPolicyPage() {
 
         <H3>3.1 AI Service Providers</H3>
         <P>
-          To power AI features, we may transmit relevant excerpts of your email
-          content to a third-party large language model (LLM) API provider.
-          These providers act as data processors under our instruction. They are
-          contractually prohibited from using your data to train their own
-          models, retaining your data after the request is complete, or sharing
-          your data with third parties.
+          When AI features are used, relevant portions of email content may be
+          temporarily processed by an AI service provider to generate summaries
+          or responses. These providers act strictly as data processors under
+          our instruction and are contractually prohibited from:
         </P>
+        <UL>
+          <li>Retaining email content after the request is complete</li>
+          <li>Training machine learning models on your data</li>
+          <li>Sharing your data with third parties</li>
+        </UL>
 
         <H3>3.2 Infrastructure Providers</H3>
         <P>
-          We use trusted cloud infrastructure providers for databases, search
-          indexing, and caching. All data is encrypted in transit (TLS 1.2+) and
-          at rest. These providers are used solely to store and process data on
-          our behalf.
+          We use trusted cloud infrastructure providers for databases, vector
+          storage, and caching. All data is encrypted in transit (TLS 1.2+) and
+          at rest. These providers are used solely to store and process derived
+          representations on our behalf.
         </P>
 
         <H3>3.3 Legal Requirements</H3>
@@ -249,8 +266,12 @@ export default function PrivacyPolicyPage() {
         <H2>4. Data Retention</H2>
         <UL>
           <li>
-            <strong>Email index data</strong> — retained while your account is
-            active; deleted within 30 days of account deletion
+            <strong>Raw email message bodies and attachments</strong> — not
+            stored on BetterMail servers and therefore not retained
+          </li>
+          <li>
+            <strong>Derived embeddings and summaries</strong> — retained while
+            your account is active; deleted within 30 days of account deletion
           </li>
           <li>
             <strong>OAuth tokens</strong> — stored encrypted; revoked and
@@ -286,8 +307,8 @@ export default function PrivacyPolicyPage() {
         <H3>Google</H3>
         <UL>
           <li>
-            <Code>https://mail.google.com/</Code> — read, compose, send, and
-            permanently delete messages; manage labels and drafts
+            <Code>https://www.googleapis.com/auth/gmail.modify</Code> — read,
+            compose, send, and manage messages; manage labels and drafts
           </li>
           <li>
             <Code>openid</Code>, <Code>email</Code>, <Code>profile</Code> —
@@ -340,7 +361,7 @@ export default function PrivacyPolicyPage() {
         <H2>6. Security</H2>
         <UL>
           <li>TLS 1.2+ encryption for all data in transit</li>
-          <li>AES-256 encryption for OAuth tokens at rest</li>
+          <li>AES-256 encryption for OAuth tokens and stored embeddings at rest</li>
           <li>
             Role-based access controls limiting who on our team can access
             production systems
@@ -423,6 +444,37 @@ export default function PrivacyPolicyPage() {
             >
               {SITE_URL}
             </a>
+          </li>
+        </UL>
+
+        <H2>11. Google API Data Usage Compliance</H2>
+        <P>
+          BetterMail&apos;s use of information received from Google APIs adheres
+          to the{" "}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-600 dark:text-blue-400 underline underline-offset-2"
+          >
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements. Specifically, BetterMail
+          does not:
+        </P>
+        <UL>
+          <li>Use Gmail data for advertising purposes</li>
+          <li>
+            Allow humans to read email content unless required for security
+            investigation, legal compliance, or at the user&apos;s explicit
+            request
+          </li>
+          <li>
+            Transfer Gmail data to third parties except as necessary to provide
+            the Service to the user
+          </li>
+          <li>
+            Use Gmail data to develop, train, or improve machine learning models
           </li>
         </UL>
 

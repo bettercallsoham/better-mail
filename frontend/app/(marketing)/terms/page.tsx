@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "Read BetterMail's Terms of Service to understand the rules and guidelines for using our email productivity application.",
 };
 
-const LAST_UPDATED = "March 6, 2025";
+const LAST_UPDATED = "March 10, 2026";
 const CONTACT_EMAIL = "admin@bettermail.tech";
 const SITE_URL = "https://bettermail.tech";
 
@@ -171,13 +171,22 @@ export default function TermsPage() {
         <P>
           You retain full ownership of your email data. BetterMail does not
           claim any ownership rights over your email content. You grant us a
-          limited, non-exclusive licence to access, process, and store your
-          email data solely for the purpose of providing the Service to you.
+          limited, non-exclusive licence to access and process your email data
+          as necessary to provide the Service.{" "}
+          <strong>
+            BetterMail does not permanently store raw email message bodies or
+            attachments.
+          </strong>{" "}
+          We store only PII-redacted derived representations (such as summaries
+          and vector embeddings) that cannot be used to reconstruct the original
+          email content.
         </P>
         <P>
           By using the AI features, you acknowledge that relevant portions of
-          your email content may be transmitted to an AI service provider to
-          generate responses. Please refer to our{" "}
+          your email content may be temporarily processed by an AI service
+          provider to generate responses. These providers are contractually
+          prohibited from retaining your data or training models on it. Please
+          refer to our{" "}
           <Link
             href="/privacy-policy"
             className="text-blue-600 dark:text-blue-400 underline underline-offset-2"
