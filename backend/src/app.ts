@@ -30,9 +30,8 @@ export function createApp() {
   app.set("trust proxy", 1);
   const corsOptions = {
     origin: [
-      "https://staging.abhisharma.app",
-      "https://mail.abhisharma.app",
-      "http://localhost:3000",
+      "https://bettermail.tech",
+      "https://mail.abhisharma.app"
     ],
     credentials: true,
   };
@@ -61,7 +60,7 @@ export function createApp() {
 
   app.use(
     "/admin/queues",
-    // allowOnlyMyIP,
+    allowOnlyMyIP,
     bullBoardEnvCheck,
     bullBoardAuth,
     serverAdapter.getRouter(),

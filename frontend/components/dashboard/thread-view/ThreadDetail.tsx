@@ -28,6 +28,7 @@ import { useUIStore } from "@/lib/store/ui.store";
 import {
   useThreadDetail,
   useEmailAction,
+  mailboxKeys,
 } from "@/features/mailbox/mailbox.query";
 import type { FullEmail } from "@/features/mailbox/mailbox.type";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ import { PanelShell } from "@/components/composer/shells/PanelShell";
 import { useComposer } from "@/components/composer/hooks/useComposer";
 import { SmartReplies } from "@/components/composer/SmartReplies";
 import { QuickReply } from "./components/QuickReply";
+import { useQueryClient } from "@tanstack/react-query";
 
 // ─── Thread detail content ─────────────────────────────────────────────────────
 function ThreadDetailContent({ threadId }: { threadId: string }) {
@@ -452,12 +454,17 @@ function ThreadDetailEmpty({ className }: { className?: string }) {
 
 export function ThreadDetail({ className }: { className?: string }) {
   const activeThreadId = useUIStore((s) => s.activeThreadId);
+  const queryClient = useQueryClient();
+
   if (!activeThreadId) return <ThreadDetailEmpty className={className} />;
+
+  const isCached = !!queryClient.getQueryData(
+    mailboxKeys.thread(activeThreadId)
+  );
+
   return (
-    <div
-      className={cn("relative flex flex-col h-full overflow-hidden", className)}
-    >
-      <Suspense fallback={<ThreadDetailSkeleton />}>
+    <div className={cn("relative flex flex-col h-full overflow-hidden", className)}>
+      <Suspense fallback={isCached ? null : <ThreadDetailSkeleton />}>
         <ThreadDetailContent threadId={activeThreadId} />
       </Suspense>
     </div>

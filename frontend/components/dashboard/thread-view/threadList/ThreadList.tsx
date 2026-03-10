@@ -7,6 +7,7 @@ import {
   useLayoutEffect,
   useRef,
   memo,
+  useTransition,
 } from "react";
 import { useUIStore } from "@/lib/store/ui.store";
 import {
@@ -98,6 +99,7 @@ function SearchResultsList({
 }) {
   const setActiveThread = useUIStore((s) => s.setActiveThread);
   const activeThreadId = useUIStore((s) => s.activeThreadId);
+  const [, startTransition] = useTransition(); // ← added
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useSearchEmails({
@@ -146,7 +148,9 @@ function SearchResultsList({
           key={e.id}
           email={e}
           isActive={e.threadId === activeThreadId}
-          onSelect={() => setActiveThread(e.threadId)}
+          onSelect={
+            () => startTransition(() => setActiveThread(e.threadId)) // ← wrapped
+          }
         />
       ))}
       <div ref={sentinelRef} className="h-4" />
@@ -246,13 +250,10 @@ const ThreadRowWithActions = memo(function ThreadRowWithActions({
 }) {
   const actions = useThreadActions(thread);
 
-  // Keep ref current so the list-level keyboard handler always has
-  // fresh callbacks without re-registering the listener
   useLayoutEffect(() => {
     if (isFocused) focusedActionsRef.current = actions;
   });
 
-  // Auto-mark as read when a thread is opened
   const handleSelect = useCallback(() => {
     onSelect();
     if (thread.isUnread) {
@@ -284,6 +285,8 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
   const activeFolder = useUIStore((s) => s.activeFolder);
   const setPendingDraftId = useUIStore((s) => s.setPendingDraftId);
 
+  const [, startTransition] = useTransition(); // ← added
+
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useThreadEmails(emailAddress, activeFolder);
 
@@ -299,7 +302,6 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
 
   useThreadNavigation(data.threadIds, focusedActionsRef);
 
-  // ── Single S/U/E handler — reads ref at call time, never stale ───────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -310,13 +312,11 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
       )
         return;
 
-      // Don't fire while a compose dialog is open
       if (
         useComposerStore.getState().instances.some((i) => i.shell === "dialog")
       )
         return;
 
-      // Yield to ThreadDetail when a thread is open — it owns s/e/u in that context
       if (useUIStore.getState().activeThreadId) return;
 
       const actions = focusedActionsRef.current;
@@ -364,7 +364,6 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
     >
       {groups.map(({ label, items }) => (
         <div key={label}>
-          {/* Fixed sticky header — matches body bg, no jarring banding */}
           <div className="sticky top-0 z-10 px-4 py-1.5 bg-white/90 dark:bg-[#18181b]/90 backdrop-blur-sm border-b border-black/[0.04] dark:border-white/[0.04]">
             <span className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-white/22 select-none">
               {label}
@@ -383,7 +382,13 @@ function ThreadListContent({ email: emailAddress }: { email?: string }) {
                 if (thread.isDraft) {
                   setPendingDraftId(thread.lastEmailId);
                 } else {
-                  setActiveThread(thread.threadId);
+                  const currentIdx = data.threadIds.indexOf(thread.threadId);
+                  [1, 2].forEach((offset) => {
+                    const nextId = data.threadIds[currentIdx + offset];
+                    if (nextId) prefetchThread(nextId);
+                  });
+
+                  startTransition(() => setActiveThread(thread.threadId));
                 }
               }}
               onHover={() => {

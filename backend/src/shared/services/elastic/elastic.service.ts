@@ -5,13 +5,12 @@ import { UnifiedEmailDocument } from "./interface";
 export class ElasticsearchService {
   private readonly client: Client;
 
-  private readonly EMAILS_INDEX = "emails_secure";
-  private readonly THREADS_INDEX = "threads_secure";
-  private readonly SAVED_SEARCHES_INDEX = "saved_searches_secure";
-  private readonly SEARCH_HISTORY_INDEX = "search_history_secure";
-  private readonly CONVERSATIONS_INDEX = "conversations_secure";
-  private readonly CONVERSATION_SUMMARIES_INDEX =
-    "conversation_summaries_secure";
+  private readonly EMAILS_INDEX = "emails_v1";
+  private readonly THREADS_INDEX = "threads_v1";
+  private readonly SAVED_SEARCHES_INDEX = "saved_searches_v1";
+  private readonly SEARCH_HISTORY_INDEX = "search_history_v1";
+  private readonly CONVERSATIONS_INDEX = "conversations_v1";
+  private readonly CONVERSATION_SUMMARIES_INDEX = "conversation_summaries_v1";
 
   constructor(client: Client) {
     this.client = client;
@@ -475,10 +474,6 @@ export class ElasticsearchService {
       });
     }
 
-    // ── With query — hybrid RRF + notes boost via msearch ─────────────────────
-    // msearch fires notes lookup + hybrid email search in one round trip.
-    // [0] = notes index (thread note matches → boost those threadIds)
-    // [1] = emails index (hybrid RRF: BM25 on subject/snippet + kNN on embedding)
 
     const emailQuery = this.buildHybridEmailQuery({
       trimmed,
