@@ -1,4 +1,5 @@
 import "dotenv/config";
+export { summarizationWorker } from "./generateSummaryWorker";
 export { emailSubscriptionWorker } from "./handleEmailSubscriptionRenewal";
 export { handleMailboxConnectionWorker } from "./handleMailboxConnection";
 export { embeddingsWorker } from "./generateEmbeddings";

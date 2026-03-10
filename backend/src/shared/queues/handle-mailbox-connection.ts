@@ -17,11 +17,10 @@ export const handleMailboxConnectionQueue = new Queue<MailboxConnectionData>(
         delay: 5000,
       },
       removeOnComplete: {
-        age: 3600,
-        count: 100,
+        count: 200,
       },
       removeOnFail: {
-        age: 48 * 3600,
+        count: 200,
       },
     },
   },
