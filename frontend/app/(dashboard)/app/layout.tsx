@@ -26,10 +26,10 @@ const AIAssistantPortal = dynamic(() =>
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const token = (await cookies()).get("access_token");
-  if (!token) redirect("/login");
+  if (!token) redirect("/auth");
 
   const user = getUserFromToken(token.value);
-  if (!user) redirect("/login");
+  if (!user) redirect("/auth");
 
   return (
     <QueryProvider>
