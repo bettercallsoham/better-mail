@@ -7,6 +7,8 @@ import { AgentFactory } from "../shared/services/ai/agent/AgentsFactory";
 import { AIEmitter } from "../shared/services/ai/agent/AIEmitter";
 import { logger } from "../shared/utils/logger";
 import { conversationQueue } from "../shared/queues/conversation.queue";
+import { MemoryService } from "../shared/services/ai/memory.service";
+import { EmbeddingsService } from "../shared/services/ai/embeddings.service";
 
 interface ProcessConversationMessageJob {
   conversationId: string;
@@ -19,12 +21,14 @@ interface ProcessConversationMessageJob {
 const conversationService = new ConversationService(elasticClient);
 const agentFactory = new AgentFactory();
 const emitter = new AIEmitter();
-
+const memory = new MemoryService(elasticClient , new EmbeddingsService());
 const orchestrator = new AIOrchestratorService(
   conversationService,
   agentFactory,
   emitter,
+  memory
 );
+
 
 export const conversationWorker = new Worker<ProcessConversationMessageJob>(
   conversationQueue.name,

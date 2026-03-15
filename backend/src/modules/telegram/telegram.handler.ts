@@ -11,7 +11,6 @@ export class TelegramHandler {
 
 
   async sendMessage(userId: string, text: string) {
-    console.log("Recieved final Text", text);
     const cacheKey = `tg:chat_id:${userId}`;
     let chatId = await redis.get(cacheKey);
 

@@ -6,7 +6,8 @@ import {
 } from "../../elastic/conversation.service";
 import { AgentFactory } from "./AgentsFactory";
 import { AIEmitter } from "./AIEmitter";
-import { gpt41LLM } from "../../../config/llm";
+import { gpt4oMiniLLM } from "../../../config/llm";
+import { MemoryService } from "../memory.service";
 import crypto from "crypto";
 import { logger } from "@sentry/node";
 import { TelegramHandler } from "../../../../modules/telegram/telegram.handler";
@@ -19,42 +20,67 @@ export class AIOrchestratorService {
     private conversationService: ConversationService,
     private agentFactory: AgentFactory,
     private emitter: AIEmitter,
+    private memoryService: MemoryService, 
   ) {}
 
   async processMessage(input: {
-  conversationId: string;
-  userId: string;
-  messageContent: string;
-}) {
-  const { conversationId, userId, messageContent } = input;
-  const config = this.getAgentConfig(conversationId, userId);
-  const isTelegram = conversationId.startsWith("tg_");
+    conversationId: string;
+    userId: string;
+    messageContent: string;
+  }) {
+    const { conversationId, userId, messageContent } = input;
+    const config = this.getAgentConfig(conversationId, userId);
+    const isTelegram = conversationId.startsWith("tg_");
 
-  try {
-    const agent = await this.agentFactory.createChatAgent();
+    try {
+      const agent = await this.agentFactory.createChatAgent();
+      const safeContent = await piiService.sanitize(messageContent);
 
-    const safeContent = await piiService.sanitize(messageContent);
+      const state = (await agent.getState(config)) as any;
+      const isFirstMessage =
+        !state.values?.messages || state.values.messages.length === 0;
 
-    const state = (await agent.getState(config)) as any;
-    const isFirstMessage =
-      !state.values?.messages || state.values.messages.length === 0;
+      const memoryBlock = await this.memoryService.inject(userId, safeContent);
+      const dynamicSystemPrompt = AgentFactory.buildSystemPrompt(memoryBlock);
 
-    const stream = await agent.stream(
-      { messages: [new HumanMessage(safeContent)] },
-      { ...config, streamMode: ["messages", "updates"] },
-    );
+      const stream = await agent.stream(
+        {
+          messages: [new HumanMessage(safeContent)],
+          
+        },
+        {
+          ...config,
+          streamMode: ["messages", "updates"],
+          configurable: {
+            ...config.configurable,
+            systemPrompt: dynamicSystemPrompt,
+          },
+        },
+      );
 
-    await this.handleStream(stream, {
-      conversationId,
-      userId,
-      isTelegram,
-      isFirstMessage,
-      messageContent: safeContent,
-    });
-  } catch (error: any) {
-    this.handleError(conversationId, error, isTelegram);
+      const finalText = await this.handleStream(stream, {
+        conversationId,
+        userId,
+        isTelegram,
+        isFirstMessage,
+        messageContent: safeContent,
+      });
+
+      if (finalText && safeContent) {
+        this.memoryService
+          .extract(userId, {
+            user: safeContent,
+            assistant: finalText,
+            conversationId,
+          })
+          .catch((err) =>
+            logger.error("[MemoryService.extract background error]:", err),
+          );
+      }
+    } catch (error: any) {
+      this.handleError(conversationId, error, isTelegram);
+    }
   }
-}
 
   async handleApproval(input: {
     conversationId: string;
@@ -68,7 +94,6 @@ export class AIOrchestratorService {
     try {
       const agent = await this.agentFactory.createChatAgent();
 
-      // Resume the graph using the structured Command API
       const stream = await agent.stream(
         new Command({ resume: approved ? "approve" : "reject" }),
         { ...config, streamMode: ["messages", "updates"] },
@@ -85,14 +110,11 @@ export class AIOrchestratorService {
     }
   }
 
-  /**
-   * Unified stream handler with Client Isolation (TG vs Web).
-   */
-  private async handleStream(stream: any, ctx: any) {
+  // ─── Returns finalText so processMessage can pass it to memory.extract ──────
+  private async handleStream(stream: any, ctx: any): Promise<string> {
     let finalText = "";
     let tgMessageId: number | null = null;
     let lastStreamedLength = 0;
-    // Map keyed by emailId for automatic deduplication across tool calls
     const capturedSources = new Map<string, any>();
     const chatId = ctx.isTelegram
       ? ctx.conversationId.replace("tg_", "")
@@ -111,20 +133,19 @@ export class AIOrchestratorService {
             this.emitter.emitToolStart(ctx.conversationId, toolName);
           }
         }
+
         if ("__interrupt__" in data) {
           const interrupt = data.__interrupt__[0].value;
           if (ctx.isTelegram && chatId) {
-            return this.telegramHandler.sendActionRequired(
+            await this.telegramHandler.sendActionRequired(
               chatId,
               interrupt.description,
               ctx.conversationId,
             );
           } else {
-            return this.emitter.emitActionRequired(
-              ctx.conversationId,
-              interrupt,
-            );
+            this.emitter.emitActionRequired(ctx.conversationId, interrupt);
           }
+          return finalText; // early return on interrupt
         }
       }
 
@@ -149,7 +170,6 @@ export class AIOrchestratorService {
           }
         }
 
-        // Capture tool results for citations
         if (msg._getType() === "tool") {
           const toolName: string = msg.name ?? "";
           const toolContent: string =
@@ -160,9 +180,7 @@ export class AIOrchestratorService {
             toolContent,
           );
           for (const src of newSources) {
-            if (src.emailId) {
-              capturedSources.set(src.emailId, src);
-            }
+            if (src.emailId) capturedSources.set(src.emailId, src);
           }
 
           if (newSources.length > 0 && !ctx.isTelegram) {
@@ -174,6 +192,7 @@ export class AIOrchestratorService {
       }
     }
 
+    // Finalize Telegram stream
     if (ctx.isTelegram && chatId && finalText.trim().length > 0) {
       await this.telegramHandler.streamToTelegram(
         chatId,
@@ -188,6 +207,8 @@ export class AIOrchestratorService {
       finalText,
       Array.from(capturedSources.values()),
     );
+
+    return finalText;
   }
 
   private async persistCompletion(ctx: any, content: string, sources: any[]) {
@@ -217,7 +238,6 @@ export class AIOrchestratorService {
         ctx.conversationId,
         ctx.userId,
         ctx.messageContent,
-        ctx.isTelegram,
       ).catch((err) => logger.error("[Title Gen Error]:", err));
     }
 
@@ -230,18 +250,18 @@ export class AIOrchestratorService {
     convId: string,
     uId: string,
     firstMsg: string,
-    isTg: boolean,
   ) {
     try {
-      const response = await gpt41LLM.invoke([
+      // Use cheap mini model — this is just a title
+      const response = await gpt4oMiniLLM.invoke([
         {
           role: "system",
-          content:
-            "Create a 3-5 word title for this chat. Return ONLY title text.",
+          content: "Create a 3-5 word title for this chat. Return ONLY title text, no quotes.",
         },
-        { role: "user", content: firstMsg },
+        { role: "user", content: firstMsg.slice(0, 200) },
       ]);
-      const title = response.content.toString().replace(/"/g, "");
+
+      const title = response.content.toString().trim();
 
       await this.conversationService.createOrUpdateSummary({
         conversationId: convId,
@@ -254,7 +274,7 @@ export class AIOrchestratorService {
         updatedAt: new Date(),
       });
 
-      if (!isTg) this.emitter.emitTitleGenerated(convId, title);
+      this.emitter.emitTitleGenerated(convId, title);
     } catch (err) {
       logger.error("[Title Background Error]:", { err });
     }
@@ -266,16 +286,15 @@ export class AIOrchestratorService {
 
   private handleError(conversationId: string, error: any, isTelegram: boolean) {
     logger.error(`[Orchestrator Fatal Error]:`, error);
-    if (isTelegram) {
-      const chatId = conversationId.replace("tg_", "");
-      console.log("ERROR HAPPEEENEDDDDD");
-      console.dir(error, { depth: null });
-    } else {
+    if (!isTelegram) {
       this.emitter.emitError(conversationId, error.message);
     }
   }
 
-  private extractSourcesFromToolResult(toolName: string, content: string): any[] {
+  private extractSourcesFromToolResult(
+    toolName: string,
+    content: string,
+  ): any[] {
     const sources: any[] = [];
 
     if (toolName === "search_emails" || toolName === "get_email_content") {
@@ -301,8 +320,6 @@ export class AIOrchestratorService {
         // non-JSON result, skip
       }
     } else if (toolName === "search_knowledge_and_history") {
-      // Parse the formatted RAG string produced by rag.service.ts
-      // Format per block: "Email N [Score: X.XX] [emailId: ID]:\nFrom: ...\nDate: ...\nBody: ...\n"
       const blocks = content.split("---").filter((b) => b.trim());
       for (const block of blocks) {
         const emailIdMatch = block.match(/\[emailId:\s*([^\]]+)\]/);

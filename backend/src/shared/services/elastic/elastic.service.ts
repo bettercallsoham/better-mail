@@ -433,86 +433,83 @@ export class ElasticsearchService {
     }
   }
 
-  async searchEmails(params: {
-    emailAddresses: string[];
-    query: string;
-    queryEmbedding?: number[]; // caller generates this — keeps ES service pure
-    size?: number;
-    page?: number;
-    filters?: {
-      isRead?: boolean;
-      isStarred?: boolean;
-      isArchived?: boolean;
-      hasAttachments?: boolean;
-      from?: string;
-      to?: string;
-      labels?: string[];
-      dateFrom?: string;
-      dateTo?: string;
-    };
-  }) {
-    const {
-      emailAddresses,
-      query,
-      queryEmbedding,
-      size = 20,
-      page = 0,
-      filters = {},
-    } = params;
+async searchEmails(params: {
+  emailAddresses: string[];
+  query: string | string[];
+  queryEmbedding?: number[];
+  size?: number;
+  page?: number;
+  filters?: {
+    isRead?: boolean;
+    isStarred?: boolean;
+    isArchived?: boolean;
+    hasAttachments?: boolean;
+    from?: string;
+    to?: string;
+    labels?: string[];
+    dateFrom?: string;
+    dateTo?: string;
+  };
+}) {
+  const {
+    emailAddresses,
+    query,
+    queryEmbedding,
+    size = 20,
+    page = 0,
+    filters = {},
+  } = params;
 
-    const trimmed = query.trim();
-    const mustFilters = this.buildMustFilters(emailAddresses, filters);
-    const sourceExcludes = ["embedding", "searchText", "bodyHtml", "bodyText"];
+  const queries = Array.isArray(query)
+    ? query.map((q) => q.trim()).filter(Boolean)
+    : [query.trim()];
 
-    // ── No query — plain filtered list, no scoring needed ─────────────────────
-    if (!trimmed) {
-      return this.plainFilteredSearch({
-        mustFilters,
-        sourceExcludes,
-        size,
-        page,
-      });
-    }
+  const mustFilters = this.buildMustFilters(emailAddresses, filters);
+  const sourceExcludes = ["embedding", "searchText", "bodyHtml", "bodyText"];
 
+  if (!queries.length) {
+    return this.plainFilteredSearch({ mustFilters, sourceExcludes, size, page });
+  }
 
-    const emailQuery = this.buildHybridEmailQuery({
-      trimmed,
-      queryEmbedding,
-      mustFilters,
-      sourceExcludes,
-      size,
-      page,
-    });
+  const emailQuery = this.buildHybridEmailQuery({
+    trimmed: queries,
+    queryEmbedding,
+    mustFilters,
+    sourceExcludes,
+    size,
+    page,
+  });
 
-    const { responses } = await this.client.msearch({
-      searches: [
-        // ── [0] Notes search ──────────────────────────────────────────────────
-        { index: this.THREADS_INDEX },
-        {
-          size: 50,
-          _source: ["threadId"],
-          query: {
-            match: {
-              notes: { query: trimmed, operator: "or", fuzziness: "AUTO" },
+  const { responses } = await this.client.msearch({
+    searches: [
+      { index: this.THREADS_INDEX },
+      {
+        size: 50,
+        _source: ["threadId"],
+        query: {
+          match: {
+            notes: {
+              query: queries.join(" "),  // ← joined string, not array
+              operator: "or",
+              fuzziness: "AUTO",
             },
           },
         },
+      },
 
-        // ── [1] Hybrid email search ───────────────────────────────────────────
-        { index: this.EMAILS_INDEX },
-        emailQuery,
-      ],
-    });
+      { index: this.EMAILS_INDEX },
+      emailQuery,
+    ],
+  });
 
-    const noteThreadIds = this.extractNoteThreadIds(responses[0]);
-    return this.parseHybridEmailResponse({
-      response: responses[1],
-      noteThreadIds,
-      size,
-      page,
-    });
-  }
-
+  const noteThreadIds = this.extractNoteThreadIds(responses[0]);
+  return this.parseHybridEmailResponse({
+    response: responses[1],
+    noteThreadIds,
+    size,
+    page,
+  });
+}
   // ─── Private helpers ──────────────────────────────────────────────────────────
 
   private buildMustFilters(
@@ -569,7 +566,7 @@ export class ElasticsearchService {
     size,
     page,
   }: {
-    trimmed: string;
+    trimmed: string | string[];
     queryEmbedding?: number[];
     mustFilters: object[];
     sourceExcludes: string[];
@@ -592,6 +589,36 @@ export class ElasticsearchService {
       },
     };
 
+    const buildLexicalShould = (q: string) => [
+      { match_phrase: { subject: { query: q, boost: 4 } } },
+      {
+        multi_match: {
+          query: q,
+          fields: ["subject^3", "snippet^1.5", "from.email"],
+          type: "best_fields",
+          operator: "or",
+          fuzziness: "AUTO",
+          boost: 2,
+        },
+      },
+      {
+        multi_match: {
+          query: q,
+          fields: ["subject^2", "snippet"],
+          type: "phrase_prefix",
+          boost: 1.5,
+        },
+      },
+    ];
+
+    // When query is an array, wrap each term's clauses in its own bool and
+    // combine them with should — any term matching is sufficient.
+    const lexicalShould = Array.isArray(trimmed)
+      ? trimmed.map((q) => ({
+          bool: { should: buildLexicalShould(q), minimum_should_match: 1 },
+        }))
+      : buildLexicalShould(trimmed);
+
     const lexicalRetriever = {
       standard: {
         query: {
@@ -599,27 +626,7 @@ export class ElasticsearchService {
             must: [
               {
                 bool: {
-                  should: [
-                    { match_phrase: { subject: { query: trimmed, boost: 4 } } },
-                    {
-                      multi_match: {
-                        query: trimmed,
-                        fields: ["subject^3", "snippet^1.5", "from.email"],
-                        type: "best_fields",
-                        operator: "or",
-                        fuzziness: "AUTO",
-                        boost: 2,
-                      },
-                    },
-                    {
-                      multi_match: {
-                        query: trimmed,
-                        fields: ["subject^2", "snippet"],
-                        type: "phrase_prefix",
-                        boost: 1.5,
-                      },
-                    },
-                  ],
+                  should: lexicalShould,
                   minimum_should_match: 1,
                 },
               },
@@ -654,9 +661,9 @@ export class ElasticsearchService {
               knn: {
                 field: "embedding",
                 query_vector: queryEmbedding,
-                k: size * 2, // reasonable fusion net
-                filter: mustFilters, // security enforced on kNN path too
-              }, // num_candidates omitted — ES BBQ defaults are optimal
+                k: size * 2,
+                filter: mustFilters,
+              },
             },
           ],
           rank_window_size: size * 2,

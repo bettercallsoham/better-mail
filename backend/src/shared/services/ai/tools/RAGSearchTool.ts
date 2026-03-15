@@ -17,7 +17,7 @@ const ragSearchSchema = z.object({
 export const unifiedRAGTool = tool(
   async (input, config) => {
     const userId = config.configurable?.userId;
-
+    console.log("using unified RAG tool");
     if (!userId) {
       return "Error: Missing required context (userId).";
     }

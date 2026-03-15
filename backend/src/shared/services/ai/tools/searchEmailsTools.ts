@@ -3,6 +3,7 @@ import { z } from "zod";
 import { elasticClient } from "../../../config/elastic";
 import { ElasticsearchService } from "../../elastic/elastic.service";
 import { getUserEmails } from "../../../../apis/utils/email-helper";
+import { gpt4oMiniLLM } from "../../../config/llm";
 
 const searchEmailsSchema = z.object({
   query: z
@@ -44,35 +45,59 @@ const searchEmailsSchema = z.object({
   limit: z.number().default(5).describe("Number of results (max 10)"),
 });
 
+async function expandQuery(query: string): Promise<string[]> {
+  try {
+    const response = await gpt4oMiniLLM.invoke(
+      `You expand email search queries.
+Generate **4 short keyword variations** of the query using synonyms, related terms, or alternative phrasing.
+Rules:
+* 2–5 words each
+* Focus on email content (subjects, receipts, notifications, etc.)
+* Do NOT repeat the original query
+* Return ONLY JSON: {"queries":["...", "...", "...", "..."]}
+
+Query: "${query}"`,
+      { response_format: { type: "json_object" } },
+    );
+
+    const text =
+      typeof response.content === "string"
+        ? response.content
+        : ((response.content as any[])[0]?.text ?? "");
+
+    const { queries } = JSON.parse(text) as { queries: string[] };
+
+    if (!Array.isArray(queries) || !queries.length) throw new Error();
+
+    return [query, ...queries.slice(0, 5)];
+  } catch {
+    return [query];
+  }
+}
+
 export const searchEmailsTool = tool(
   async (input, config) => {
     const userId = config.configurable?.userId;
-
-    if (!userId) {
-      console.error("❌ No userId found in tool config!");
-      return "Error: User identity could not be verified. Please try again.";
-    }
+    if (!userId) return "Error: User identity could not be verified.";
 
     const elasticService = new ElasticsearchService(elasticClient);
 
     try {
       const { emails: emailAddresses, error } = await getUserEmails(userId);
-      if (error || !emailAddresses.length) {
+      if (error || !emailAddresses.length)
         return "No email accounts connected. Please connect an account first.";
-      }
+
+      const expandedQueries = await expandQuery(input.query);
 
       const result = await elasticService.searchEmails({
         emailAddresses,
-        query: input.query,
+        query: expandedQueries,
         size: Math.min(input.limit, 10),
         filters: input.filters || {},
       });
 
-      const simplified = result.emails.map((email: any) => {
+      const emails = result.emails.map((email: any) => {
         const fullBody: string = email.bodyText || "";
-        const bodyExcerpt =
-          fullBody.length > 600 ? fullBody.slice(0, 600) + "…" : fullBody;
-
         return {
           emailId: email._id,
           threadId: email.threadId,
@@ -80,7 +105,10 @@ export const searchEmailsTool = tool(
           from: email.from?.email,
           to: email.to?.map((r: any) => r.email).join(", "),
           snippet: email.snippet,
-          bodyText: bodyExcerpt || undefined,
+          bodyText:
+            fullBody.length > 600
+              ? fullBody.slice(0, 600) + "…"
+              : fullBody || undefined,
           receivedAt: email.receivedAt,
           isRead: email.isRead,
           isStarred: email.isStarred,
@@ -94,7 +122,7 @@ export const searchEmailsTool = tool(
 
       return JSON.stringify({
         total: result.total,
-        emails: simplified,
+        emails,
         summary: `Found ${result.total} emails.`,
       });
     } catch (e: any) {

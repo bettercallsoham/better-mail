@@ -24,6 +24,8 @@ async function startServer() {
   const elasticService = new ElasticsearchService(elasticClient);
   await elasticService.ensureIndexes();
 
+  
+
   setupTelegramBot();
 
   telegramBot.start({
