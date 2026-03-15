@@ -10,39 +10,41 @@ router.use(verifyAccessToken());
 router.post(
   "/",
   feedbackValidator.validateCreatePost,
-  feedbackController.createPost
+  feedbackController.createPost,
 );
+router.get("/upload-signature", feedbackController.getUploadSignature);
+
 router.get(
   "/",
   feedbackValidator.validateListPosts,
-  feedbackController.listPosts
+  feedbackController.listPosts,
 );
 router.get(
   "/:postId",
   feedbackValidator.validatePostId,
-  feedbackController.getPost
+  feedbackController.getPost,
 );
 router.delete(
   "/:postId",
   feedbackValidator.validatePostId,
-  feedbackController.deletePost
+  feedbackController.deletePost,
 );
 
 router.post(
   "/:postId/upvote",
   feedbackValidator.validatePostId,
-  feedbackController.toggleUpvote
+  feedbackController.toggleUpvote,
 );
 
 router.post(
   "/:postId/comments",
   feedbackValidator.validateAddComment,
-  feedbackController.addComment
+  feedbackController.addComment,
 );
 router.delete(
   "/:postId/comments/:commentId",
   feedbackValidator.validateDeleteComment,
-  feedbackController.deleteComment
+  feedbackController.deleteComment,
 );
 
 export default router;

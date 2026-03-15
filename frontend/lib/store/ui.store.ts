@@ -31,6 +31,9 @@ interface LayoutSlice {
   splitPct: Record<string, number>;
   /** Draft email ID pending open in ComposeDialog */
   pendingDraftId: string | null;
+  feedbackCreateOpen: boolean;
+
+  setFeedbackCreateOpen: (open: boolean) => void;
   setLayoutMode: (mode: LayoutMode) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -120,7 +123,9 @@ export const useUIStore = create<UIState>()(
       activeAIConversationId: null,
       splitPct: { ...DEFAULT_SPLIT },
       pendingDraftId: null,
-
+      feedbackCreateOpen: false,
+      setFeedbackCreateOpen: (open) => set({ feedbackCreateOpen: open }),
+  
       setLayoutMode: (mode) =>
         set({ layoutMode: mode, activeThreadId: null, focusedThreadId: null }),
 

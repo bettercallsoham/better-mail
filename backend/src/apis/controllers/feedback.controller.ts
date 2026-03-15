@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { FeedbackService } from "../services/feedback.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { PostType } from "../../shared/models/feedback/feedback_post.model";
+import cloudinary from "../../shared/config/cloudinary";
 
 const feedbackService = new FeedbackService();
 
@@ -102,4 +103,28 @@ export const deleteComment = asyncHandler(
     res.json({ success: true, message: "Comment deleted" });
   },
   "deleteComment",
+);
+
+
+export const getUploadSignature = asyncHandler(
+  async (req: Request, res: Response) => {
+    const timestamp = Math.round(Date.now() / 1000);
+
+    const signature = cloudinary.utils.api_sign_request(
+      { timestamp, folder: "feedback" },
+      cloudinary.config().api_secret!
+    );
+
+    res.json({
+      success: true,
+      data: {
+        signature,
+        timestamp,
+        apiKey: cloudinary.config().api_key,
+        cloudName: cloudinary.config().cloud_name,
+        folder: "feedback",
+      },
+    });
+  },
+  "getUploadSignature"
 );

@@ -28,6 +28,7 @@ import {
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { useUIStore, LayoutMode } from "@/lib/store/ui.store";
 import { useRouter } from "next/navigation";
+import { IconListDetails } from "@tabler/icons-react";
 
 // ── Layout mode config ─────────────────────────────────────────────────────
 
@@ -161,8 +162,11 @@ export function UserDropdownContent({
       "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
     router.push("/auth");
   };
-  const handleFeedback = () =>
-    window.open("mailto:feedback@yourapp.com?subject=Feedback", "_blank");
+  const handleFeedback = () => {
+  router.push("/app/feedback");
+};
+
+    
   const setShortcutsModalOpen = useUIStore((s) => s.setShortcutsModalOpen);
 
   return (
@@ -232,10 +236,7 @@ export function UserDropdownContent({
           className="text-neutral-500 dark:text-neutral-400 shrink-0"
         />
         <span className="text-[12px]">Submit feedback</span>
-        <ExternalLink
-          size={11}
-          className="ml-auto text-neutral-300 dark:text-neutral-600 shrink-0"
-        />
+     
       </DropdownMenuItem>
 
       <DropdownMenuItem className="gap-2.5 py-2 cursor-pointer">
@@ -278,7 +279,7 @@ function UserFooterInner({ isOpen }: { isOpen: boolean }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <div
           className={cn(
             "w-full flex cursor-pointer items-center gap-2.5 rounded-lg transition-colors duration-150 outline-none group",
             "hover:bg-app-sidebar-hover",
@@ -312,7 +313,7 @@ function UserFooterInner({ isOpen }: { isOpen: boolean }) {
               className="shrink-0 text-neutral-400 dark:text-neutral-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
             />
           )}
-        </button>
+        </div>
       </DropdownMenuTrigger>
 
       <UserDropdownContent side="top" align="start" />
