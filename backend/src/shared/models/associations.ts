@@ -8,6 +8,8 @@ import { Integration } from "./integrations/integration.model";
 import { TelegramIntegration } from "./integrations/telegram-integration.model";
 import { SlackIntegration } from "./integrations/slack-integration.model";
 import { NotionIntegration } from "./integrations/notion-integration.model";
+import { FeedbackPost } from "./feedback/feedback_post.model";
+import { FeedbackComment } from "./feedback/feedback_comment.model";
 
 User.hasMany(Subscription, {
   foreignKey: "user_id",
@@ -89,3 +91,12 @@ Integration.hasOne(NotionIntegration, {
 NotionIntegration.belongsTo(Integration, {
   foreignKey: "integration_id",
 });
+
+FeedbackPost.belongsTo(User, { as: "author", foreignKey: "userId" });
+User.hasMany(FeedbackPost, { as: "posts", foreignKey: "userId" });
+
+FeedbackComment.belongsTo(User, { as: "author", foreignKey: "userId" });
+User.hasMany(FeedbackComment, { as: "comments", foreignKey: "userId" });
+
+FeedbackPost.hasMany(FeedbackComment, { as: "comments", foreignKey: "postId" });
+FeedbackComment.belongsTo(FeedbackPost, { as: "post", foreignKey: "postId" });

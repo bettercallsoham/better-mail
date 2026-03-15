@@ -9,6 +9,7 @@ import aiRouter from "./routers/ai.routes";
 import conversationRouter from "./routers/conversation.routes";
 import realtimeRouter from "./routers/realtime.routes";
 import integrationRouter from "./routers/integrations.routes";
+import feedbackRouter from "./routers/feedback.routes";
 
 const router = Router();
 router.use("/auth", authRouter);
@@ -20,5 +21,6 @@ router.use("/templates", templateRouter);
 router.use("/ai", aiRouter);
 router.use("/conversations", conversationRouter);
 router.use("/integrations", integrationRouter);
+router.use("/feedback", feedbackRouter);
 router.use("/realtime", realtimeRouter);
 export default router;
