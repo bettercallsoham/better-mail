@@ -1,35 +1,173 @@
-## Day 1 : ( Jan 15 , 2026)
+### BETTERMAIL - BETTER WAY TO MANAGE EMAIL WITH AI
 
-- As i am more of a backend guy , and i believe in backend-first approach , i started by setting up the repo
-  for backend ( self hosting ElasticSearch and kibana took most of my time :) , but it was all worth it !!!
-  only 1 thing that i have to choose a 4gb ram VM , so that the elastic / email-engine and redis and all backend along with
-  workers etc works seamlessely in one vm ( that's a bad example of vertical scaling , but shit happens!!!! )
-  i have very limited credits left and i have the challenge to make it work before my credits ran out :
+Too lazy to write docs , but that's how you can run it in local.
 
-- So it'll be my finest project so far , i want to keep it how people ( or senior engineers do it in the production )?
-  but why ? "CAUSE IF YOU WANT TO BE X , START ACTING LIKE ONE RIGHT NOW "!!
+[DON'T FORGET TO LEAVE A STAR 🌟]
 
-so there are certain aspects or patterns i have to follow ? the end goal ?
+To start backend :
 
-- Consistency , availability , minimum down time , error/bug-free ( lol )
-- then comes monitoring ,and obserability ( i think sentry will handle this for me ).
-- then comes the scalability ( as i am not expecting a huge traffic now ) , i still have to follow some backend principles so that users get the right feel about the BETTERMAIL !!!!
+```bash
+  git clone https://github.com/nerdyabhi/better-mail.git
+  cd backend
+  pnpm i
+```
 
-## Day 2 : (Jan 16 ) CREATION OF THE DATABASE
+then add this in your `.env` file
 
-- Database is the most cruical part while building a product , and i often suffer from the "Over-engineering disease" while building it everytime , the ideal thing to do here is make sure the requirements are clear here and just build it !
-- you always have the option to change the schema once
+```js
+# Sentry
+SENTRY_DSN= #For monitoring and logging
 
-So this is the initial plan i came up with (ofcourse there's always a room for improvment )but we'll continue building and will fix stuffs later !!!
-![DB Schema](./docs/db-schema.png)
+APP_PORT=3001
 
-### SETTING UP PAYMENTS
+#DATABASE
+PG_CONNECTION_STRING=
 
-- i'll be using stripe for this : and ofcourse it's not registered as a company , so everything will be done in test mode
-- why i am doing this ? TOLD YAA Buddy "i am a product-first full stack engineer" and if i am not , i'll be one :)
-- and to learn stripe and how payments are handled in industries is important :)
+#REDIS
+REDIS_HOST=
+REDIS_PORT=
+REDIS_PASSWORD=
 
-### Now it's time for User registration flow :
 
-- user can register either by [email/password , google oauth , microsoft oauth];
-- now i have to make sure the flow is consistent will start by implementing email/password flow :)
+OUTLOOK_CLIENT_STATE=
+
+
+OUTLOOK_WEBHOOK_URL=
+ELASTIC_API_KEY=
+ELASTIC_NODE=
+ELASTIC_PASSWORD=
+
+#### NOT GETTING USED
+#STARTER_PRICE_ID=
+#PRO_PRICE_ID=
+#BUSINESS_PRICE_ID=
+
+#STRIPE_PUBLISHABLE_KEY=
+#STRIPE_SECRET_KEY=
+
+JWT_SECRET=
+
+CLOUDINARY_URL=
+CLOUDINARY_CLOUDNAME=
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
+GMAIL_PUBSUB_TOPIC=
+
+
+OUTLOOK_CLIENT_ID=
+OUTLOOK_CLIENT_SECRET=
+OUTLOOK_REDIRECT_URI=
+
+OUTLOOK_CONNECT_REDIRECT_URI=
+GOOGLE_CONNECT_REDIRECT_URI=
+
+MICROSOFT_TENANT_ID=common
+
+## NOT GETTING USED EITHER
+#EMAIL_ENGINE_PASSWORD=
+#EMAIL_ENGINE_ACCESS_TOKEN=
+
+
+
+### BULLBOARD
+
+BULLBOARD_USERNAME=
+BULLBOARD_PASSWORD=
+
+# Enable BullBoard in production (false by default for security)
+BULLBOARD_ENABLED=true
+
+# Development mode - allows access without auth (NEVER use in production!)
+BULLBOARD_DEV_MODE=false
+
+# Optional: IP Whitelist (comma-separated IPs allowed to access dashboard)
+# Uncomment and add your IPs in production
+# BULLBOARD_ALLOWED_IPS=
+
+
+
+
+## AZURE OPENAI
+AZURE_OPEN_AI_KEY=
+GPT_41_ENDPOINT=
+GPT_41_MODEL=
+GPT_41_API_VERSION=
+
+GPT_4O_MINI_ENDPOINT=
+GPT_4O_MINI_MODEL=
+GPT_4O_MINI_VERSION=
+### EMBEDDINGS _ OPENAI
+EMBEDDINGS_ENDPOINT=
+EMBEDDINGS_MODEL_NAME="
+EMBEDDINGS_MODEL_DEPLOYMENT=
+
+
+### SOKETI - APP CONNECTION
+SOKETI_DEFAULT_APP_ID=
+SOKETI_DEFAULT_APP_KEY=
+SOKETI_DEFAULT_APP_SECRET=
+
+
+TELEGRAM_BOT_TOKEN=
+# TELEGRAM_BOT_TOKEN=
+
+TELEGRAM_BOT_USERNAME=
+FRONTEND_URL=
+ALLOWED_IP=
+
+AZURE_LANGUAGE_ENDPOINT=
+AZURE_LANGUAGE_KEY=
+
+
+
+```
+
+Then do run this command to start backend server in development mode.
+
+```bash
+  pnpm run dev
+```
+
+And To run workers use this command
+
+```bash
+  pnpm run dev:worker
+```
+
+## Start Frontend
+
+This one is quite easy
+
+```bash
+cd frontend
+pnpm i
+```
+
+add this to `frontend/.env`
+
+```js
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+NEXT_PUBLIC_POSTHOG_KEY=
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+
+NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+
+NEXT_PUBLIC_PUSHER_KEY=your-key
+NEXT_PUBLIC_SOKETI_HOST="your soketi host"
+
+NODE_ENV="development"
+```
+
+Run it in dev server or
+
+```bash
+ pnpm run dev
+```
+
+```bash
+ pnpm run build
+ pnpm run start
+```
