@@ -34,7 +34,7 @@ function GitHubStars() {
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        "hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-medium",
+        " flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-medium",
         "text-neutral-600 border-neutral-200 bg-white/60 hover:border-neutral-300 hover:text-neutral-900",
         "transition-all duration-200 active:scale-95 shadow-sm backdrop-blur-sm"
       )}
