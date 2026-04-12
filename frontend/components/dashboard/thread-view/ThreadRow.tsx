@@ -144,7 +144,7 @@ function ActionTray({
   size?: "default" | "sm";
 }) {
   const btnCls = cn(
-    "flex items-center justify-center rounded-md transition-colors duration-75",
+    "flex items-center justify-center rounded-md cursor-pointer transition-colors duration-75",
     // Dark: start at white/30 (visible but not bright), hover to white/60
     "text-gray-400 dark:text-white/30",
     "hover:text-gray-700 dark:hover:text-white/60",

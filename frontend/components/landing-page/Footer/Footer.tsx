@@ -41,7 +41,7 @@ const Footer = () => {
                 <Linkedin className="w-4 h-4" />
               </a>
               <a
-                href="https://github.com/nerdyabhi/bettermail"
+                href="https://github.com/nerdyabhi/better-mail"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-9 h-9 rounded-lg bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-600 hover:text-neutral-900 transition-colors"

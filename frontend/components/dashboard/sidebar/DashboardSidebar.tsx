@@ -198,7 +198,6 @@ function FolderList({
           </div>
         </>
       )}
-      {/* Tools section */}
       {!compact && <SectionHeader label="Tools" />}
       <div className="flex flex-col gap-0.5 py-1">
         <FolderRow
@@ -261,9 +260,7 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const isInsightsActive = pathname === "/app/insights";
 
-  const [isHovering, setIsHovering] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dialogs, setDialogs] = useState<
     { key: string; params?: Partial<OpenComposerParams> }[]
   >([]);
@@ -284,17 +281,16 @@ export function DashboardSidebar() {
     [setActiveFolder, pathname, router],
   );
 
-  // N key opens compose (disabled when typing in inputs — handled by useKeyboard)
   useKeyboard("n", () => openCompose(), [openCompose]);
 
-  const isOpen = !collapsed || isHovering || dropdownOpen;
+  // Purely driven by store — no hover, no local open state
+  const isOpen = !collapsed;
   const noop = () => {};
 
   return (
     <>
       {/* ── MOBILE TOPBAR ── */}
       <div className="md:hidden flex w-full items-center gap-2 px-3 h-14 shrink-0 bg-app-sidebar-bg border-b border-app-sidebar-border">
-        {/* Hamburger — opens drawer */}
         <button
           onClick={() => setMobileOpen(true)}
           className="p-2 -ml-1 shrink-0 rounded-xl text-neutral-600 dark:text-neutral-300 hover:bg-app-sidebar-hover transition-colors"
@@ -302,7 +298,6 @@ export function DashboardSidebar() {
           <IconMenu2 size={20} />
         </button>
 
-        {/* Inline search bar — opens search modal */}
         <button
           onClick={() => setMailSearchOpen(true)}
           className="flex-1 flex items-center gap-2 h-9 px-3 rounded-xl bg-black/5 dark:bg-white/6 min-w-0 active:opacity-70 transition-opacity"
@@ -317,7 +312,6 @@ export function DashboardSidebar() {
           </span>
         </button>
 
-        {/* User avatar — opens user dropdown directly */}
         <MobileUserAvatarButton />
       </div>
 
@@ -334,8 +328,6 @@ export function DashboardSidebar() {
               className="absolute inset-0 bg-black/40"
               onClick={() => setMobileOpen(false)}
             />
-
-            {/* Panel */}
             <motion.div
               key="panel"
               initial={{ x: "-100%" }}
@@ -344,16 +336,10 @@ export function DashboardSidebar() {
               transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
               className="relative w-[75vw] max-w-75 h-full flex flex-col shadow-2xl bg-app-sidebar-bg"
             >
-              {/* Drawer header: account switcher + X close */}
               <div className="border-b border-app-sidebar-border flex items-start">
                 <div className="flex-1 min-w-0">
-                  <AccountSwitcher
-                    isOpen={true}
-                    onAddAccount={noop}
-                    onDropdownOpenChange={noop}
-                  />
+                  <AccountSwitcher isOpen={true} onDropdownOpenChange={noop} />
                 </div>
-                {/* X button — top-right of drawer */}
                 <button
                   onClick={() => setMobileOpen(false)}
                   className="mt-3 mr-3 shrink-0 p-1.5 rounded-md text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-app-sidebar-hover transition-colors"
@@ -362,16 +348,14 @@ export function DashboardSidebar() {
                 </button>
               </div>
 
-              {/* Folders */}
               <div className="flex-1 overflow-y-auto py-2">
-                {/* Compose button */}
-                <div className="px-2 pb-2">
+                <div className="px-2 cursor-pointer pb-2">
                   <button
                     onClick={() => {
                       openCompose();
                       setMobileOpen(false);
                     }}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.97] text-white dark:text-neutral-900 text-[13px] font-semibold transition-all duration-150"
+                    className="flex items-center gap-2 px-3 py-2 cursor-pointer rounded-xl bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.97] text-white dark:text-neutral-900 text-[13px] font-semibold transition-all duration-150"
                   >
                     <IconEdit size={14} />
                     Compose
@@ -412,7 +396,6 @@ export function DashboardSidebar() {
                 </Suspense>
               </div>
 
-              {/* User footer — same as desktop */}
               <div className="border-t border-app-sidebar-border py-2 shrink-0">
                 <UserFooter isOpen={true} />
               </div>
@@ -423,27 +406,17 @@ export function DashboardSidebar() {
 
       {/* ── DESKTOP ── */}
       <div className="hidden md:block h-full">
-        <Sidebar open={isOpen} setOpen={setIsHovering} animate>
-          <SidebarBody
-            className="justify-between border-r py-4 overflow-hidden bg-app-sidebar-bg border-app-sidebar-border"
-            onMouseEnter={() => collapsed && setIsHovering(true)}
-            onMouseLeave={() => {
-              if (!dropdownOpen) setIsHovering(false);
-            }}
-          >
+        {/* Pass noop as setOpen — sidebar only opens/closes via setSidebarCollapsed */}
+        <Sidebar open={isOpen} setOpen={noop}>
+          <SidebarBody className="justify-between border-r py-4 overflow-hidden bg-app-sidebar-bg border-app-sidebar-border">
             <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-              {/* Account switcher — collapse button lives inside */}
               <div
                 className={cn(
                   "border-b mb-1 border-app-sidebar-border",
                   !isOpen && "border-transparent",
                 )}
               >
-                <AccountSwitcher
-                  isOpen={isOpen}
-                  onAddAccount={noop}
-                  onDropdownOpenChange={setDropdownOpen}
-                />
+                <AccountSwitcher isOpen={isOpen} onDropdownOpenChange={noop} />
               </div>
 
               {/* Compose button */}
@@ -459,7 +432,7 @@ export function DashboardSidebar() {
                       <button
                         onClick={() => openCompose()}
                         className={cn(
-                          "flex items-center justify-center gap-2 rounded-xl transition-all duration-150",
+                          "flex items-center cursor-pointer justify-center gap-2 rounded-xl transition-all duration-150",
                           "bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.97]",
                           "text-white dark:text-neutral-900",
                           isOpen
@@ -510,7 +483,7 @@ export function DashboardSidebar() {
         </Sidebar>
       </div>
 
-      {/* Compose modals — up to 2 open at once; each is independently closeable */}
+      {/* Compose modals */}
       {dialogs.map(({ key, params }) => (
         <ComposeDialog
           key={key}
@@ -522,7 +495,6 @@ export function DashboardSidebar() {
       ))}
       <DraftComposerLauncher onOpen={(p) => openCompose(p)} />
 
-      {/* Inbox Zero triage dialog — globally accessible */}
       {inboxZeroOpen && (
         <Suspense fallback={null}>
           <InboxZeroQueueDialog
@@ -532,7 +504,6 @@ export function DashboardSidebar() {
         </Suspense>
       )}
 
-      {/* Integrations modal — globally accessible */}
       <IntegrationsModal
         open={integrationsOpen}
         onClose={() => setIntegrationsOpen(false)}
@@ -542,8 +513,6 @@ export function DashboardSidebar() {
 }
 
 // ─── Draft → ComposeDialog launcher ──────────────────────────────────────────
-// Watches UIStore for a pending draft ID. When set, loads the draft (via
-// Suspense query) and opens a ComposeDialog pre-populated with its content.
 
 function DraftComposerLauncher({
   onOpen,

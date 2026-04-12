@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useMemo } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,9 +29,10 @@ import { AnimatePresence, motion } from "motion/react";
 
 interface AccountSwitcherProps {
   isOpen: boolean;
-  onAddAccount: () => void;
   onDropdownOpenChange: (open: boolean) => void;
 }
+
+// ── Provider icons ────────────────────────────────────────────────────────────
 
 function GoogleIcon() {
   return (
@@ -67,6 +68,8 @@ function OutlookIcon() {
   );
 }
 
+// ── Shared UI pieces ──────────────────────────────────────────────────────────
+
 function AllAccountsChip({
   isActive,
   size = "md",
@@ -74,13 +77,12 @@ function AllAccountsChip({
   isActive: boolean;
   size?: "sm" | "md";
 }) {
-  const dim = size === "sm" ? "h-6 w-6" : "h-8 w-8";
   return (
     <div className="relative shrink-0">
       <div
         className={cn(
           "rounded-lg flex items-center justify-center bg-app-sidebar-muted text-neutral-600 dark:text-neutral-300",
-          dim,
+          size === "sm" ? "h-6 w-6" : "h-8 w-8",
         )}
       >
         <IconStack2 size={size === "sm" ? 13 : 16} stroke={1.5} />
@@ -106,14 +108,32 @@ function AllAccountsChip({
 
 function ProviderIconBox({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="h-6 w-6 rounded-md bg-white border border-neutral-200 dark:border-app-sidebar-border dark:bg-app-sidebar-hover
-    ebar-hover)] flex items-center justify-center shrink-0 shadow-sm"
-    >
+    <div className="h-6 w-6 rounded-md bg-white border border-neutral-200 dark:border-app-sidebar-border dark:bg-app-sidebar-hover flex items-center justify-center shrink-0 shadow-sm">
       {children}
     </div>
   );
 }
+
+function Tip({
+  children,
+  side,
+  content,
+}: {
+  children: React.ReactNode;
+  side: "bottom" | "right";
+  content: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={side} sideOffset={6}>
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+// ── Add account menu items ────────────────────────────────────────────────────
 
 function AddAccountMenuItems() {
   const { mutate: connectAccount, isPending } = useConnectAccount();
@@ -122,174 +142,146 @@ function AddAccountMenuItems() {
       <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 font-semibold px-2.5 pt-2 pb-1">
         Add account
       </DropdownMenuLabel>
-      <DropdownMenuItem
-        onClick={() => connectAccount("gmail")}
-        disabled={isPending}
-        className="flex items-center gap-3 py-2.5 px-2.5 rounded-lg cursor-pointer"
-      >
-        <ProviderIconBox>
-          <GoogleIcon />
-        </ProviderIconBox>
-        <div className="flex flex-col">
-          <span className="text-[13px] font-medium">Gmail</span>
-          <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
-            Connect Google account
-          </span>
-        </div>
-        {isPending && (
-          <svg
-            className="ml-auto h-3.5 w-3.5 animate-spin text-neutral-400"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
-        )}
-      </DropdownMenuItem>
-      <DropdownMenuItem
-        onClick={() => connectAccount("outlook")}
-        disabled={isPending}
-        className="flex items-center gap-3 py-2.5 px-2.5 rounded-lg cursor-pointer"
-      >
-        <ProviderIconBox>
-          <OutlookIcon />
-        </ProviderIconBox>
-        <div className="flex flex-col">
-          <span className="text-[13px] font-medium">Outlook</span>
-          <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
-            Connect Microsoft account
-          </span>
-        </div>
-      </DropdownMenuItem>
+      {[
+        {
+          provider: "gmail" as const,
+          label: "Gmail",
+          sub: "Connect Google account",
+          Icon: GoogleIcon,
+        },
+        {
+          provider: "outlook" as const,
+          label: "Outlook",
+          sub: "Connect Microsoft account",
+          Icon: OutlookIcon,
+        },
+      ].map(({ provider, label, sub, Icon }) => (
+        <DropdownMenuItem
+          key={provider}
+          onClick={() => connectAccount(provider)}
+          disabled={isPending}
+          className="flex items-center gap-3 py-2.5 px-2.5 rounded-lg cursor-pointer"
+        >
+          <ProviderIconBox>
+            <Icon />
+          </ProviderIconBox>
+          <div className="flex flex-col">
+            <span className="text-[13px] font-medium">{label}</span>
+            <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+              {sub}
+            </span>
+          </div>
+          {isPending && (
+            <svg
+              className="ml-auto h-3.5 w-3.5 animate-spin text-neutral-400"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+          )}
+        </DropdownMenuItem>
+      ))}
     </>
   );
 }
 
-interface AddAccountDropdownProps {
-  overflowAccounts: ConnectedAccount[];
-  activeEmail: string | null;
-  onSwitch: (email: string | null) => void;
-  hasOverflow: boolean;
-  onOpenChange: (open: boolean) => void;
-}
+// ── Account row used in dropdowns ─────────────────────────────────────────────
 
-function AddAccountDropdown({
-  overflowAccounts,
-  activeEmail,
+function AccountRow({
+  account,
+  isActive,
   onSwitch,
-  hasOverflow,
-  onOpenChange,
-}: AddAccountDropdownProps) {
+}: {
+  account: ConnectedAccount;
+  isActive: boolean;
+  onSwitch: () => void;
+}) {
   return (
-    <DropdownMenu onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <button
-          title={
-            hasOverflow
-              ? `${overflowAccounts.length} more · Add account`
-              : "Add account"
-          }
-          className={cn(
-            "relative h-8 w-8 cursor-pointer rounded-lg border border-dashed flex items-center justify-center shrink-0",
-            "border-neutral-300 dark:border-app-sidebar-border",
-            "text-neutral-400 dark:text-neutral-500",
-            "hover:text-neutral-600 dark:hover:text-neutral-300",
-            "hover:bg-app-sidebar-hover hover:border-neutral-400 dark:hover:border-neutral-500",
-            "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-          )}
-        >
-          <IconPlus size={14} stroke={2} />
-          {hasOverflow && (
-            <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 rounded-full bg-neutral-500 dark:bg-neutral-400 text-white dark:text-neutral-900 text-[9px] font-bold flex items-center justify-center tabular-nums leading-none">
-              +{overflowAccounts.length}
-            </span>
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        sideOffset={8}
-        className="w-60 z-9999 rounded-xl shadow-xl border border-black/7 dark:border-white/8 bg-white dark:bg-[#232120] p-1.5"
-      >
-        {overflowAccounts.length > 0 && (
-          <>
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 font-semibold px-2 py-1.5">
-              More accounts
-            </DropdownMenuLabel>
-            {overflowAccounts.map((account) => (
-              <DropdownMenuItem
-                key={account.email}
-                onClick={() => onSwitch(account.email)}
-                className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg cursor-pointer"
-              >
-                <AccountAvatar
-                  email={account.email}
-                  avatar={account.avatar_url ?? undefined}
-                  size="sm"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12.5px] font-medium truncate">
-                    {account.name || account.email}
-                  </p>
-                  {account.name && (
-                    <p className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate">
-                      {account.email}
-                    </p>
-                  )}
-                </div>
-                {account.email === activeEmail && (
-                  <IconCheck
-                    size={13}
-                    stroke={2.5}
-                    className="text-blue-500 shrink-0"
-                  />
-                )}
-              </DropdownMenuItem>
-            ))}
-            <div className="my-1 h-px bg-neutral-100 dark:bg-white/6 mx-2" />
-          </>
+    <DropdownMenuItem
+      onClick={onSwitch}
+      className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg cursor-pointer"
+    >
+      <AccountAvatar
+        email={account.email}
+        avatar={account.avatar_url ?? undefined}
+        size="sm"
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-[12.5px] font-medium truncate">
+          {account.name || account.email}
+        </p>
+        {account.name && (
+          <p className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate">
+            {account.email}
+          </p>
         )}
-        <AddAccountMenuItems />
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </div>
+      {isActive && (
+        <IconCheck size={13} stroke={2.5} className="text-blue-500 shrink-0" />
+      )}
+    </DropdownMenuItem>
   );
 }
 
-function CollapsedDropdown({
+const DROPDOWN_CONTENT_CLS =
+  "w-60 z-9999 rounded-xl shadow-xl border border-black/7 dark:border-white/8 bg-white dark:bg-[#232120] p-1.5";
+const SECTION_LABEL_CLS =
+  "text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 font-semibold px-2.5 pt-2 pb-1";
+const DIVIDER = (
+  <div className="my-1 h-px bg-neutral-100 dark:bg-white/6 mx-2" />
+);
+
+// ── Collapsed sidebar: single dropdown showing all accounts + add ─────────────
+
+function CollapsedAccountDropdown({
   accounts,
   activeEmail,
   isAllAccounts,
   onSwitch,
-  children,
 }: {
   accounts: ConnectedAccount[];
   activeEmail: string | null;
   isAllAccounts: boolean;
   onSwitch: (email: string | null) => void;
-  children: React.ReactNode;
 }) {
+  const activeAccount = accounts.find((a) => a.email === activeEmail) ?? null;
+
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild>
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg">
+          {isAllAccounts ? (
+            <AllAccountsChip isActive />
+          ) : (
+            <AccountAvatar
+              email={activeEmail!}
+              avatar={activeAccount?.avatar_url ?? undefined}
+              isActive
+              size="md"
+            />
+          )}
+        </button>
+      </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
         side="right"
         sideOffset={10}
-        className="w-60 z-9999 rounded-xl shadow-xl border border-black/7 dark:border-white/8 bg-white dark:bg-[#232120] p-1.5"
+        className={DROPDOWN_CONTENT_CLS}
       >
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 font-semibold px-2.5 pt-2 pb-1">
+        <DropdownMenuLabel className={SECTION_LABEL_CLS}>
           Accounts
         </DropdownMenuLabel>
         <DropdownMenuItem
@@ -307,41 +299,80 @@ function CollapsedDropdown({
           )}
         </DropdownMenuItem>
         {accounts.map((account) => (
-          <DropdownMenuItem
+          <AccountRow
             key={account.email}
-            onClick={() => onSwitch(account.email)}
-            className="flex items-center gap-2.5 py-2 px-2.5 rounded-lg cursor-pointer"
-          >
-            <AccountAvatar
-              email={account.email}
-              avatar={account.avatar_url ?? undefined}
-              size="sm"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-[12.5px] font-medium truncate">
-                {account.name || account.email}
-              </p>
-              {account.name && (
-                <p className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate">
-                  {account.email}
-                </p>
-              )}
-            </div>
-            {account.email === activeEmail && (
-              <IconCheck
-                size={13}
-                stroke={2.5}
-                className="text-blue-500 shrink-0"
-              />
-            )}
-          </DropdownMenuItem>
+            account={account}
+            isActive={account.email === activeEmail}
+            onSwitch={() => onSwitch(account.email)}
+          />
         ))}
-        <div className="my-1 h-px bg-neutral-100 dark:bg-white/6 mx-2" />
+        {DIVIDER}
         <AddAccountMenuItems />
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
+
+// ── Expanded sidebar: inline chips + overflow dropdown ────────────────────────
+
+function AddAccountDropdown({
+  overflowAccounts,
+  activeEmail,
+  onSwitch,
+  onOpenChange,
+}: {
+  overflowAccounts: ConnectedAccount[];
+  activeEmail: string | null;
+  onSwitch: (email: string | null) => void;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <DropdownMenu onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn(
+            "relative h-8 w-8 cursor-pointer rounded-lg border border-dashed flex items-center justify-center shrink-0",
+            "border-neutral-300 dark:border-app-sidebar-border text-neutral-400 dark:text-neutral-500",
+            "hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-app-sidebar-hover hover:border-neutral-400 dark:hover:border-neutral-500",
+            "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+          )}
+        >
+          <IconPlus size={14} stroke={2} />
+          {overflowAccounts.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 rounded-full bg-neutral-500 dark:bg-neutral-400 text-white dark:text-neutral-900 text-[9px] font-bold flex items-center justify-center tabular-nums leading-none">
+              +{overflowAccounts.length}
+            </span>
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        sideOffset={8}
+        className={DROPDOWN_CONTENT_CLS}
+      >
+        {overflowAccounts.length > 0 && (
+          <>
+            <DropdownMenuLabel className={SECTION_LABEL_CLS}>
+              More accounts
+            </DropdownMenuLabel>
+            {overflowAccounts.map((account) => (
+              <AccountRow
+                key={account.email}
+                account={account}
+                isActive={account.email === activeEmail}
+                onSwitch={() => onSwitch(account.email)}
+              />
+            ))}
+            {DIVIDER}
+          </>
+        )}
+        <AddAccountMenuItems />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 const MAX_INLINE_CHIPS = 3;
 
@@ -351,133 +382,128 @@ function AccountSwitcherInner({
 }: AccountSwitcherProps) {
   const { data: accountsData } = useConnectedAccounts();
   const { data: userData } = useCurrentUser();
-  const accounts: ConnectedAccount[] = accountsData?.success
-    ? accountsData.data
-    : [];
+  const accountsMemoized = useMemo(
+    () => (accountsData?.success ? accountsData.data : []),
+    [accountsData],
+  );
+  const accounts: ConnectedAccount[] = accountsMemoized;
   const selectedEmail = useUIStore((s) => s.selectedEmailAddress);
   const setSelectedEmail = useUIStore((s) => s.setSelectedEmailAddress);
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
 
-  const activeEmail = selectedEmail;
-  const activeAccount = accounts.find((a) => a.email === activeEmail) ?? null;
-  const isAllAccounts = activeEmail === null;
+  const activeAccount = accounts.find((a) => a.email === selectedEmail) ?? null;
+  const isAllAccounts = selectedEmail === null;
   const userName = userData?.user?.fullName ?? "—";
-  const inlineAccounts = accounts.slice(0, MAX_INLINE_CHIPS);
-  const overflowAccounts = accounts.slice(MAX_INLINE_CHIPS);
-  const hasOverflow = overflowAccounts.length > 0;
-  const handleSwitch = (email: string | null) => setSelectedEmail(email);
+
+  const sortedAccounts = useMemo(() => {
+    if (!selectedEmail) return accounts;
+    const idx = accounts.findIndex((a) => a.email === selectedEmail);
+    if (idx < MAX_INLINE_CHIPS || idx === -1) return accounts; // already visible
+    const reordered = [...accounts];
+    reordered.splice(idx, 1);
+    reordered.unshift(accounts[idx]);
+    return reordered;
+  }, [accounts, selectedEmail]);
+
+  // then use sortedAccounts instead of accounts for the two slices:
+  const inlineAccounts = sortedAccounts.slice(0, MAX_INLINE_CHIPS);
+  const overflowAccounts = sortedAccounts.slice(MAX_INLINE_CHIPS);
+
+  const toggleBtn = (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        setSidebarCollapsed(!collapsed);
+      }}
+      className={cn(
+        "p-1.5 cursor-pointer rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-app-sidebar-hover",
+        collapsed && "mb-3",
+      )}
+    >
+      {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+    </button>
+  );
 
   return (
     <TooltipProvider delayDuration={400}>
       <div
         className={cn(
           "pb-2",
-          isOpen ? "px-3 pt-2" : "flex flex-col items-center px-1 pt-3",
+          isOpen ? "px-3 pt-2" : "flex flex-col items-center px-1 pt-2 gap-1.5",
         )}
       >
         {!isOpen ? (
-          <CollapsedDropdown
-            accounts={accounts}
-            activeEmail={activeEmail}
-            isAllAccounts={isAllAccounts}
-            onSwitch={handleSwitch}
-          >
-            <button
-              title={
-                isAllAccounts
-                  ? "All accounts"
-                  : activeAccount?.name
-                    ? `${activeAccount.name} · ${activeEmail}`
-                    : (activeEmail ?? "")
-              }
-              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
+          // ── Collapsed view: toggle on top, then account avatar ──
+          <>
+            <Tip
+              side="right"
+              content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {isAllAccounts ? (
-                <AllAccountsChip isActive />
-              ) : (
-                <AccountAvatar
-                  email={activeEmail!}
-                  avatar={activeAccount?.avatar_url ?? undefined}
-                  isActive
-                  size="md"
-                />
-              )}
-            </button>
-          </CollapsedDropdown>
+              {toggleBtn}
+            </Tip>
+            <CollapsedAccountDropdown
+              accounts={accounts}
+              activeEmail={selectedEmail}
+              isAllAccounts={isAllAccounts}
+              onSwitch={setSelectedEmail}
+            />
+          </>
         ) : (
+          // ── Expanded view: chip row + account info ──
           <>
             <div className="flex items-center gap-1.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => handleSwitch(null)}
-                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
-                  >
-                    <AllAccountsChip isActive={isAllAccounts} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6}>
-                  All accounts
-                </TooltipContent>
-              </Tooltip>
+              <Tip side="bottom" content="All accounts">
+                <button
+                  onClick={() => setSelectedEmail(null)}
+                  className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
+                >
+                  <AllAccountsChip isActive={isAllAccounts} />
+                </button>
+              </Tip>
 
               {inlineAccounts.map((account) => (
-                <Tooltip key={account.email}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => handleSwitch(account.email)}
-                      className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
-                    >
-                      <AccountAvatar
-                        email={account.email}
-                        avatar={account.avatar_url ?? undefined}
-                        isActive={account.email === activeEmail}
-                        size="md"
-                      />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={6}>
-                    {account.name
+                <Tip
+                  key={account.email}
+                  side="bottom"
+                  content={
+                    account.name
                       ? `${account.name} · ${account.email}`
-                      : account.email}
-                  </TooltipContent>
-                </Tooltip>
+                      : account.email
+                  }
+                >
+                  <button
+                    onClick={() => setSelectedEmail(account.email)}
+                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
+                  >
+                    <AccountAvatar
+                      email={account.email}
+                      avatar={account.avatar_url ?? undefined}
+                      isActive={account.email === selectedEmail}
+                      size="md"
+                    />
+                  </button>
+                </Tip>
               ))}
 
               <AddAccountDropdown
                 overflowAccounts={overflowAccounts}
-                activeEmail={activeEmail}
-                onSwitch={handleSwitch}
-                hasOverflow={hasOverflow}
+                activeEmail={selectedEmail}
+                onSwitch={setSelectedEmail}
                 onOpenChange={onDropdownOpenChange}
               />
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSidebarCollapsed(!collapsed);
-                    }}
-                    className="ml-auto p-1.5  cursor-pointer rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-[var(--app-sidebar-hover)]"
-                  >
-                    {collapsed ? (
-                      <PanelLeftOpen size={15} />
-                    ) : (
-                      <PanelLeftClose size={15} />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6}>
-                  {collapsed ? "Pin sidebar" : "Collapse sidebar"}
-                </TooltipContent>
-              </Tooltip>
+              <Tip
+                side="bottom"
+                content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                <span className="ml-auto">{toggleBtn}</span>
+              </Tip>
             </div>
 
             <AnimatePresence initial={false} mode="wait">
               <motion.div
-                key={activeEmail ?? "__all__"}
+                key={selectedEmail ?? "__all__"}
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
@@ -512,13 +538,16 @@ function AccountSwitcherSkeleton({ isOpen }: { isOpen: boolean }) {
     <div
       className={cn(
         "pb-2",
-        isOpen ? "px-3 pt-2" : "flex flex-col items-center px-1 pt-3",
+        isOpen ? "px-3 pt-2" : "flex flex-col items-center px-1 pt-2 gap-1.5",
       )}
     >
+      {!isOpen && (
+        <div className="h-7 w-7 rounded-md bg-app-sidebar-muted animate-pulse" />
+      )}
       <div
         className={cn("flex items-center gap-1.5", !isOpen && "justify-center")}
       >
-        {[0, 1, 2].map((i) => (
+        {(isOpen ? [0, 1, 2] : [0]).map((i) => (
           <div
             key={i}
             className="h-8 w-8 rounded-lg bg-app-sidebar-muted animate-pulse"
@@ -538,14 +567,12 @@ function AccountSwitcherSkeleton({ isOpen }: { isOpen: boolean }) {
 
 export function AccountSwitcher({
   isOpen,
-  onAddAccount,
   onDropdownOpenChange,
 }: AccountSwitcherProps) {
   return (
     <Suspense fallback={<AccountSwitcherSkeleton isOpen={isOpen} />}>
       <AccountSwitcherInner
         isOpen={isOpen}
-        onAddAccount={onAddAccount}
         onDropdownOpenChange={onDropdownOpenChange}
       />
     </Suspense>

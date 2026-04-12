@@ -301,7 +301,7 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
                     handleRead();
                     setOverflowOpen(false);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-gray-600 dark:text-white/60 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+                  className="w-full flex cursor-pointer items-center gap-2.5 px-3 py-2 text-[12.5px] text-gray-600 dark:text-white/60 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
                 >
                   {isRead ? (
                     <IconMailOpened size={13} />
@@ -313,13 +313,13 @@ function ThreadDetailContent({ threadId }: { threadId: string }) {
                     U
                   </kbd>
                 </button>
-                <div className="mx-2 my-1 border-t border-black/[0.05] dark:border-white/[0.05]" />
+                <div className="mx-2 my-1 border-t border-black/5 dark:border-white/5" />
                 <button
                   onClick={() => {
                     handleDelete();
                     setOverflowOpen(false);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                  className="w-full flex items-center cursor-pointer gap-2.5 px-3 py-2 text-[12.5px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                 >
                   <IconTrash size={13} />
                   Delete
