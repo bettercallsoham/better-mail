@@ -8,7 +8,7 @@ import type { SearchEmail } from "@/features/mailbox/mailbox.type";
 
 function Avatar({ email, name }: { email: string; name?: string }) {
   const hue = email.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
-  const initials = (name || email)[0].toUpperCase();
+  const initials = (name || email)[0]?.toUpperCase();
   return (
     <div
       className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-[12px] font-semibold"

@@ -11,15 +11,7 @@ import {
 } from "@/features/mailbox/mailbox.query";
 import { mailboxService } from "@/features/mailbox/mailbox.api";
 import { cn } from "@/lib/utils";
-import {
-  Search,
-  X,
-  Tag,
-  UserRound,
-  Bell,
-  TriangleAlert,
-  SlidersHorizontal,
-} from "lucide-react";
+import { Search, X, SlidersHorizontal } from "lucide-react";
 import { MailSearchCommand } from "../../MailSearchCommand";
 import { SavedSearchesStrip } from "./components/SavedSearchesStrip";
 import type { SearchFilters } from "@/lib/store/ui.store";
@@ -35,13 +27,6 @@ const LABEL_DISPLAY: Record<string, string> = {
   CATEGORY_UPDATES: "Updates",
   CATEGORY_SOCIAL: "Social",
   CATEGORY_FORUMS: "Forums",
-};
-
-const FOLDER_ICON: Record<string, React.ReactNode> = {
-  "label:CATEGORY_PROMOTIONS": <Tag className="w-3.5 h-3.5" />,
-  "label:CATEGORY_SOCIAL": <UserRound className="w-3.5 h-3.5" />,
-  "label:CATEGORY_UPDATES": <Bell className="w-3.5 h-3.5" />,
-  "label:CATEGORY_FORUMS": <TriangleAlert className="w-3.5 h-3.5" />,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -280,7 +265,10 @@ export function ThreadListToolbar() {
 
   return (
     <>
-      <MailSearchCommand open={mailSearchOpen} onOpenChange={setMailSearchOpen} />
+      <MailSearchCommand
+        open={mailSearchOpen}
+        onOpenChange={setMailSearchOpen}
+      />
       {layoutMode === "flow" ? (
         <FlowToolbar onOpenSearch={() => setMailSearchOpen(true)} />
       ) : (
@@ -296,8 +284,6 @@ export function ThreadListToolbar() {
 
 function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
   const {
-    activeFolder,
-    setActiveFolder,
     searchQuery,
     searchFilters,
     clearSearch,
@@ -321,7 +307,7 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
     <div className="shrink-0 flex flex-col select-none">
       {/* Row 1 — search bar (hidden on mobile, search lives in topbar) */}
       <div className="hidden md:flex items-center gap-2 px-4 h-[42px]">
-        <button
+        <div
           onClick={onOpenSearch}
           className="flex-1 flex items-center gap-2.5 text-left group min-w-0 overflow-hidden"
         >
@@ -347,7 +333,7 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
               ⌘K
             </kbd>
           )}
-        </button>
+        </div>
 
         {hasSearch && (
           <button
@@ -360,34 +346,20 @@ function FlowToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
         )}
       </div>
 
-      {/* Row 3 — active token pills (individually removable) */}
-      {hasSearch && tokens.length > 0 && (
-        <div className="flex items-center  gap-1.5 px-4 pb-2.5 -mt-0.5 flex-wrap">
-          {tokens.map((tok) => (
-            <TokenPill key={tok.key} token={tok} size="md" />
-          ))}
-          <button
-            onClick={clearSearch}
-            className="flex items-center gap-1 h-[22px] px-1.5 rounded-md text-[10.5px] font-medium text-gray-400 dark:text-white/22 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/[0.07] transition-all"
-          >
-            <X className="w-2.5 h-2.5" />
-            Clear all
-          </button>
-        </div>
+      {/* Row 4 — saved filters strip (hidden during active search to avoid duplicate filter rows) */}
+      {!hasSearch && (
+        <SavedSearchesStrip
+          savedSearches={savedSearches}
+          searchQuery={searchQuery}
+          searchFilters={searchFilters}
+          hasSearch={hasSearch}
+          categoryLabels={categoryLabels}
+          onSelectSaved={handleSelectSaved}
+          deleteSavedSearch={deleteSavedSearch}
+          createSavedSearch={createSavedSearch}
+          updateSavedSearch={updateSavedSearch}
+        />
       )}
-
-      {/* Row 4 — saved filters strip */}
-      <SavedSearchesStrip
-        savedSearches={savedSearches}
-        searchQuery={searchQuery}
-        searchFilters={searchFilters}
-        hasSearch={hasSearch}
-        categoryLabels={categoryLabels}
-        onSelectSaved={handleSelectSaved}
-        deleteSavedSearch={deleteSavedSearch}
-        createSavedSearch={createSavedSearch}
-        updateSavedSearch={updateSavedSearch}
-      />
 
       <div className="h-px bg-black/[0.06] dark:bg-white/[0.06]" />
     </div>
@@ -520,18 +492,20 @@ function VelocityToolbar({ onOpenSearch }: { onOpenSearch: () => void }) {
         </div>
       </div>
 
-      {/* Row 2 — saved filters strip */}
-      <SavedSearchesStrip
-        savedSearches={savedSearches}
-        searchQuery={searchQuery}
-        searchFilters={searchFilters}
-        hasSearch={hasSearch}
-        categoryLabels={categoryLabels}
-        onSelectSaved={handleSelectSaved}
-        deleteSavedSearch={deleteSavedSearch}
-        createSavedSearch={createSavedSearch}
-        updateSavedSearch={updateSavedSearch}
-      />
+      {/* Row 2 — saved filters strip (hidden during active search to avoid duplicate filter rows) */}
+      {!hasSearch && (
+        <SavedSearchesStrip
+          savedSearches={savedSearches}
+          searchQuery={searchQuery}
+          searchFilters={searchFilters}
+          hasSearch={hasSearch}
+          categoryLabels={categoryLabels}
+          onSelectSaved={handleSelectSaved}
+          deleteSavedSearch={deleteSavedSearch}
+          createSavedSearch={createSavedSearch}
+          updateSavedSearch={updateSavedSearch}
+        />
+      )}
     </div>
   );
 }

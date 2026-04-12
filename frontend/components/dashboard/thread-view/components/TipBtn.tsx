@@ -25,7 +25,7 @@ export function TipBtn({ onClick, tip, kbd, className, disabled, active, childre
             onClick={onClick}
             disabled={disabled}
             className={cn(
-              "w-8 h-8 flex items-center justify-center rounded-xl transition-all duration-100",
+              "w-8 h-8 flex cursor-pointer items-center justify-center rounded-xl transition-all duration-100",
               "text-gray-400 dark:text-white/28",
               "hover:text-gray-700 dark:hover:text-white/65 hover:bg-black/[0.05] dark:hover:bg-white/[0.07]",
               "disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent",

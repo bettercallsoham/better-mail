@@ -13,20 +13,20 @@ import type { SavedSearch } from "@/features/mailbox/mailbox.type";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface ActiveFilters {
-  isRead?:         boolean;
-  isStarred?:      boolean;
+  isRead?: boolean;
+  isStarred?: boolean;
   hasAttachments?: boolean;
-  isArchived?:     boolean;
-  filterFrom?:     string;
-  filterTo?:       string;
-  dateFrom?:       string;
-  dateTo?:         string;
+  isArchived?: boolean;
+  filterFrom?: string;
+  filterTo?: string;
+  dateFrom?: string;
+  dateTo?: string;
   // FIX: string[] to match SearchFilters in ui.store — labels are multi-select
-  labels?:         string[];
+  labels?: string[];
 }
 
 type FilterAction =
-  | { type: "SET";   filters: ActiveFilters }
+  | { type: "SET"; filters: ActiveFilters }
   | { type: "PATCH"; patch: Partial<ActiveFilters> }
   | { type: "RESET" };
 
@@ -34,13 +34,16 @@ type FilterAction =
 // Keyboard shortcut aliases
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const SHORTCUT_MAP: Record<string, { ghost: string; expansion: string }> = {
-  u: { ghost: " · is:unread",      expansion: "is:unread "      },
-  s: { ghost: " · is:starred",     expansion: "is:starred "     },
-  f: { ghost: " · from:",          expansion: "from:"           },
-  t: { ghost: " · to:",            expansion: "to:"             },
+export const SHORTCUT_MAP: Record<
+  string,
+  { ghost: string; expansion: string }
+> = {
+  u: { ghost: " · is:unread", expansion: "is:unread " },
+  s: { ghost: " · is:starred", expansion: "is:starred " },
+  f: { ghost: " · from:", expansion: "from:" },
+  t: { ghost: " · to:", expansion: "to:" },
   a: { ghost: " · has:attachment", expansion: "has:attachment " },
-  e: { ghost: " · is:archived",    expansion: "is:archived "    },
+  e: { ghost: " · is:archived", expansion: "is:archived " },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,10 +54,10 @@ const PROMOTABLE: Array<{
   match: string;
   apply: (f: ActiveFilters) => ActiveFilters;
 }> = [
-  { match: "is:unread",      apply: (f) => ({ ...f, isRead: false }) },
-  { match: "is:read",        apply: (f) => ({ ...f, isRead: true  }) },
-  { match: "is:starred",     apply: (f) => ({ ...f, isStarred: true }) },
-  { match: "is:archived",    apply: (f) => ({ ...f, isArchived: true }) },
+  { match: "is:unread", apply: (f) => ({ ...f, isRead: false }) },
+  { match: "is:read", apply: (f) => ({ ...f, isRead: true }) },
+  { match: "is:starred", apply: (f) => ({ ...f, isStarred: true }) },
+  { match: "is:archived", apply: (f) => ({ ...f, isArchived: true }) },
   { match: "has:attachment", apply: (f) => ({ ...f, hasAttachments: true }) },
 ];
 
@@ -62,7 +65,10 @@ const PROMOTABLE: Array<{
 // Pure helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function extractOperators(raw: string): { cleaned: string; delta: ActiveFilters } {
+function extractOperators(raw: string): {
+  cleaned: string;
+  delta: ActiveFilters;
+} {
   if (!raw.includes(":")) return { cleaned: raw, delta: {} };
   let cleaned = raw;
   const delta: ActiveFilters = {};
@@ -70,7 +76,10 @@ function extractOperators(raw: string): { cleaned: string; delta: ActiveFilters 
     const re = new RegExp(`(?:^|\\s)${op.match}(?=\\s|$)`, "gi");
     if (re.test(cleaned)) {
       Object.assign(delta, op.apply({}));
-      cleaned = cleaned.replace(re, " ").replace(/\s{2,}/g, " ").trim();
+      cleaned = cleaned
+        .replace(re, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
     }
   }
   return { cleaned, delta };
@@ -83,7 +92,7 @@ function detectInProgressOperator(
   const match = raw.match(/(?:^|\s)(from:|to:)(\S*)$/i);
   if (!match) return null;
   return {
-    prefix:  match[1].replace(":", "").toLowerCase() as "from" | "to",
+    prefix: match[1].replace(":", "").toLowerCase() as "from" | "to",
     partial: match[2],
   };
 }
@@ -92,12 +101,12 @@ export function parseQuery(raw: string): SearchQueryParams {
   const params: SearchQueryParams = { query: "" };
   const text: string[] = [];
   for (const p of raw.trim().split(/\s+/)) {
-    if      (p.startsWith("from:"))  params.filterFrom     = p.slice(5);
-    else if (p.startsWith("to:"))    params.filterTo       = p.slice(3);
-    else if (p === "is:unread")      params.isRead         = false;
-    else if (p === "is:read")        params.isRead         = true;
-    else if (p === "is:starred")     params.isStarred      = true;
-    else if (p === "is:archived")    params.isArchived     = true;
+    if (p.startsWith("from:")) params.filterFrom = p.slice(5);
+    else if (p.startsWith("to:")) params.filterTo = p.slice(3);
+    else if (p === "is:unread") params.isRead = false;
+    else if (p === "is:read") params.isRead = true;
+    else if (p === "is:starred") params.isStarred = true;
+    else if (p === "is:archived") params.isArchived = true;
     else if (p === "has:attachment") params.hasAttachments = true;
     else text.push(p);
   }
@@ -106,11 +115,13 @@ export function parseQuery(raw: string): SearchQueryParams {
 }
 
 function buildSearchParams(
-  parsed:  SearchQueryParams | null,
+  parsed: SearchQueryParams | null,
   filters: ActiveFilters,
   size = 8,
 ): SearchQueryParams | null {
-  const hasFilters = Object.values(filters).some((v) => v !== undefined && v !== "");
+  const hasFilters = Object.values(filters).some(
+    (v) => v !== undefined && v !== "",
+  );
   if (!parsed && !hasFilters) return null;
 
   const merged: SearchQueryParams = {
@@ -119,28 +130,52 @@ function buildSearchParams(
     // boundary so neither side has to change its natural representation.
     labels: filters.labels?.join(","),
     size,
-    query:  parsed?.query?.trim() || " ",
+    query: parsed?.query?.trim() || " ",
   };
 
-  if (parsed?.filterFrom     && !merged.filterFrom)                             merged.filterFrom     = parsed.filterFrom;
-  if (parsed?.filterTo       && !merged.filterTo)                               merged.filterTo       = parsed.filterTo;
-  if (parsed?.isRead         !== undefined && merged.isRead         === undefined) merged.isRead       = parsed.isRead;
-  if (parsed?.isStarred      !== undefined && merged.isStarred      === undefined) merged.isStarred    = parsed.isStarred;
-  if (parsed?.isArchived     !== undefined && merged.isArchived     === undefined) merged.isArchived   = parsed.isArchived;
-  if (parsed?.hasAttachments !== undefined && merged.hasAttachments === undefined) merged.hasAttachments = parsed.hasAttachments;
+  if (parsed?.filterFrom && !merged.filterFrom)
+    merged.filterFrom = parsed.filterFrom;
+  if (parsed?.filterTo && !merged.filterTo) merged.filterTo = parsed.filterTo;
+  if (parsed?.isRead !== undefined && merged.isRead === undefined)
+    merged.isRead = parsed.isRead;
+  if (parsed?.isStarred !== undefined && merged.isStarred === undefined)
+    merged.isStarred = parsed.isStarred;
+  if (parsed?.isArchived !== undefined && merged.isArchived === undefined)
+    merged.isArchived = parsed.isArchived;
+  if (
+    parsed?.hasAttachments !== undefined &&
+    merged.hasAttachments === undefined
+  )
+    merged.hasAttachments = parsed.hasAttachments;
 
   return merged;
 }
 
-function dedupeRecentSearches<T extends { searchText: string }>(items: T[]): T[] {
+function dedupeRecentSearches<T extends { searchText: string }>(
+  items: T[],
+): T[] {
   const meaningful = items.filter((r) => r.searchText.trim().length > 2);
   return meaningful.filter(
-    (r) => !meaningful.some(
-      (other) =>
-        other.searchText !== r.searchText &&
-        other.searchText.toLowerCase().startsWith(r.searchText.toLowerCase()),
-    ),
+    (r) =>
+      !meaningful.some(
+        (other) =>
+          other.searchText !== r.searchText &&
+          other.searchText.toLowerCase().startsWith(r.searchText.toLowerCase()),
+      ),
   );
+}
+
+function dedupeByThreadId<T extends { threadId: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const item of items) {
+    if (seen.has(item.threadId)) continue;
+    seen.add(item.threadId);
+    deduped.push(item);
+  }
+
+  return deduped;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,11 +191,17 @@ function useDebounce<T>(value: T, delay: number): T {
   return d;
 }
 
-function filtersReducer(state: ActiveFilters, action: FilterAction): ActiveFilters {
+function filtersReducer(
+  state: ActiveFilters,
+  action: FilterAction,
+): ActiveFilters {
   switch (action.type) {
-    case "SET":   return action.filters;
-    case "PATCH": return { ...state, ...action.patch };
-    case "RESET": return {};
+    case "SET":
+      return action.filters;
+    case "PATCH":
+      return { ...state, ...action.patch };
+    case "RESET":
+      return {};
   }
 }
 
@@ -168,14 +209,17 @@ function filtersReducer(state: ActiveFilters, action: FilterAction): ActiveFilte
 // Main hook
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void) {
-  const [input,            setInputRaw]    = useState("");
-  const [filters,          dispatchFilter] = useReducer(filtersReducer, {});
-  const [focusedIdx,       setFocusedIdx]  = useState(-1);
-  const [showPreview,      setShowPreview] = useState(true);
-  const [hoveredThreadId,  setHoveredThreadId] = useState<string | null>(null);
+export function useSearchState(
+  open: boolean,
+  onOpenChange: (v: boolean) => void,
+) {
+  const [input, setInputRaw] = useState("");
+  const [filters, dispatchFilter] = useReducer(filtersReducer, {});
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+  const [showPreview, setShowPreview] = useState(true);
+  const [hoveredThreadId, setHoveredThreadId] = useState<string | null>(null);
 
-  const setSearchQuery  = useUIStore((s) => s.setSearchQuery);
+  const setSearchQuery = useUIStore((s) => s.setSearchQuery);
   const setActiveThread = useUIStore((s) => s.setActiveThread);
 
   const setFilters = useCallback((f: ActiveFilters) => {
@@ -185,7 +229,10 @@ export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void
 
   const setInput = useCallback((raw: string) => {
     setFocusedIdx(-1);
-    if (!raw.includes(":")) { setInputRaw(raw); return; }
+    if (!raw.includes(":")) {
+      setInputRaw(raw);
+      return;
+    }
     const { cleaned, delta } = extractOperators(raw);
     if (Object.keys(delta).length > 0) {
       dispatchFilter({ type: "PATCH", patch: delta });
@@ -195,14 +242,21 @@ export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void
     }
   }, []);
 
-  const debounced    = useDebounce(input, 280);
-  const hasInput     = useMemo(() => debounced.trim().length > 0, [debounced]);
-  const filterCount  = useMemo(
-    () => Object.values(filters).filter((v) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)).length,
+  const debounced = useDebounce(input, 280);
+  const hasInput = useMemo(() => debounced.trim().length > 0, [debounced]);
+  const filterCount = useMemo(
+    () =>
+      Object.values(filters).filter(
+        (v) =>
+          v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
+      ).length,
     [filters],
   );
-  const parsed       = useMemo(() => (hasInput ? parseQuery(debounced) : null), [hasInput, debounced]);
-  const inProgress   = useMemo(() => detectInProgressOperator(input), [input]);
+  const parsed = useMemo(
+    () => (hasInput ? parseQuery(debounced) : null),
+    [hasInput, debounced],
+  );
+  const inProgress = useMemo(() => detectInProgressOperator(input), [input]);
   const searchParams = useMemo(
     () => (inProgress ? null : buildSearchParams(parsed, filters, 8)),
     [inProgress, parsed, filters],
@@ -218,51 +272,60 @@ export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void
 
   const { data: recentData } = useQuery({
     queryKey: mailboxKeys.recentSearches(),
-    queryFn:  mailboxService.getRecentSearches,
+    queryFn: mailboxService.getRecentSearches,
     staleTime: 30_000,
-    enabled:  open,
+    enabled: open,
   });
 
   const { data: recentThreadsData } = useQuery({
     queryKey: [...mailboxKeys.threads(), "recent-5"],
-    queryFn:  () => mailboxService.getThreadEmails({ size: 5, page: 0 }),
+    queryFn: () => mailboxService.getThreadEmails({ size: 5, page: 0 }),
     staleTime: 30_000,
-    enabled:  open && !hasInput,
+    enabled: open && !hasInput,
   });
 
   const { data: savedData } = useQuery({
     queryKey: mailboxKeys.savedSearches(),
-    queryFn:  mailboxService.getSavedSearches,
+    queryFn: mailboxService.getSavedSearches,
     staleTime: 60_000,
-    gcTime:   10 * 60 * 1000,
-    enabled:  open,
-    select:   (d) => d.data as SavedSearch[],
+    gcTime: 10 * 60 * 1000,
+    enabled: open,
+    select: (d) => d.data as SavedSearch[],
   });
 
   const { data: inlineSuggestData } = useQuery({
     queryKey: mailboxKeys.suggestions({ query: inProgress?.partial, limit: 6 }),
-    queryFn:  () => mailboxService.getEmailSuggestions(inProgress?.partial || undefined, 6),
+    queryFn: () =>
+      mailboxService.getEmailSuggestions(inProgress?.partial || undefined, 6),
     staleTime: 30_000,
-    enabled:  !!inProgress,
+    enabled: !!inProgress,
   });
 
   const { data: liveResults, isFetching } = useQuery({
     queryKey: ["search-live", searchParams],
-    queryFn:  () => mailboxService.searchEmails(searchParams!),
-    enabled:  !!searchParams,
+    queryFn: () => mailboxService.searchEmails(searchParams!),
+    enabled: !!searchParams,
     staleTime: 15_000,
   });
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const results        = liveResults?.emails ?? [];
-  const total          = liveResults?.total  ?? 0;
+  const results = useMemo(
+    () => dedupeByThreadId(liveResults?.emails ?? []),
+    [liveResults?.emails],
+  );
+  const total = liveResults?.total ?? 0;
   const recentSearches = useMemo(
     () => dedupeRecentSearches(recentData?.data ?? []).slice(0, 6),
     [recentData],
   );
-  const recentThreads     = recentThreadsData?.data?.threads?.slice(0, 5) ?? [];
-  const inlineSuggestions = inProgress ? (inlineSuggestData?.data?.suggestions ?? []) : [];
+  const recentThreads = useMemo(
+    () => dedupeByThreadId(recentThreadsData?.data?.threads ?? []).slice(0, 5),
+    [recentThreadsData?.data?.threads],
+  );
+  const inlineSuggestions = inProgress
+    ? (inlineSuggestData?.data?.suggestions ?? [])
+    : [];
 
   const savedSearches = useMemo(() => {
     const all = savedData ?? [];
@@ -275,7 +338,8 @@ export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void
   }, [savedData]);
 
   const focusedEmail = useMemo(
-    () => (!inProgress && focusedIdx >= 0 ? results[focusedIdx] ?? null : null),
+    () =>
+      !inProgress && focusedIdx >= 0 ? (results[focusedIdx] ?? null) : null,
     [focusedIdx, results, inProgress],
   );
 
@@ -289,12 +353,15 @@ export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void
 
   const commitSearch = useCallback(
     (q: string) => {
-      const plainQuery    = q.trim() || null;
+      const plainQuery = q.trim() || null;
       // FIX: pass ActiveFilters directly — ui.store.setSearchQuery accepts
       // SearchFilters which now has labels?: string[]. The store type was
       // updated to match; no join needed here.
       const activeFilters = filterCount > 0 ? { ...filters } : null;
-      if (!plainQuery && !activeFilters) { close(); return; }
+      if (!plainQuery && !activeFilters) {
+        close();
+        return;
+      }
       setSearchQuery(plainQuery ?? " ", activeFilters);
       close();
     },
@@ -303,7 +370,10 @@ export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void
 
   const commitSavedSearch = useCallback(
     (saved: SavedSearch) => {
-      setSearchQuery(saved.query.searchText || " ", saved.query.filters ?? null);
+      setSearchQuery(
+        saved.query.searchText || " ",
+        saved.query.filters ?? null,
+      );
       close();
     },
     [setSearchQuery, close],
@@ -320,8 +390,13 @@ export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void
 
   const navigate = useCallback(
     (dir: 1 | -1) => {
-      const max  = inProgress ? inlineSuggestions.length - 1 : results.length - 1;
-      const next = Math.min(Math.max(focusedIdx + dir, dir === -1 ? -1 : 0), max);
+      const max = inProgress
+        ? inlineSuggestions.length - 1
+        : results.length - 1;
+      const next = Math.min(
+        Math.max(focusedIdx + dir, dir === -1 ? -1 : 0),
+        max,
+      );
       setFocusedIdx(next);
     },
     [focusedIdx, results.length, inProgress, inlineSuggestions.length],
@@ -332,15 +407,14 @@ export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void
       if (!inProgress) return;
       const { prefix } = inProgress;
       const cleaned = input
-        .replace(
-          /(?:^|\s)(from:|to:)\S*$/i,
-          (m, op) => (m.startsWith(" ") ? ` ${op}${email} ` : `${op}${email} `),
+        .replace(/(?:^|\s)(from:|to:)\S*$/i, (m, op) =>
+          m.startsWith(" ") ? ` ${op}${email} ` : `${op}${email} `,
         )
         .replace(new RegExp(`(?:^|\\s)${prefix}:${email}(?=\\s|$)`, "gi"), " ")
         .replace(/\s{2,}/g, " ")
         .trim();
       dispatchFilter({
-        type:  "PATCH",
+        type: "PATCH",
         patch: prefix === "from" ? { filterFrom: email } : { filterTo: email },
       });
       setInputRaw(cleaned);
@@ -349,18 +423,35 @@ export function useSearchState(open: boolean, onOpenChange: (v: boolean) => void
   );
 
   return {
-    input,            setInput,
-    debounced,        hasInput,
+    input,
+    setInput,
+    debounced,
+    hasInput,
     ghostSuffix,
-    filters,          setFilters,        filterCount,
-    focusedIdx,       setFocusedIdx,
+    filters,
+    setFilters,
+    filterCount,
+    focusedIdx,
+    setFocusedIdx,
     focusedEmail,
-    showPreview,      setShowPreview,
-    hoveredThreadId,  setHoveredThreadId,
-    results,          total,             isFetching,
-    recentSearches,   recentThreads,     savedSearches,
-    inProgress,       inlineSuggestions, commitInlineSuggestion,
-    showResults:      hasInput || filterCount > 0,
-    commitSearch,     commitSavedSearch, openThread, navigate, close,
+    showPreview,
+    setShowPreview,
+    hoveredThreadId,
+    setHoveredThreadId,
+    results,
+    total,
+    isFetching,
+    recentSearches,
+    recentThreads,
+    savedSearches,
+    inProgress,
+    inlineSuggestions,
+    commitInlineSuggestion,
+    showResults: hasInput || filterCount > 0,
+    commitSearch,
+    commitSavedSearch,
+    openThread,
+    navigate,
+    close,
   };
 }
