@@ -43,7 +43,10 @@ export const AnimatedThemeToggler = ({
       flushSync(() => {
         const newTheme = !isDark;
         setIsDark(newTheme);
-        document.documentElement.classList.toggle("dark");
+        document.documentElement.classList.toggle("dark", newTheme);
+        document.documentElement.style.colorScheme = newTheme
+          ? "dark"
+          : "light";
         localStorage.setItem("theme", newTheme ? "dark" : "light");
       });
     }).ready;
@@ -88,7 +91,7 @@ export const AnimatedThemeToggler = ({
       >
         {/* Invisible ref button for getBoundingClientRect */}
         <button ref={buttonRef} className="sr-only" aria-hidden tabIndex={-1} />
-        <span className="text-neutral-500 dark:text-neutral-400 flex-shrink-0 flex items-center">
+        <span className="text-neutral-500 dark:text-neutral-400 shrink-0 flex items-center">
           {isDark ? <Sun size={14} /> : <Moon size={14} />}
         </span>
         <span className="text-[12px]">
