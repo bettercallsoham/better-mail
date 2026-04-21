@@ -22,8 +22,6 @@ class EmailAccount extends Model<
   declare subscription_id: string | null;
   declare subscription_expiration: Date | null;
   declare avatar_url: string | null;
-
-  declare email_engine_id: string | null;
   declare created_at: CreationOptional<Date>;
   declare updated_at: CreationOptional<Date>;
   declare deleted_at: CreationOptional<Date | null>;
@@ -92,17 +90,6 @@ EmailAccount.init(
     avatar_url: {
       type: DataTypes.TEXT,
       allowNull: true,
-    },
-
-    email_engine_id: {
-      type: DataTypes.UUID,
-      allowNull: true,
-      references: {
-        model: "email_engine_instances",
-        key: "id",
-      },
-      onDelete: "RESTRICT",
-      onUpdate: "CASCADE",
     },
 
     created_at: {
