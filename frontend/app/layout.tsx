@@ -80,7 +80,12 @@ const themeInitScript = `(() => {
   try {
     const storedTheme = localStorage.getItem("theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const isDark = storedTheme ? storedTheme === "dark" : prefersDark;
+    const isDark =
+      storedTheme === "dark"
+        ? true
+        : storedTheme === "light"
+          ? false
+          : prefersDark;
     document.documentElement.classList.toggle("dark", isDark);
     document.documentElement.style.colorScheme = isDark ? "dark" : "light";
   } catch {

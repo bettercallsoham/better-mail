@@ -23,6 +23,15 @@ export const AnimatedThemeToggler = ({
   const [isDark, setIsDark] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
+  const applyTheme = useCallback((newThemeIsDark: boolean) => {
+    setIsDark(newThemeIsDark);
+    document.documentElement.classList.toggle("dark", newThemeIsDark);
+    document.documentElement.style.colorScheme = newThemeIsDark
+      ? "dark"
+      : "light";
+    localStorage.setItem("theme", newThemeIsDark ? "dark" : "light");
+  }, []);
+
   useEffect(() => {
     const updateTheme = () => {
       setIsDark(document.documentElement.classList.contains("dark"));
@@ -37,17 +46,18 @@ export const AnimatedThemeToggler = ({
   }, []);
 
   const toggleTheme = useCallback(async () => {
-    if (!buttonRef.current) return;
+    const newTheme = !isDark;
+    const canAnimateTransition =
+      !!buttonRef.current && typeof document.startViewTransition === "function";
+
+    if (!canAnimateTransition) {
+      applyTheme(newTheme);
+      return;
+    }
 
     await document.startViewTransition(() => {
       flushSync(() => {
-        const newTheme = !isDark;
-        setIsDark(newTheme);
-        document.documentElement.classList.toggle("dark", newTheme);
-        document.documentElement.style.colorScheme = newTheme
-          ? "dark"
-          : "light";
-        localStorage.setItem("theme", newTheme ? "dark" : "light");
+        applyTheme(newTheme);
       });
     }).ready;
 
@@ -73,7 +83,7 @@ export const AnimatedThemeToggler = ({
         pseudoElement: "::view-transition-new(root)",
       },
     );
-  }, [isDark, duration]);
+  }, [isDark, duration, applyTheme]);
 
   // ── Render as a DropdownMenuItem ───────────────────────────────────────
   // Uses DropdownMenuItem's own styling, just like Settings / Keyboard rows.
