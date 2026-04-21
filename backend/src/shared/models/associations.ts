@@ -2,7 +2,6 @@ import { User } from "./user-model";
 import { Subscription } from "./subscription-model";
 import { Plan } from "./plan-model";
 import { EmailAccount } from "./emailAccount.model";
-import { EmailEngineInstance } from "./emailengine-model";
 import { EmailTemplate } from "./email-template.model";
 import { Integration } from "./integrations/integration.model";
 import { TelegramIntegration } from "./integrations/telegram-integration.model";
@@ -36,15 +35,6 @@ User.hasMany(EmailAccount, {
 EmailAccount.belongsTo(User, {
   foreignKey: "user_id",
   as: "user",
-});
-
-EmailEngineInstance.hasMany(EmailAccount, {
-  foreignKey: "email_engine_instance_id",
-  as: "emailAccounts",
-});
-EmailAccount.belongsTo(EmailEngineInstance, {
-  foreignKey: "email_engine_instance_id",
-  as: "emailEngineInstance",
 });
 
 User.hasMany(EmailTemplate, {
