@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { PostHogProvider } from "@/lib/analytics/PosthogProvider";
+import { ThemeProvider } from "next-themes";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://bettermail.tech"),
@@ -76,23 +77,6 @@ export const metadata: Metadata = {
   },
 };
 
-const themeInitScript = `(() => {
-  try {
-    const storedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const isDark =
-      storedTheme === "dark"
-        ? true
-        : storedTheme === "light"
-          ? false
-          : prefersDark;
-    document.documentElement.classList.toggle("dark", isDark);
-    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-  } catch {
-    // Ignore storage/matchMedia errors and keep default theme.
-  }
-})();`;
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -116,15 +100,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable}  ${instrumentSerif.variable} font-sans antialiased`}
-        suppressHydrationWarning
       >
-        <PostHogProvider>{children}</PostHogProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <PostHogProvider>{children}</PostHogProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
